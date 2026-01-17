@@ -15,39 +15,41 @@ export function Navbar() {
   const isDashboard = location.startsWith("/dashboard") || location.startsWith("/create");
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b border-white/5 bg-slate-100 shadow-sm">
-      <div className="container mx-auto flex h-24 items-center justify-between px-4">
+    <nav className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/95 backdrop-blur-sm shadow-sm">
+      <div className="container mx-auto flex h-20 items-center justify-between px-6">
         <Link href="/">
           <div className="flex items-center cursor-pointer group">
             <img 
               src={logoImg} 
               alt="Applyn Logo" 
-              className="h-20 w-auto object-contain transition-transform group-hover:scale-105" 
+              className="h-14 w-auto object-contain transition-transform group-hover:scale-105" 
             />
           </div>
         </Link>
 
-        <div className="hidden md:flex items-center gap-6">
+        <div className="hidden md:flex items-center gap-8">
           {!isDashboard ? (
             <>
-              <Link href="/">
-                <a className={`text-sm font-semibold transition-colors hover:text-primary ${location === "/" ? "text-primary" : "text-slate-600"}`}>Home</a>
-              </Link>
-              <Link href="/features">
-                <a className={`text-sm font-semibold transition-colors hover:text-primary ${location === "/features" ? "text-primary" : "text-slate-600"}`}>Features</a>
-              </Link>
-              <Link href="/pricing">
-                <a className={`text-sm font-semibold transition-colors hover:text-primary ${location === "/pricing" ? "text-primary" : "text-slate-600"}`}>Pricing</a>
-              </Link>
-              <Link href="/faq">
-                <a className={`text-sm font-semibold transition-colors hover:text-primary ${location === "/faq" ? "text-primary" : "text-slate-600"}`}>FAQ</a>
-              </Link>
+              <div className="flex items-center gap-6 mr-2">
+                <Link href="/">
+                  <a className={`text-sm font-semibold transition-colors hover:text-primary ${location === "/" ? "text-primary" : "text-slate-600"}`}>Home</a>
+                </Link>
+                <Link href="/features">
+                  <a className={`text-sm font-semibold transition-colors hover:text-primary ${location === "/features" ? "text-primary" : "text-slate-600"}`}>Features</a>
+                </Link>
+                <Link href="/pricing">
+                  <a className={`text-sm font-semibold transition-colors hover:text-primary ${location === "/pricing" ? "text-primary" : "text-slate-600"}`}>Pricing</a>
+                </Link>
+                <Link href="/faq">
+                  <a className={`text-sm font-semibold transition-colors hover:text-primary ${location === "/faq" ? "text-primary" : "text-slate-600"}`}>FAQ</a>
+                </Link>
+              </div>
               <div className="h-6 w-px bg-slate-200" />
               <Link href="/login">
                 <Button variant="ghost" size="sm" className="font-semibold text-slate-600 hover:text-primary hover:bg-primary/5">Sign in</Button>
               </Link>
               <Link href="/login">
-                <Button size="sm" className="bg-primary hover:bg-primary/90 text-black font-bold px-6 rounded-xl shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95">Get Started</Button>
+                <Button size="sm" className="bg-primary hover:bg-primary/90 text-black font-bold px-6 h-10 rounded-xl shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95">Get Started</Button>
               </Link>
             </>
           ) : (
