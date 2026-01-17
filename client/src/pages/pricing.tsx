@@ -6,58 +6,77 @@ import pricingImg from "@assets/generated_images/saas_pricing_plans_illustration
 
 export default function Pricing() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-mesh selection:bg-primary/30">
       <Navbar />
       
-      <section className="py-20 text-center">
-        <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto space-y-6">
-            <h1 className="text-5xl font-bold tracking-tight text-slate-900">
-              Simple, Transparent <span className="text-primary">Pricing</span>
-            </h1>
-            <p className="text-xl text-muted-foreground">
-              Choose the plan that fits your business needs. No hidden fees.
-            </p>
-            <div className="pt-8">
-                <img src={pricingImg} alt="Pricing" className="w-64 mx-auto drop-shadow-xl" />
-            </div>
+      <section className="py-24 text-center">
+        <div className="container mx-auto px-6">
+          <div className="max-w-4xl mx-auto space-y-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <h1 className="text-6xl md:text-8xl font-extrabold tracking-tight text-gradient leading-tight">
+                Simple <span className="text-primary">Transparent</span> Pricing
+              </h1>
+              <p className="text-xl text-slate-400 mt-6 max-w-2xl mx-auto">
+                No monthly subscriptions. Pay once and own your app files forever. Optimized for the Indian startup ecosystem.
+              </p>
+            </motion.div>
+            
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2 }}
+              className="pt-12"
+            >
+              <img src={pricingImg} alt="Pricing" className="w-80 mx-auto drop-shadow-2xl" />
+            </motion.div>
           </div>
         </div>
       </section>
 
-      <section className="pb-24">
-        <div className="container mx-auto px-4 max-w-5xl">
-          <div className="grid md:grid-cols-2 gap-8">
+      <section className="pb-32">
+        <div className="container mx-auto px-6 max-w-6xl">
+          <div className="grid md:grid-cols-2 gap-8 items-stretch">
             <PricingCard 
-              title="Basic"
+              title="Standard Build"
               price="₹999"
-              description="Perfect for small businesses and personal blogs."
+              description="Perfect for individual bloggers and small shop owners looking for an Android presence."
               features={[
-                "Android .apk & .aab Build",
-                "Standard WebView Integration",
-                "Splash Screen with Branding",
-                "Email Support",
-                "1 Year of Updates"
+                "Full Android .apk & .aab files",
+                "Automated WebView Setup",
+                "Basic Push Notification Setup",
+                "Standard App Icon & Splash",
+                "Email Support (24h turnaround)",
+                "1 Year of Technical Updates"
               ]}
-              buttonText="Start with Basic"
+              buttonText="Get Android Build"
               variant="outline"
             />
             <PricingCard 
-              title="Pro"
+              title="Enterprise Pro"
               price="₹2,499"
-              description="Best for growing startups and e-commerce stores."
+              description="The complete solution for established brands and scaling agencies across all platforms."
               features={[
-                "Android + iOS Builds",
-                "Unlimited Push Notifications",
-                "Custom Splash Screen (No Branding)",
-                "Offline Mode Support",
+                "Android + iOS Ready Files",
+                "Unlimited Firebase Notifications",
+                "Custom Branding (White-Label)",
+                "Advanced Offline Caching",
                 "Priority WhatsApp Support",
-                "Lifetime Free Updates"
+                "Lifetime Platform Updates",
+                "Ready for Store Submission"
               ]}
-              buttonText="Upgrade to Pro"
+              buttonText="Get Full Access"
               variant="default"
               popular
             />
+          </div>
+          
+          <div className="mt-16 p-8 rounded-[2.5rem] bg-white/5 border border-white/10 text-center max-w-3xl mx-auto">
+            <h3 className="text-2xl font-bold mb-4">Agency or Reseller?</h3>
+            <p className="text-slate-400 mb-6">We offer white-label dashboard and bulk pricing for digital agencies. Contact our sales team for custom plans.</p>
+            <Button variant="secondary" className="font-bold">Contact Sales</Button>
           </div>
         </div>
       </section>
