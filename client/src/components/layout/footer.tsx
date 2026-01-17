@@ -11,7 +11,13 @@ export function Footer() {
           <div className="col-span-1 md:col-span-1 space-y-6">
             <Link href="/">
               <div className="flex items-center gap-3 cursor-pointer group">
-                <img src={logoImg} alt="Applyn Logo" className="h-8 w-auto" />
+                <div className="relative h-8 w-8 overflow-hidden rounded-md">
+                  <img 
+                    src={logoImg} 
+                    alt="Applyn Logo" 
+                    className="absolute inset-0 h-full w-full object-cover scale-[2.2] translate-y-[-5%] translate-x-[-15%]" 
+                  />
+                </div>
                 <span className="text-xl font-black tracking-tighter text-white group-hover:text-primary transition-colors">Applyn</span>
               </div>
             </Link>

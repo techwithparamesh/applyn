@@ -19,7 +19,14 @@ export function Navbar() {
       <div className="container mx-auto flex h-20 items-center justify-between px-4">
         <Link href="/">
           <div className="flex items-center gap-3 cursor-pointer group">
-            <img src={logoImg} alt="Applyn Logo" className="h-10 w-auto" />
+            <div className="relative h-10 w-10 overflow-hidden rounded-lg">
+              <img 
+                src={logoImg} 
+                alt="Applyn Logo" 
+                className="absolute inset-0 h-full w-full object-cover scale-[2.2] translate-y-[-5%] translate-x-[-15%]" 
+                style={{ filter: 'brightness(1.2) contrast(1.1)' }}
+              />
+            </div>
             <div className="h-6 w-px bg-white/10 hidden sm:block" />
             <span className="text-xl font-black tracking-tighter text-white group-hover:text-primary transition-colors">Applyn</span>
           </div>
