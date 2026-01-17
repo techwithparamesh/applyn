@@ -44,7 +44,7 @@ export default function Home() {
                     <Globe className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-primary transition-colors" />
                     <Input 
                       placeholder="https://yourbusiness.com" 
-                      className="h-14 pl-12 text-lg rounded-2xl border-slate-200 bg-white shadow-sm focus:ring-primary/20"
+                      className="h-14 pl-12 text-lg rounded-2xl border-white/10 bg-white/5 shadow-sm focus:ring-primary/20 text-white placeholder:text-slate-500"
                     />
                   </div>
                   <Button 
