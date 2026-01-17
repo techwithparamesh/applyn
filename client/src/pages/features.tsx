@@ -1,4 +1,5 @@
 import { Navbar } from "@/components/layout/navbar";
+import { Footer } from "@/components/layout/footer";
 import { CheckCircle2, Zap, Globe, ShieldCheck, Smartphone, Bell, RefreshCw, Layers } from "lucide-react";
 import { motion } from "framer-motion";
 import featureImg from "@assets/generated_images/saas_platform_dashboard_features_illustration.png";
@@ -86,6 +87,7 @@ export default function Features() {
           </div>
         </div>
       </section>
+      <Footer />
     </div>
   );
 }

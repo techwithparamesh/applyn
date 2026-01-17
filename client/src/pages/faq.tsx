@@ -1,48 +1,47 @@
 import { Navbar } from "@/components/layout/navbar";
+import { Footer } from "@/components/layout/footer";
 import { motion } from "framer-motion";
 
 export default function FAQ() {
   return (
-    <div className="min-h-screen bg-mesh selection:bg-primary/30">
+    <div className="min-h-screen bg-mesh selection:bg-primary/30 flex flex-col">
       <Navbar />
       
-      <section className="py-24 relative overflow-hidden">
-        <div className="container mx-auto px-6 max-w-4xl">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-20 space-y-4"
-          >
-            <h1 className="text-5xl md:text-7xl font-extrabold text-gradient">Help Center</h1>
-            <p className="text-xl text-slate-400">Everything you need to know about WebToApp.</p>
-          </motion.div>
-          
-          <div className="grid gap-6">
-            <FAQItem 
-              question="Will my app be approved by Play Store?"
-              answer="Absolutely. We follow all Play Store and App Store guidelines. Our templates are built to be compliant, and we've helped 10,000+ apps get approved successfully."
-            />
-            <FAQItem 
-              question="Do I need to pay monthly or yearly?"
-              answer="Neither. We believe in simple Indian pricing psychology. Pay once per app and get your build files. Updates are included for the first year (Basic) or lifetime (Pro)."
-            />
-            <FAQItem 
-              question="Can I send push notifications?"
-              answer="Yes! Our Pro plan includes full integration with Firebase Cloud Messaging, allowing you to send unlimited notifications to your users' devices instantly."
-            />
-            <FAQItem 
-              question="Do I get the source code?"
-              answer="Yes, in our Pro plan, we provide the complete build files ready for submission. We also offer a managed service if you want us to handle the publishing for you."
-            />
+      <main className="flex-1">
+        <section className="py-24 relative overflow-hidden">
+          <div className="container mx-auto px-6 max-w-4xl">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center mb-20 space-y-4"
+            >
+              <h1 className="text-5xl md:text-7xl font-extrabold text-gradient">Help Center</h1>
+              <p className="text-xl text-slate-400">Everything you need to know about WebToApp.</p>
+            </motion.div>
+            
+            <div className="grid gap-6">
+              <FAQItem 
+                question="Will my app be approved by Play Store?"
+                answer="Absolutely. We follow all Play Store and App Store guidelines. Our templates are built to be compliant, and we've helped 10,000+ apps get approved successfully."
+              />
+              <FAQItem 
+                question="Do I need to pay monthly or yearly?"
+                answer="Neither. We believe in simple Indian pricing psychology. Pay once per app and get your build files. Updates are included for the first year (Basic) or lifetime (Pro)."
+              />
+              <FAQItem 
+                question="Can I send push notifications?"
+                answer="Yes! Our Pro plan includes full integration with Firebase Cloud Messaging, allowing you to send unlimited notifications to your users' devices instantly."
+              />
+              <FAQItem 
+                question="Do I get the source code?"
+                answer="Yes, in our Pro plan, we provide the complete build files ready for submission. We also offer a managed service if you want us to handle the publishing for you."
+              />
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </main>
 
-      <footer className="py-20 bg-slate-900 text-white border-t border-white/5">
-        <div className="container mx-auto px-6 text-center text-slate-500 text-sm">
-          © 2026 WebToApp. Built for the Next Billion Users.
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

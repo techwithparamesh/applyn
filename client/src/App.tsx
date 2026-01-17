@@ -11,6 +11,7 @@ import Login from "@/pages/login";
 import Features from "@/pages/features";
 import Pricing from "@/pages/pricing";
 import FAQ from "@/pages/faq";
+import Contact from "@/pages/contact";
 
 function Router() {
   return (
@@ -19,6 +20,7 @@ function Router() {
       <Route path="/features" component={Features} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/faq" component={FAQ} />
+      <Route path="/contact" component={Contact} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/create" component={CreateApp} />
       <Route path="/login" component={Login} />

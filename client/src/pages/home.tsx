@@ -119,7 +119,7 @@ export default function Home() {
       </main>
 
       {/* FAQ Section */}
-      <section id="faq" className="py-32 bg-white relative overflow-hidden">
+      <section id="faq" className="py-32 relative overflow-hidden">
         <div className="container mx-auto px-6 max-w-4xl relative z-10">
           <div className="text-center mb-16 space-y-4">
             <h2 className="text-4xl md:text-6xl font-extrabold text-gradient">Got Questions?</h2>
@@ -141,33 +141,18 @@ export default function Home() {
             />
           </div>
         </div>
-        {/* Decorative background element */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-[120px] -z-10"></div>
       </section>
 
-      <footer className="py-20 bg-slate-900 text-white rounded-t-[4rem]">
-        <div className="container mx-auto px-6 text-center">
-          <div className="flex justify-center mb-8">
-            <div className="flex items-center gap-2 font-bold text-2xl">
-              <Smartphone className="h-8 w-8 text-primary" />
-              <span>WebToApp</span>
-            </div>
-          </div>
-          <p className="text-slate-400 text-sm mb-8">Crafted with care for Indian Entrepreneurs.</p>
-          <div className="text-slate-500 text-xs">
-            © 2026 WebToApp. All rights reserved.
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }
 
 function FAQItem({ question, answer }: { question: string, answer: string }) {
   return (
-    <div className="group p-8 rounded-3xl bg-slate-50 border border-slate-100 hover:border-primary/20 hover:bg-white hover:shadow-xl hover:shadow-primary/5 transition-all duration-300">
-      <h3 className="text-xl font-bold text-slate-900 mb-3 group-hover:text-primary transition-colors">{question}</h3>
-      <p className="text-slate-600 leading-relaxed">{answer}</p>
+    <div className="group p-8 rounded-3xl bg-white/5 border border-white/10 hover:border-primary/20 hover:bg-white/10 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300">
+      <h3 className="text-xl font-bold text-white mb-3 group-hover:text-primary transition-colors">{question}</h3>
+      <p className="text-slate-400 leading-relaxed">{answer}</p>
     </div>
   );
 }
