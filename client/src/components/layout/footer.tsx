@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { Smartphone, Mail, Phone, MapPin, Github, Twitter, Linkedin } from "lucide-react";
 
-import logoImg from "@assets/ChatGPT_Image_Jan_17,_2026,_01_03_48_PM_1768635239654.png";
+import logoImg from "@assets/ChatGPT_Image_Jan_17,_2026,_01_09_57_PM_1768635605492.png";
 
 export function Footer() {
   return (
@@ -11,11 +11,11 @@ export function Footer() {
           <div className="col-span-1 md:col-span-1 space-y-6">
             <Link href="/">
               <div className="flex items-center gap-3 cursor-pointer group">
-                <div className="relative h-8 w-8 overflow-hidden rounded-md">
+                <div className="relative h-10 w-10 flex items-center justify-center overflow-hidden">
                   <img 
                     src={logoImg} 
                     alt="Applyn Logo" 
-                    className="absolute inset-0 h-full w-full object-cover scale-[2.2] translate-y-[-5%] translate-x-[-15%]" 
+                    className="h-full w-auto object-contain scale-[2.2] translate-y-[-5%] translate-x-[-15%]" 
                   />
                 </div>
                 <span className="text-xl font-black tracking-tighter text-white group-hover:text-primary transition-colors">Applyn</span>

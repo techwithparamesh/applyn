@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import logoImg from "@assets/ChatGPT_Image_Jan_17,_2026,_01_03_48_PM_1768635239654.png";
+import logoImg from "@assets/ChatGPT_Image_Jan_17,_2026,_01_09_57_PM_1768635605492.png";
 
 export function Navbar() {
   const [location] = useLocation();
@@ -19,12 +19,12 @@ export function Navbar() {
       <div className="container mx-auto flex h-20 items-center justify-between px-4">
         <Link href="/">
           <div className="flex items-center gap-3 cursor-pointer group">
-            <div className="relative h-10 w-10 overflow-hidden rounded-lg">
+            <div className="relative h-12 w-12 flex items-center justify-center overflow-hidden">
               <img 
                 src={logoImg} 
                 alt="Applyn Logo" 
-                className="absolute inset-0 h-full w-full object-cover scale-[2.2] translate-y-[-5%] translate-x-[-15%]" 
-                style={{ filter: 'brightness(1.2) contrast(1.1)' }}
+                className="h-full w-auto object-contain scale-[2.2] translate-y-[-5%] translate-x-[-15%]" 
+                style={{ filter: 'brightness(1.1) contrast(1.1)' }}
               />
             </div>
             <div className="h-6 w-px bg-white/10 hidden sm:block" />
