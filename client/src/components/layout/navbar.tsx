@@ -23,7 +23,7 @@ export function Navbar() {
               src={logoImg} 
               alt="Applyn Logo" 
               className="h-16 w-auto object-contain transition-transform group-hover:scale-105" 
-              style={{ filter: 'brightness(1.1) contrast(1.1)' }}
+              style={{ filter: 'drop-shadow(0px 0px 1px rgba(255,255,255,0.8)) brightness(1.5) contrast(1.2)' }}
             />
           </div>
         </Link>
