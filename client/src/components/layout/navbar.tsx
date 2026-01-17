@@ -16,13 +16,14 @@ export function Navbar() {
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-white/5 bg-slate-100 shadow-sm">
-      <div className="container mx-auto flex h-24 items-center justify-between px-4">
+      <div className="container mx-auto flex h-28 items-center justify-between px-4">
         <Link href="/">
           <div className="flex items-center cursor-pointer group">
             <img 
               src={logoImg} 
               alt="Applyn Logo" 
-              className="h-20 w-auto object-contain transition-transform group-hover:scale-105" 
+              className="h-24 w-auto object-contain transition-transform group-hover:scale-105" 
+              style={{ filter: 'contrast(1.1) brightness(0.95)' }}
             />
           </div>
         </Link>

@@ -14,7 +14,8 @@ export function Footer() {
                 <img 
                   src={logoImg} 
                   alt="Applyn Logo" 
-                  className="h-18 w-auto object-contain transition-transform group-hover:scale-105" 
+                  className="h-22 w-auto object-contain transition-transform group-hover:scale-105" 
+                  style={{ filter: 'contrast(1.1) brightness(0.95)' }}
                 />
               </div>
             </Link>
