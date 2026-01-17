@@ -11,138 +11,141 @@ export default function Home() {
   const [, setLocation] = useLocation();
 
   return (
-    <div className="min-h-screen bg-mesh selection:bg-primary/30">
+    <div className="min-h-screen bg-white selection:bg-blue-100">
       <Navbar />
 
       <main>
         {/* Hero Section */}
-        <section className="relative pt-24 pb-32 overflow-hidden">
+        <section className="relative pt-32 pb-40 overflow-hidden">
+          {/* Background Decorative Elements */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-full -z-10 opacity-50">
+            <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-50 rounded-full blur-[120px]" />
+            <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-indigo-50 rounded-full blur-[120px]" />
+          </div>
+
           <div className="container mx-auto px-6">
-            <div className="grid lg:grid-cols-12 gap-16 items-center">
+            <div className="flex flex-col items-center text-center space-y-12">
               <motion.div 
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, ease: "easeOut" }}
-                className="lg:col-span-7 space-y-10"
+                transition={{ duration: 0.6 }}
+                className="space-y-6 max-w-4xl"
               >
-                <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm font-semibold text-primary backdrop-blur-sm">
-                  <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse"></span>
-                  Trusted by 10,000+ Indian Businesses
+                <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 border border-blue-100 px-4 py-1.5 text-sm font-bold text-blue-600 mb-4">
+                  <Star className="h-4 w-4 fill-blue-600" />
+                  Made for Indian businesses
                 </div>
                 
-                <h1 className="text-6xl md:text-8xl font-extrabold tracking-tight text-slate-900 leading-[0.95] text-gradient">
-                  Your Website is <br />
-                  <span className="text-primary">Your New App.</span>
+                <h1 className="text-6xl md:text-8xl font-black tracking-tighter text-slate-900 leading-[0.95]">
+                  Your website.<br />
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Now an app.</span>
                 </h1>
                 
-                <p className="text-xl text-slate-600 leading-relaxed max-w-xl">
-                  Transform your existing website into a premium, Play Store-ready mobile app in under 5 minutes. No coding, no hassle, just results.
+                <p className="text-xl md:text-2xl text-slate-600 leading-relaxed max-w-2xl mx-auto">
+                  Turn any website into a mobile app in minutes — no code required.
                 </p>
+              </motion.div>
 
-                <div className="flex flex-col sm:flex-row gap-4 max-w-lg">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="w-full max-w-xl space-y-6"
+              >
+                <div className="flex flex-col sm:flex-row gap-4 p-2 bg-slate-50 border border-slate-100 rounded-[2rem] shadow-sm">
                   <div className="relative flex-1 group">
-                    <Globe className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-primary transition-colors" />
+                    <Globe className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
                     <Input 
-                      placeholder="https://yourbusiness.com" 
-                      className="h-14 pl-12 text-lg rounded-2xl border-white/10 bg-white/5 shadow-sm focus:ring-primary/20 text-white placeholder:text-slate-500"
+                      placeholder="Enter your website URL" 
+                      className="h-14 pl-12 border-none bg-transparent shadow-none focus-visible:ring-0 text-slate-900 text-lg"
                     />
                   </div>
                   <Button 
                     onClick={() => setLocation("/create")}
                     size="lg" 
-                    className="h-14 px-8 text-lg font-bold rounded-2xl shadow-xl shadow-primary/25 hover:scale-105 transition-all active:scale-95"
+                    className="h-14 px-10 text-lg font-bold rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xl shadow-blue-500/25 transition-all hover:scale-[1.02] active:scale-95 border-none"
                   >
-                    Get Started <ArrowRight className="ml-2 h-5 w-5" />
+                    Create My App
                   </Button>
                 </div>
 
-                <div className="flex items-center gap-8 pt-4">
-                  {[
-                    { label: "Play Store Ready", icon: ShieldCheck },
-                    { label: "WhatsApp Updates", icon: Zap }
-                  ].map((item, i) => (
-                    <div key={i} className="flex items-center gap-2 text-sm font-semibold text-slate-500">
-                      <item.icon className="h-5 w-5 text-primary" />
-                      {item.label}
-                    </div>
-                  ))}
+                <div className="flex flex-col items-center gap-4">
+                  <button 
+                    onClick={() => setLocation("/features")}
+                    className="text-slate-500 font-bold hover:text-blue-600 transition-colors flex items-center gap-2 group"
+                  >
+                    See how it works <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                  
+                  <p className="text-sm font-medium text-slate-400">
+                    Free preview · No credit card required
+                  </p>
+                </div>
+
+                <div className="flex justify-center items-center gap-8 pt-8 opacity-60 grayscale hover:grayscale-0 transition-all">
+                  <div className="flex items-center gap-2 font-bold text-slate-600">
+                    <Smartphone className="h-6 w-6" />
+                    Android
+                  </div>
+                  <div className="flex items-center gap-2 font-bold text-slate-600">
+                    <Smartphone className="h-6 w-6 rotate-180" />
+                    iOS
+                  </div>
                 </div>
               </motion.div>
 
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                className="lg:col-span-5 relative"
+              <motion.div
+                initial={{ opacity: 0, y: 40 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 1, delay: 0.4 }}
+                className="relative mt-20 w-full max-w-5xl mx-auto px-4"
               >
-                <div className="relative z-10 glass rounded-[3rem] p-4 p-8">
-                  <img 
-                    src={heroImg} 
-                    alt="Mockup" 
-                    className="w-full h-auto drop-shadow-[0_20px_50px_rgba(0,0,0,0.1)] rounded-2xl"
-                  />
+                <div className="relative z-10 p-4 bg-white rounded-[3rem] shadow-2xl border border-slate-100">
+                   <div className="overflow-hidden rounded-[2rem] bg-slate-50 aspect-video flex items-center justify-center border border-slate-100">
+                      <img 
+                        src={heroImg} 
+                        alt="Applyn Dashboard Preview" 
+                        className="w-full h-auto object-cover"
+                      />
+                   </div>
                 </div>
-                {/* Visual Depth Elements */}
-                <div className="absolute -top-12 -right-12 w-64 h-64 bg-primary/20 rounded-full blur-[100px] -z-10 animate-pulse"></div>
-                <div className="absolute -bottom-12 -left-12 w-64 h-64 bg-emerald-400/20 rounded-full blur-[100px] -z-10"></div>
+                {/* Visual accents */}
+                <div className="absolute -top-10 -right-10 w-40 h-40 bg-blue-400/20 rounded-full blur-3xl -z-10" />
+                <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-indigo-400/20 rounded-full blur-3xl -z-10" />
               </motion.div>
             </div>
           </div>
         </section>
 
-        {/* Features Preview */}
-        <section className="py-32 bg-slate-900 text-white rounded-[4rem] mx-4 mb-4">
+        {/* Value Prop Preview */}
+        <section className="py-24 bg-slate-50/50">
           <div className="container mx-auto px-6">
-            <div className="max-w-3xl mb-20">
-              <h2 className="text-4xl md:text-6xl font-bold mb-6">Why Indian businesses <br /> love WebToApp.</h2>
-              <p className="text-xl text-slate-400">We built this specifically for the Indian market dynamics.</p>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-8">
-              <FeatureCard 
-                icon={<Smartphone className="h-10 w-10" />}
-                title="Native Experience"
-                description="Your app feels like it was built from scratch, not just a website wrapper."
-              />
-              <FeatureCard 
-                icon={<Star className="h-10 w-10 text-yellow-400" />}
-                title="Store Approval"
-                description="We handle all technical compliance. 100% approval rate guaranteed."
-              />
-              <FeatureCard 
-                icon={<Zap className="h-10 w-10 text-primary" />}
-                title="WhatsApp Support"
-                description="Get onboarding help and app updates directly on your WhatsApp."
-              />
+            <div className="grid md:grid-cols-3 gap-12">
+               <div className="space-y-4">
+                  <div className="h-12 w-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600">
+                    <Zap className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900">Instant Conversion</h3>
+                  <p className="text-slate-600 leading-relaxed">Turn your URL into a production-ready mobile app package in under 5 minutes.</p>
+               </div>
+               <div className="space-y-4">
+                  <div className="h-12 w-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600">
+                    <ShieldCheck className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900">Store Compliant</h3>
+                  <p className="text-slate-600 leading-relaxed">We handle all technical requirements for Play Store and App Store approval.</p>
+               </div>
+               <div className="space-y-4">
+                  <div className="h-12 w-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600">
+                    <Globe className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900">Global Reach</h3>
+                  <p className="text-slate-600 leading-relaxed">Optimized performance for 2G/3G networks and multi-language support built-in.</p>
+               </div>
             </div>
           </div>
         </section>
       </main>
-
-      {/* FAQ Section */}
-      <section id="faq" className="py-32 relative overflow-hidden">
-        <div className="container mx-auto px-6 max-w-4xl relative z-10">
-          <div className="text-center mb-16 space-y-4">
-            <h2 className="text-4xl md:text-6xl font-extrabold text-gradient">Got Questions?</h2>
-            <p className="text-xl text-slate-500">Everything you need to know about the transition.</p>
-          </div>
-          
-          <div className="grid gap-6">
-            <FAQItem 
-              question="Will my app be approved by Play Store?"
-              answer="Absolutely. We follow all Play Store and App Store guidelines. Our templates are built to be compliant, and we've helped 10,000+ apps get approved successfully."
-            />
-            <FAQItem 
-              question="Do I need to pay monthly or yearly?"
-              answer="Neither. We believe in simple Indian pricing psychology. Pay once per app and get your build files. Updates are included for the first year (Basic) or lifetime (Pro)."
-            />
-            <FAQItem 
-              question="Can I send push notifications?"
-              answer="Yes! Our Pro plan includes full integration with Firebase Cloud Messaging, allowing you to send unlimited notifications to your users' devices instantly."
-            />
-          </div>
-        </div>
-      </section>
 
       <Footer />
     </div>
