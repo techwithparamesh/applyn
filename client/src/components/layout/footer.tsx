@@ -10,15 +10,12 @@ export function Footer() {
         <div className="grid md:grid-cols-4 gap-12 mb-16">
           <div className="col-span-1 md:col-span-1 space-y-6">
             <Link href="/">
-              <div className="flex items-center gap-3 cursor-pointer group">
-                <div className="relative h-10 w-10 flex items-center justify-center overflow-hidden">
-                  <img 
-                    src={logoImg} 
-                    alt="Applyn Logo" 
-                    className="h-full w-auto object-contain scale-[2.2] translate-y-[-5%] translate-x-[-15%]" 
-                  />
-                </div>
-                <span className="text-xl font-black tracking-tighter text-white group-hover:text-primary transition-colors">Applyn</span>
+              <div className="flex items-center cursor-pointer group -ml-2">
+                <img 
+                  src={logoImg} 
+                  alt="Applyn Logo" 
+                  className="h-14 w-auto object-contain transition-transform group-hover:scale-105" 
+                />
               </div>
             </Link>
             <p className="text-sm leading-relaxed">
