@@ -5,7 +5,7 @@ import logoImg from "@assets/ChatGPT_Image_Jan_17,_2026,_01_09_57_PM_17686356054
 
 export function Footer() {
   return (
-    <footer className="bg-slate-950 text-slate-400 py-20 border-t border-white/5">
+    <footer className="bg-white text-slate-600 py-24 border-t border-slate-200">
       <div className="container mx-auto px-6">
         <div className="grid md:grid-cols-4 gap-12 mb-16">
           <div className="col-span-1 md:col-span-1 space-y-6">
@@ -14,8 +14,7 @@ export function Footer() {
                 <img 
                   src={logoImg} 
                   alt="Applyn Logo" 
-                  className="h-14 w-auto object-contain transition-transform group-hover:scale-105" 
-                  style={{ filter: 'drop-shadow(0px 0px 1px rgba(255,255,255,0.8)) brightness(1.5) contrast(1.2)' }}
+                  className="h-20 w-auto object-contain transition-transform group-hover:scale-105" 
                 />
               </div>
             </Link>
@@ -30,7 +29,7 @@ export function Footer() {
           </div>
 
           <div>
-            <h4 className="font-bold text-white mb-6">Product</h4>
+            <h4 className="font-bold text-slate-900 mb-6">Product</h4>
             <ul className="space-y-4 text-sm">
               <li><Link href="/features" className="hover:text-primary transition-colors">Features</Link></li>
               <li><Link href="/pricing" className="hover:text-primary transition-colors">Pricing</Link></li>
@@ -40,7 +39,7 @@ export function Footer() {
           </div>
 
           <div>
-            <h4 className="font-bold text-white mb-6">Company</h4>
+            <h4 className="font-bold text-slate-900 mb-6">Company</h4>
             <ul className="space-y-4 text-sm">
               <li><Link href="/contact" className="hover:text-primary transition-colors">Contact Us</Link></li>
               <li><Link href="/faq" className="hover:text-primary transition-colors">FAQ</Link></li>
@@ -50,7 +49,7 @@ export function Footer() {
           </div>
 
           <div className="space-y-6">
-            <h4 className="font-bold text-white mb-6">Contact</h4>
+            <h4 className="font-bold text-slate-900 mb-6">Contact</h4>
             <ul className="space-y-4 text-sm">
               <li className="flex items-center gap-3">
                 <Mail className="h-4 w-4 text-primary" />
