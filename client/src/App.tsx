@@ -10,6 +10,7 @@ import CreateApp from "@/pages/create-app";
 import Login from "@/pages/login";
 import Features from "@/pages/features";
 import Pricing from "@/pages/pricing";
+import FAQ from "@/pages/faq";
 
 function Router() {
   return (
@@ -17,6 +18,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/features" component={Features} />
       <Route path="/pricing" component={Pricing} />
+      <Route path="/faq" component={FAQ} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/create" component={CreateApp} />
       <Route path="/login" component={Login} />

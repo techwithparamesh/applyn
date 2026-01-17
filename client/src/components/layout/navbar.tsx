@@ -13,7 +13,7 @@ export function Navbar() {
   const isDashboard = location.startsWith("/dashboard") || location.startsWith("/create");
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md">
+    <nav className="sticky top-0 z-50 w-full border-b border-white/5 bg-background/80 backdrop-blur-md">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/">
           <div className="flex items-center gap-2 font-bold text-xl text-primary cursor-pointer">
@@ -32,12 +32,14 @@ export function Navbar() {
                 <a className={`text-sm font-semibold transition-colors hover:text-primary ${location === "/features" ? "text-primary" : "text-slate-600"}`}>Features</a>
               </Link>
               <Link href="/pricing">
-                <a className={`text-sm font-semibold transition-colors hover:text-primary ${location === "/pricing" ? "text-primary" : "text-slate-600"}`}>Pricing</a>
+                <a className={`text-sm font-semibold transition-colors hover:text-primary ${location === "/pricing" ? "text-primary" : "text-slate-400"}`}>Pricing</a>
               </Link>
-              <a href="#faq" className="text-sm font-semibold text-slate-600 hover:text-primary transition-colors">FAQ</a>
-              <div className="h-6 w-px bg-slate-200" />
+              <Link href="/faq">
+                <a className={`text-sm font-semibold transition-colors hover:text-primary ${location === "/faq" ? "text-primary" : "text-slate-400"}`}>FAQ</a>
+              </Link>
+              <div className="h-6 w-px bg-white/10" />
               <Link href="/login">
-                <Button variant="ghost" size="sm" className="font-semibold text-slate-600 hover:text-primary hover:bg-primary/5">Log in</Button>
+                <Button variant="ghost" size="sm" className="font-semibold text-slate-400 hover:text-primary hover:bg-primary/5">Log in</Button>
               </Link>
               <Link href="/create">
                 <Button size="sm" className="bg-primary hover:bg-primary/90 font-bold px-6 rounded-xl shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95">Convert URL</Button>
