@@ -118,11 +118,56 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="py-20 bg-white">
-        <div className="container mx-auto px-6 text-center text-slate-400 text-sm">
-          © 2026 WebToApp. Crafted for the Next Billion Users.
+      {/* FAQ Section */}
+      <section id="faq" className="py-32 bg-white relative overflow-hidden">
+        <div className="container mx-auto px-6 max-w-4xl relative z-10">
+          <div className="text-center mb-16 space-y-4">
+            <h2 className="text-4xl md:text-6xl font-extrabold text-gradient">Got Questions?</h2>
+            <p className="text-xl text-slate-500">Everything you need to know about the transition.</p>
+          </div>
+          
+          <div className="grid gap-6">
+            <FAQItem 
+              question="Will my app be approved by Play Store?"
+              answer="Absolutely. We follow all Play Store and App Store guidelines. Our templates are built to be compliant, and we've helped 10,000+ apps get approved successfully."
+            />
+            <FAQItem 
+              question="Do I need to pay monthly or yearly?"
+              answer="Neither. We believe in simple Indian pricing psychology. Pay once per app and get your build files. Updates are included for the first year (Basic) or lifetime (Pro)."
+            />
+            <FAQItem 
+              question="Can I send push notifications?"
+              answer="Yes! Our Pro plan includes full integration with Firebase Cloud Messaging, allowing you to send unlimited notifications to your users' devices instantly."
+            />
+          </div>
+        </div>
+        {/* Decorative background element */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-[120px] -z-10"></div>
+      </section>
+
+      <footer className="py-20 bg-slate-900 text-white rounded-t-[4rem]">
+        <div className="container mx-auto px-6 text-center">
+          <div className="flex justify-center mb-8">
+            <div className="flex items-center gap-2 font-bold text-2xl">
+              <Smartphone className="h-8 w-8 text-primary" />
+              <span>WebToApp</span>
+            </div>
+          </div>
+          <p className="text-slate-400 text-sm mb-8">Crafted with care for Indian Entrepreneurs.</p>
+          <div className="text-slate-500 text-xs">
+            © 2026 WebToApp. All rights reserved.
+          </div>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function FAQItem({ question, answer }: { question: string, answer: string }) {
+  return (
+    <div className="group p-8 rounded-3xl bg-slate-50 border border-slate-100 hover:border-primary/20 hover:bg-white hover:shadow-xl hover:shadow-primary/5 transition-all duration-300">
+      <h3 className="text-xl font-bold text-slate-900 mb-3 group-hover:text-primary transition-colors">{question}</h3>
+      <p className="text-slate-600 leading-relaxed">{answer}</p>
     </div>
   );
 }
