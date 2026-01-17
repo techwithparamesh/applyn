@@ -87,7 +87,7 @@ export default function Home() {
       </section>
 
       {/* Features Grid */}
-      <section className="py-24 bg-slate-50 border-y border-slate-200">
+      <section id="features" className="py-24 bg-slate-50 border-y border-slate-200">
         <div className="container mx-auto px-4">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <h2 className="text-3xl font-bold mb-4 text-slate-900">Why choose WebToApp?</h2>
@@ -112,6 +112,61 @@ export default function Home() {
               title="Store Compliant"
               description="100% compliant with Google Play Store & Apple App Store policies."
             />
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section id="pricing" className="py-24 bg-white">
+        <div className="container mx-auto px-4">
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <h2 className="text-3xl font-bold mb-4 text-slate-900">Simple Indian Pricing</h2>
+            <p className="text-muted-foreground">
+              Transparent plans designed for Indian startups and small businesses.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            <div className="border rounded-2xl p-8 hover:border-primary/50 transition-colors">
+              <h3 className="text-xl font-bold mb-2">Basic</h3>
+              <div className="text-3xl font-bold mb-4">₹999 <span className="text-sm font-normal text-muted-foreground">/app</span></div>
+              <ul className="space-y-3 mb-8">
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> Android .apk & .aab</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> Standard WebView</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> Email Support</li>
+              </ul>
+              <Button variant="outline" className="w-full">Get Started</Button>
+            </div>
+
+            <div className="border-2 border-primary rounded-2xl p-8 relative overflow-hidden bg-primary/5">
+              <div className="absolute top-4 right-4 bg-primary text-white text-xs px-2 py-1 rounded">BEST VALUE</div>
+              <h3 className="text-xl font-bold mb-2">Pro</h3>
+              <div className="text-3xl font-bold mb-4">₹2,499 <span className="text-sm font-normal text-muted-foreground">/app</span></div>
+              <ul className="space-y-3 mb-8">
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> Android + iOS</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> Push Notifications</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> Custom Splash Screen</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> Priority WhatsApp Support</li>
+              </ul>
+              <Button className="w-full">Get Started</Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section id="faq" className="py-24 bg-slate-50 border-t">
+        <div className="container mx-auto px-4 max-w-3xl">
+          <h2 className="text-3xl font-bold mb-12 text-center">Frequently Asked Questions</h2>
+          <div className="space-y-6">
+            <div className="bg-white p-6 rounded-xl border">
+              <h3 className="font-bold mb-2">Will my app be approved by Play Store?</h3>
+              <p className="text-muted-foreground text-sm">Yes! We follow all standard guidelines to ensure your app is store-ready. We've helped 10,000+ apps get approved.</p>
+            </div>
+            <div className="bg-white p-6 rounded-xl border">
+              <h3 className="font-bold mb-2">Do I need to pay monthly?</h3>
+              <p className="text-muted-foreground text-sm">No, our pricing is per app. Pay once and get your build files. Updates are included for 1 year.</p>
+            </div>
           </div>
         </div>
       </section>
