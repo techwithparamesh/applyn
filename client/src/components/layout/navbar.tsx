@@ -16,10 +16,10 @@ export function Navbar() {
     <nav className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/">
-          <a className="flex items-center gap-2 font-bold text-xl text-primary">
+          <div className="flex items-center gap-2 font-bold text-xl text-primary cursor-pointer">
             <Smartphone className="h-6 w-6" />
             <span>WebToApp</span>
-          </a>
+          </div>
         </Link>
 
         <div className="hidden md:flex items-center gap-6">
