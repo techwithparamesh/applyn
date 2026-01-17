@@ -8,11 +8,15 @@ import Home from "@/pages/home";
 import Dashboard from "@/pages/dashboard";
 import CreateApp from "@/pages/create-app";
 import Login from "@/pages/login";
+import Features from "@/pages/features";
+import Pricing from "@/pages/pricing";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/features" component={Features} />
+      <Route path="/pricing" component={Pricing} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/create" component={CreateApp} />
       <Route path="/login" component={Login} />

@@ -25,8 +25,12 @@ export function Navbar() {
         <div className="hidden md:flex items-center gap-6">
           {!isDashboard ? (
             <>
-              <a href="#features" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Features</a>
-              <a href="#pricing" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Pricing</a>
+              <Link href="/features">
+                <a className={`text-sm font-medium transition-colors hover:text-primary ${location === "/features" ? "text-primary font-semibold" : "text-muted-foreground"}`}>Features</a>
+              </Link>
+              <Link href="/pricing">
+                <a className={`text-sm font-medium transition-colors hover:text-primary ${location === "/pricing" ? "text-primary font-semibold" : "text-muted-foreground"}`}>Pricing</a>
+              </Link>
               <a href="#faq" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">FAQ</a>
               <div className="h-6 w-px bg-border" />
               <Link href="/login">
