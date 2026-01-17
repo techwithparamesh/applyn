@@ -1,6 +1,8 @@
 import { Link } from "wouter";
 import { Smartphone, Mail, Phone, MapPin, Github, Twitter, Linkedin } from "lucide-react";
 
+import logoImg from "@assets/ChatGPT_Image_Jan_17,_2026,_01_03_48_PM_1768635239654.png";
+
 export function Footer() {
   return (
     <footer className="bg-slate-950 text-slate-400 py-20 border-t border-white/5">
@@ -8,9 +10,9 @@ export function Footer() {
         <div className="grid md:grid-cols-4 gap-12 mb-16">
           <div className="col-span-1 md:col-span-1 space-y-6">
             <Link href="/">
-              <div className="flex items-center gap-2 font-bold text-2xl text-white cursor-pointer">
-                <Smartphone className="h-8 w-8 text-primary" />
-                <span>WebToApp</span>
+              <div className="flex items-center gap-3 cursor-pointer group">
+                <img src={logoImg} alt="Applyn Logo" className="h-8 w-auto" />
+                <span className="text-xl font-black tracking-tighter text-white group-hover:text-primary transition-colors">Applyn</span>
               </div>
             </Link>
             <p className="text-sm leading-relaxed">

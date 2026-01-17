@@ -8,17 +8,20 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+import logoImg from "@assets/ChatGPT_Image_Jan_17,_2026,_01_03_48_PM_1768635239654.png";
+
 export function Navbar() {
   const [location] = useLocation();
   const isDashboard = location.startsWith("/dashboard") || location.startsWith("/create");
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-white/5 bg-background/80 backdrop-blur-md">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4">
+      <div className="container mx-auto flex h-20 items-center justify-between px-4">
         <Link href="/">
-          <div className="flex items-center gap-2 font-bold text-xl text-primary cursor-pointer">
-            <Smartphone className="h-6 w-6" />
-            <span>WebToApp</span>
+          <div className="flex items-center gap-3 cursor-pointer group">
+            <img src={logoImg} alt="Applyn Logo" className="h-10 w-auto" />
+            <div className="h-6 w-px bg-white/10 hidden sm:block" />
+            <span className="text-xl font-black tracking-tighter text-white group-hover:text-primary transition-colors">Applyn</span>
           </div>
         </Link>
 

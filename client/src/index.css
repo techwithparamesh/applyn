@@ -38,29 +38,30 @@
 }
 
 :root {
-  /* Dark Slate Aesthetic */
+  /* Applyn Aesthetic */
   --background: 222 47% 7%;
   --foreground: 210 40% 98%;
   
   --card: 222 47% 11%;
   --card-foreground: 210 40% 98%;
   
-  /* Emerald / Cyber Primary */
-  --primary: 158 95% 58%;
+  /* Applyn Primary (Sky Blue to Indigo Gradient) */
+  --primary: 199 89% 55%;
   --primary-foreground: 222 47% 7%;
   
-  --secondary: 217 32% 17%;
+  /* Applyn Secondary (Soft Purple) */
+  --secondary: 262 83% 58%;
   --secondary-foreground: 210 40% 98%;
   
   --muted: 217 32% 17%;
   --muted-foreground: 215 20% 65%;
   
-  --accent: 217 32% 17%;
+  --accent: 262 83% 58%;
   --accent-foreground: 210 40% 98%;
   
-  --border: 217 32% 17%;
-  --input: 217 32% 17%;
-  --ring: 158 95% 58%;
+  --border: 222 47% 15%;
+  --input: 222 47% 15%;
+  --ring: 199 89% 55%;
 }
 
 @layer base {
@@ -77,10 +78,10 @@
     @apply bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.3)];
   }
   .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-br from-white via-slate-100 to-slate-300;
+    @apply bg-clip-text text-transparent bg-gradient-to-br from-[#40C9FF] via-[#E81CFF] to-[#7928CA];
   }
   .bg-mesh {
-    background-image: radial-gradient(at 0% 0%, hsla(158,95%,58%,0.1) 0, transparent 50%),
-                      radial-gradient(at 100% 0%, hsla(221,83%,53%,0.1) 0, transparent 50%);
+    background-image: radial-gradient(at 0% 0%, hsla(199,89%,55%,0.15) 0, transparent 50%),
+                      radial-gradient(at 100% 0%, hsla(262,83%,58%,0.15) 0, transparent 50%);
   }
 }
