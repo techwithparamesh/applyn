@@ -39,10 +39,10 @@ export function Navbar() {
               </Link>
               <div className="h-6 w-px bg-white/10" />
               <Link href="/login">
-                <Button variant="ghost" size="sm" className="font-semibold text-slate-400 hover:text-primary hover:bg-primary/5">Log in</Button>
+                <Button variant="ghost" size="sm" className="font-semibold text-slate-400 hover:text-primary hover:bg-primary/5">Sign in</Button>
               </Link>
-              <Link href="/create">
-                <Button size="sm" className="bg-primary hover:bg-primary/90 font-bold px-6 rounded-xl shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95">Convert URL</Button>
+              <Link href="/login">
+                <Button size="sm" className="bg-primary hover:bg-primary/90 text-black font-bold px-6 rounded-xl shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95">Get Started</Button>
               </Link>
             </>
           ) : (
