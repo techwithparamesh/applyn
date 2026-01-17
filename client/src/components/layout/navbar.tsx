@@ -15,38 +15,40 @@ export function Navbar() {
   const isDashboard = location.startsWith("/dashboard") || location.startsWith("/create");
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b border-slate-100 bg-white/80 backdrop-blur-md">
+    <nav className="sticky top-0 z-50 w-full border-b border-white/5 bg-background/80 backdrop-blur-md">
       <div className="container mx-auto flex h-20 items-center justify-between px-4">
         <Link href="/">
           <div className="flex items-center cursor-pointer group">
             <img 
               src={logoImg} 
               alt="Applyn Logo" 
-              className="h-14 w-auto object-contain transition-transform group-hover:scale-105" 
+              className="h-16 w-auto object-contain transition-transform group-hover:scale-105" 
+              style={{ filter: 'drop-shadow(0px 0px 1px rgba(255,255,255,0.8)) brightness(1.5) contrast(1.2)' }}
             />
           </div>
         </Link>
 
-        <div className="hidden md:flex items-center gap-8">
+        <div className="hidden md:flex items-center gap-6">
           {!isDashboard ? (
             <>
               <Link href="/">
-                <a className={`text-sm font-bold tracking-tight transition-colors hover:text-primary ${location === "/" ? "text-primary" : "text-slate-600"}`}>Home</a>
+                <a className={`text-sm font-semibold transition-colors hover:text-primary ${location === "/" ? "text-primary" : "text-slate-600"}`}>Home</a>
+              </Link>
+              <Link href="/features">
+                <a className={`text-sm font-semibold transition-colors hover:text-primary ${location === "/features" ? "text-primary" : "text-slate-600"}`}>Features</a>
               </Link>
               <Link href="/pricing">
-                <a className={`text-sm font-bold tracking-tight transition-colors hover:text-primary ${location === "/pricing" ? "text-primary" : "text-slate-600"}`}>Pricing</a>
+                <a className={`text-sm font-semibold transition-colors hover:text-primary ${location === "/pricing" ? "text-primary" : "text-slate-400"}`}>Pricing</a>
               </Link>
               <Link href="/faq">
-                <a className={`text-sm font-bold tracking-tight transition-colors hover:text-primary ${location === "/faq" ? "text-primary" : "text-slate-600"}`}>FAQ</a>
+                <a className={`text-sm font-semibold transition-colors hover:text-primary ${location === "/faq" ? "text-primary" : "text-slate-400"}`}>FAQ</a>
               </Link>
-              <div className="h-6 w-px bg-slate-200" />
+              <div className="h-6 w-px bg-white/10" />
               <Link href="/login">
-                <button className="text-sm font-bold text-slate-600 hover:text-primary transition-colors cursor-pointer">Sign in</button>
+                <Button variant="ghost" size="sm" className="font-semibold text-slate-400 hover:text-primary hover:bg-primary/5">Sign in</Button>
               </Link>
-              <Link href="/create">
-                <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold px-8 h-12 rounded-full shadow-lg shadow-blue-500/20 transition-all hover:scale-105 active:scale-95 border-none">
-                  Create My App
-                </Button>
+              <Link href="/login">
+                <Button size="sm" className="bg-primary hover:bg-primary/90 text-black font-bold px-6 rounded-xl shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95">Get Started</Button>
               </Link>
             </>
           ) : (
@@ -86,13 +88,8 @@ export function Navbar() {
         </div>
 
         {/* Mobile Menu */}
-        <div className="md:hidden flex items-center gap-4">
-          <Link href="/create">
-            <Button size="sm" className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-full px-4 border-none text-xs">
-              Create My App
-            </Button>
-          </Link>
-          <Button variant="ghost" size="icon" className="text-slate-900">
+        <div className="md:hidden">
+          <Button variant="ghost" size="icon">
             <Menu className="h-6 w-6" />
           </Button>
         </div>
