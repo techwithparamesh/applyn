@@ -1,0 +1,190 @@
+You are a senior SaaS architect, full-stack engineer, and startup product strategist.
+
+Your task is to DESIGN and GENERATE a COMPLETE, PRODUCTION-READY SaaS PLATFORM
+that converts any website URL into Android and iOS mobile apps.
+
+========================
+CORE BUSINESS GOAL
+========================
+Build an India-focused “Website → App Converter SaaS” that fills gaps left by existing tools
+(WebView wrappers, no-code builders) by being:
+
+- Extremely simple
+- Low-cost
+- WhatsApp-first
+- Play Store friendly
+- Agency & reseller friendly
+- Non-technical user friendly
+
+========================
+TARGET USERS
+========================
+1. Small business owners (India)
+2. Bloggers & news portals
+3. Real estate agents
+4. Coaching institutes
+5. WordPress / Shopify users
+6. Digital agencies (white-label resale)
+
+========================
+CORE PROBLEM TO SOLVE
+========================
+Existing tools fail because they are:
+- Expensive
+- Too technical
+- Not Play Store safe
+- No local support
+- No WhatsApp onboarding
+- No done-for-you publishing
+- No Indian pricing psychology
+
+This SaaS must CLOSE THESE GAPS.
+
+========================
+CORE FEATURES (MVP)
+========================
+1. User enters Website URL
+2. App auto-generated using WebView (Android + iOS)
+3. Custom app name, icon, splash screen
+4. App preview (APK preview / emulator link)
+5. Push notifications (Firebase)
+6. Bottom navigation support (optional)
+7. Play Store ready build (.aab)
+8. Admin approval system
+9. Payment integration (Razorpay)
+10. WhatsApp onboarding + status updates
+11. Multi-language dashboard (English + Telugu ready)
+
+========================
+ADVANCED FEATURES (SCALING)
+========================
+- White-label for agencies
+- Reseller pricing control
+- Auto Play Store compliance checks
+- App update system (URL change → app update)
+- Analytics dashboard
+- PWA fallback
+- Offline page handling
+- Deep linking
+- Custom domain for agencies
+
+========================
+TECH STACK (MANDATORY)
+========================
+Frontend:
+- Next.js (App Router)
+- Tailwind CSS
+- Simple, clean Indian SaaS UI
+- Mobile-first dashboard
+
+Backend:
+- Node.js + Express
+- REST APIs
+- JWT Authentication
+- Role-based access (User / Admin / Reseller)
+
+Database:
+- PostgreSQL (Prisma ORM)
+OR MongoDB (Mongoose) – choose best
+
+Mobile App Generation:
+- Android WebView template (Kotlin)
+- iOS WebView template (Swift)
+- Dynamic config injection (URL, name, icon)
+
+Notifications:
+- Firebase Cloud Messaging
+
+Payments:
+- Razorpay (India-ready)
+
+Deployment:
+- VPS friendly (Ubuntu)
+- Docker optional
+- Environment-based configs
+
+========================
+PROJECT STRUCTURE
+========================
+Generate a FULL MONOREPO with:
+
+/frontend
+  ├─ auth
+  ├─ dashboard
+  ├─ app-builder
+  ├─ billing
+  ├─ admin-panel
+
+/backend
+  ├─ auth
+  ├─ users
+  ├─ apps
+  ├─ builds
+  ├─ payments
+  ├─ notifications
+
+/mobile
+  ├─ android-webview-template
+  ├─ ios-webview-template
+
+/docs
+  ├─ API docs
+  ├─ onboarding guide
+  ├─ Play Store checklist
+
+========================
+CRITICAL BUSINESS LOGIC
+========================
+- One user = multiple apps allowed
+- One active build at a time
+- App rebuild allowed after X minutes
+- Admin approval before download
+- Payment required before build
+- Free preview, paid download
+
+========================
+SECURITY & SCALE
+========================
+- Rate limiting
+- Input validation
+- URL safety checks
+- App abuse prevention
+- Logging & error handling
+
+========================
+OUTPUT REQUIRED
+========================
+1. FULL frontend code
+2. FULL backend code
+3. Android WebView template
+4. iOS WebView template
+5. Database schema
+6. API contracts
+7. ENV example files
+8. README with setup steps
+9. Deployment guide for VPS
+10. Admin credentials setup
+11. Sample user journey flow
+
+========================
+IMPORTANT INSTRUCTIONS
+========================
+- Code must be CLEAN and COMMENTED
+- Avoid placeholders unless unavoidable
+- Assume production readiness
+- Follow SaaS best practices
+- Focus on SPEED, SIMPLICITY, SCALE
+- Make decisions when ambiguous, explain why
+
+========================
+FINAL STEP
+========================
+Start by:
+1. Explaining system architecture
+2. Then generate code step-by-step
+3. Ensure everything runs locally
+4. Assume developer will copy-paste directly into Replit
+
+DO NOT ASK QUESTIONS.
+MAKE SMART ASSUMPTIONS.
+BUILD LIKE A REAL STARTUP PRODUCT.
