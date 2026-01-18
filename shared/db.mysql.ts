@@ -4,6 +4,7 @@ export const users = mysqlTable("users", {
   id: varchar("id", { length: 36 }).primaryKey(),
   name: text("name"),
   username: varchar("username", { length: 200 }).notNull().unique(),
+  role: varchar("role", { length: 16 }).notNull().default("user"),
   password: text("password").notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
@@ -14,8 +15,10 @@ export const apps = mysqlTable("apps", {
   ownerId: varchar("owner_id", { length: 36 }).notNull(),
   name: text("name").notNull(),
   url: text("url").notNull(),
-  icon: text("icon").notNull().default("🚀"),
-  primaryColor: text("primary_color").notNull().default("#2563EB"),
+  // MySQL does not allow DEFAULT values for TEXT/BLOB on many versions.
+  // Keep these as VARCHAR to match the manual VPS schema.
+  icon: varchar("icon", { length: 32 }).notNull().default("🚀"),
+  primaryColor: varchar("primary_color", { length: 16 }).notNull().default("#2563EB"),
   platform: varchar("platform", { length: 16 }).notNull().default("android"),
   status: varchar("status", { length: 16 }).notNull().default("draft"),
   packageName: varchar("package_name", { length: 200 }),
@@ -39,6 +42,17 @@ export const buildJobs = mysqlTable("build_jobs", {
   lockToken: varchar("lock_token", { length: 64 }),
   lockedAt: timestamp("locked_at", { mode: "date" }),
   error: text("error"),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+export const supportTickets = mysqlTable("support_tickets", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  requesterId: varchar("requester_id", { length: 36 }).notNull(),
+  appId: varchar("app_id", { length: 36 }),
+  subject: varchar("subject", { length: 200 }).notNull(),
+  message: text("message").notNull(),
+  status: varchar("status", { length: 16 }).notNull().default("open"),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });

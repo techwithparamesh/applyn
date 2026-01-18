@@ -8,8 +8,11 @@ import { z } from "zod";
 import {
   insertAppSchema,
   insertContactSubmissionSchema,
+  insertSupportTicketSchema,
   insertUserSchema,
+  supportTicketStatusSchema,
   type User,
+  userRoleSchema,
 } from "@shared/schema";
 import { storage } from "./storage";
 import { hashPassword, sanitizeUser } from "./auth";
@@ -21,6 +24,43 @@ function safeArtifactsRoot() {
 
 function getAuthedUser(req: any): User | null {
   return (req.user as User | undefined) ?? null;
+}
+
+type Role = "admin" | "support" | "user";
+function roleOf(user: User | null): Role {
+  const raw = (user as any)?.role;
+  return raw === "admin" || raw === "support" ? raw : "user";
+}
+
+function isStaff(user: User | null) {
+  const role = roleOf(user);
+  return role === "admin" || role === "support";
+}
+
+function requireRole(roles: Role[]) {
+  return (req: any, res: any, next: any) => {
+    const user = getAuthedUser(req);
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+    const role = roleOf(user);
+    if (!roles.includes(role)) return res.status(403).json({ message: "Forbidden" });
+    return next();
+  };
+}
+
+function sanitizeAppForViewer(app: any, viewer: User | null) {
+  const role = roleOf(viewer);
+  if (role === "admin" || role === "support") return app;
+
+  // End users should never see raw build logs or internal artifact paths.
+  const copy = { ...app };
+  copy.buildLogs = null;
+  copy.artifactPath = null;
+  copy.artifactMime = null;
+  copy.artifactSize = null;
+  if (copy.buildError) {
+    copy.buildError = "Build failed. Please contact support.";
+  }
+  return copy;
 }
 
 function requireAuth(req: any, res: any, next: any) {
@@ -66,6 +106,77 @@ export async function registerRoutes(
     }
   });
 
+  // --- Support ticketing (MVP) ---
+  app.post("/api/support/tickets", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const payload = insertSupportTicketSchema.parse(req.body);
+
+      // If an app is referenced, ensure the requester owns it (unless staff).
+      if (payload.appId) {
+        const appItem = await storage.getApp(payload.appId);
+        if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+          return res.status(404).json({ message: "App not found" });
+        }
+      }
+
+      const created = await storage.createSupportTicket(user.id, payload);
+      return res.status(201).json(created);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.get("/api/support/tickets", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const rows = isStaff(user)
+        ? await storage.listSupportTicketsAll()
+        : await storage.listSupportTicketsByRequester(user.id);
+
+      return res.json(rows);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  const updateTicketSchema = z
+    .object({
+      status: supportTicketStatusSchema,
+    })
+    .strict();
+
+  app.patch(
+    "/api/support/tickets/:id",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        const user = getAuthedUser(req);
+        if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+        const payload = updateTicketSchema.parse(req.body);
+
+        const existing = await storage.getSupportTicket(req.params.id);
+        if (!existing) return res.status(404).json({ message: "Not found" });
+
+        const staff = isStaff(user);
+        if (!staff && existing.requesterId !== user.id) {
+          return res.status(404).json({ message: "Not found" });
+        }
+
+        const updated = await storage.updateSupportTicketStatus(existing.id, payload.status);
+        if (!updated) return res.status(404).json({ message: "Not found" });
+        return res.json(updated);
+      } catch (err) {
+        return next(err);
+      }
+    },
+  );
+
   const loginSchema = z
     .object({
       username: z.string().min(3).max(200),
@@ -100,6 +211,7 @@ export async function registerRoutes(
         name: parsed.name,
         username: parsed.username,
         password: passwordHash,
+        role: "user",
       });
 
       (req as any).login(user, (err: any) => {
@@ -161,8 +273,10 @@ export async function registerRoutes(
     try {
       const user = getAuthedUser(req);
       if (!user) return res.status(401).json({ message: "Unauthorized" });
-      const apps = await storage.listAppsByOwner(user.id);
-      return res.json(apps);
+      const rows = isStaff(user)
+        ? await storage.listAppsAll()
+        : await storage.listAppsByOwner(user.id);
+      return res.json(rows.map((a: any) => sanitizeAppForViewer(a, user)));
     } catch (err) {
       return next(err);
     }
@@ -173,10 +287,10 @@ export async function registerRoutes(
       const user = getAuthedUser(req);
       if (!user) return res.status(401).json({ message: "Unauthorized" });
       const appItem = await storage.getApp(req.params.id);
-      if (!appItem || appItem.ownerId !== user.id) {
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
         return res.status(404).json({ message: "Not found" });
       }
-      return res.json(appItem);
+      return res.json(sanitizeAppForViewer(appItem as any, user));
     } catch (err) {
       return next(err);
     }
@@ -197,6 +311,13 @@ export async function registerRoutes(
         .parse(req.body);
 
       const created = await storage.createApp(user.id, payload);
+
+      // If the app is meant to be built immediately, enqueue a build job.
+      // This avoids apps being stuck in "processing" with no job.
+      if ((created.status as any) === "processing") {
+        await storage.enqueueBuildJob(user.id, created.id);
+      }
+
       return res.status(201).json(created);
     } catch (err) {
       return next(err);
@@ -210,13 +331,13 @@ export async function registerRoutes(
       if (!user) return res.status(401).json({ message: "Unauthorized" });
 
       const appItem = await storage.getApp(req.params.id);
-      if (!appItem || appItem.ownerId !== user.id) {
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
         return res.status(404).json({ message: "Not found" });
       }
 
       const patch = updateAppSchema.parse(req.body);
       const updated = await storage.updateApp(req.params.id, patch);
-      return res.json(updated);
+      return res.json(updated ? sanitizeAppForViewer(updated as any, user) : updated);
     } catch (err) {
       return next(err);
     }
@@ -228,7 +349,7 @@ export async function registerRoutes(
       if (!user) return res.status(401).json({ message: "Unauthorized" });
 
       const appItem = await storage.getApp(req.params.id);
-      if (!appItem || appItem.ownerId !== user.id) {
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
         return res.status(404).json({ message: "Not found" });
       }
 
@@ -245,12 +366,12 @@ export async function registerRoutes(
       if (!user) return res.status(401).json({ message: "Unauthorized" });
 
       const appItem = await storage.getApp(req.params.id);
-      if (!appItem || appItem.ownerId !== user.id) {
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
         return res.status(404).json({ message: "Not found" });
       }
 
       await storage.updateAppBuild(appItem.id, { status: "processing", buildError: null });
-      const job = await storage.enqueueBuildJob(user.id, appItem.id);
+      const job = await storage.enqueueBuildJob(appItem.ownerId, appItem.id);
       return res.status(202).json({ ok: true, jobId: job.id });
     } catch (err) {
       return next(err);
@@ -263,7 +384,7 @@ export async function registerRoutes(
       if (!user) return res.status(401).json({ message: "Unauthorized" });
 
       const appItem = await storage.getApp(req.params.id);
-      if (!appItem || appItem.ownerId !== user.id) {
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
         return res.status(404).json({ message: "Not found" });
       }
 
@@ -291,6 +412,61 @@ export async function registerRoutes(
       return next(err);
     }
   });
+
+  // --- Admin: Team management (MVP) ---
+  const adminCreateTeamMemberSchema = z
+    .object({
+      email: z.string().email().max(320).transform((s) => s.trim().toLowerCase()),
+      role: userRoleSchema,
+    })
+    .strict();
+
+  app.get(
+    "/api/admin/team-members",
+    requireAuth,
+    requireRole(["admin"]),
+    async (_req, res, next) => {
+      try {
+        const rows = await storage.listUsers();
+        return res.json(rows);
+      } catch (err) {
+        return next(err);
+      }
+    },
+  );
+
+  app.post(
+    "/api/admin/team-members",
+    requireAuth,
+    requireRole(["admin"]),
+    async (req, res, next) => {
+      try {
+        const payload = adminCreateTeamMemberSchema.parse(req.body);
+        if (payload.role === "user") {
+          return res.status(400).json({ message: "Team member role must be admin or support" });
+        }
+
+        const existing = await storage.getUserByUsername(payload.email);
+        if (existing) {
+          return res.status(409).json({ message: "User already exists" });
+        }
+
+        // MVP: create with a random temporary password (admin shares it out-of-band).
+        const tempPassword = `Temp-${Math.random().toString(36).slice(2, 10)}-${Math.random().toString(36).slice(2, 10)}`;
+        const passwordHash = await hashPassword(tempPassword);
+
+        const user = await storage.createUser({
+          username: payload.email,
+          password: passwordHash,
+          role: payload.role,
+        });
+
+        return res.status(201).json({ user: sanitizeUser(user), tempPassword });
+      } catch (err) {
+        return next(err);
+      }
+    },
+  );
 
   return httpServer;
 

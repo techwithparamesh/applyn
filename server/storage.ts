@@ -3,7 +3,11 @@ import type {
   ContactSubmission,
   InsertApp,
   InsertContactSubmission,
+  InsertSupportTicket,
   InsertUser,
+  SupportTicket,
+  SupportTicketStatus,
+  UserRole,
   User,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -42,9 +46,13 @@ export type AppBuildPatch = {
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  createUser(user: InsertUser & { role?: UserRole }): Promise<User>;
+
+  // Admin use-cases
+  listUsers(): Promise<Array<Omit<User, "password">>>;
 
   listAppsByOwner(ownerId: string): Promise<App[]>;
+  listAppsAll(): Promise<App[]>;
   getApp(id: string): Promise<App | undefined>;
   createApp(ownerId: string, app: InsertApp): Promise<App>;
   updateApp(id: string, patch: Partial<InsertApp>): Promise<App | undefined>;
@@ -56,18 +64,27 @@ export interface IStorage {
   updateAppBuild(id: string, patch: AppBuildPatch): Promise<App | undefined>;
 
   createContactSubmission(payload: InsertContactSubmission): Promise<ContactSubmission>;
+
+  // Support ticketing (MVP)
+  createSupportTicket(requesterId: string, payload: InsertSupportTicket): Promise<SupportTicket>;
+  getSupportTicket(id: string): Promise<SupportTicket | undefined>;
+  listSupportTicketsByRequester(requesterId: string): Promise<SupportTicket[]>;
+  listSupportTicketsAll(): Promise<SupportTicket[]>;
+  updateSupportTicketStatus(id: string, status: SupportTicketStatus): Promise<SupportTicket | undefined>;
 }
 
 export class MemStorage implements IStorage {
   private users: Map<string, User>;
   private apps: Map<string, App>;
   private contacts: Map<string, ContactSubmission>;
+  private tickets: Map<string, SupportTicket>;
   private buildJobs: Map<string, BuildJob>;
 
   constructor() {
     this.users = new Map();
     this.apps = new Map();
     this.contacts = new Map();
+    this.tickets = new Map();
     this.buildJobs = new Map();
   }
 
@@ -81,13 +98,14 @@ export class MemStorage implements IStorage {
     );
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
+  async createUser(insertUser: InsertUser & { role?: UserRole }): Promise<User> {
     const id = randomUUID();
     const now = new Date();
     const user: User = {
       id,
       name: insertUser.name ?? null,
       username: insertUser.username,
+      role: insertUser.role ?? "user",
       password: insertUser.password,
       createdAt: now,
       updatedAt: now,
@@ -96,10 +114,20 @@ export class MemStorage implements IStorage {
     return user;
   }
 
+  async listUsers(): Promise<Array<Omit<User, "password">>> {
+    return Array.from(this.users.values())
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+      .map(({ password: _pw, ...rest }) => rest);
+  }
+
   async listAppsByOwner(ownerId: string): Promise<App[]> {
     return Array.from(this.apps.values())
       .filter((a) => a.ownerId === ownerId)
       .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+  }
+
+  async listAppsAll(): Promise<App[]> {
+    return Array.from(this.apps.values()).sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
   }
 
   async getApp(id: string): Promise<App | undefined> {
@@ -165,6 +193,45 @@ export class MemStorage implements IStorage {
     };
     this.contacts.set(id, row);
     return row;
+  }
+
+  async createSupportTicket(requesterId: string, payload: InsertSupportTicket): Promise<SupportTicket> {
+    const id = randomUUID();
+    const now = new Date();
+    const row: SupportTicket = {
+      id,
+      requesterId,
+      appId: payload.appId ?? null,
+      subject: payload.subject,
+      message: payload.message,
+      status: "open",
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.tickets.set(id, row);
+    return row;
+  }
+
+  async getSupportTicket(id: string): Promise<SupportTicket | undefined> {
+    return this.tickets.get(id);
+  }
+
+  async listSupportTicketsByRequester(requesterId: string): Promise<SupportTicket[]> {
+    return Array.from(this.tickets.values())
+      .filter((t) => t.requesterId === requesterId)
+      .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+  }
+
+  async listSupportTicketsAll(): Promise<SupportTicket[]> {
+    return Array.from(this.tickets.values()).sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+  }
+
+  async updateSupportTicketStatus(id: string, status: SupportTicketStatus): Promise<SupportTicket | undefined> {
+    const existing = this.tickets.get(id);
+    if (!existing) return undefined;
+    const updated: SupportTicket = { ...existing, status, updatedAt: new Date() };
+    this.tickets.set(id, updated);
+    return updated;
   }
 
   async enqueueBuildJob(ownerId: string, appId: string): Promise<BuildJob> {

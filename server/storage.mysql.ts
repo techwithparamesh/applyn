@@ -5,10 +5,14 @@ import type {
   ContactSubmission,
   InsertApp,
   InsertContactSubmission,
+  InsertSupportTicket,
   InsertUser,
+  SupportTicket,
+  SupportTicketStatus,
+  UserRole,
   User,
 } from "@shared/schema";
-import { apps, buildJobs, contactSubmissions, users } from "@shared/db.mysql";
+import { apps, buildJobs, contactSubmissions, supportTickets, users } from "@shared/db.mysql";
 import { getMysqlDb } from "./db-mysql";
 import type { AppBuildPatch, BuildJob, BuildJobStatus } from "./storage";
 
@@ -27,7 +31,7 @@ export class MysqlStorage {
     return rows[0] as unknown as User;
   }
 
-  async createUser(user: InsertUser): Promise<User> {
+  async createUser(user: InsertUser & { role?: UserRole }): Promise<User> {
     const id = randomUUID();
     const now = new Date();
 
@@ -35,6 +39,7 @@ export class MysqlStorage {
       id,
       name: user.name ?? null,
       username: user.username,
+      role: user.role ?? "user",
       password: user.password,
       createdAt: now,
       updatedAt: now,
@@ -43,12 +48,22 @@ export class MysqlStorage {
     return (await this.getUser(id))!;
   }
 
+  async listUsers(): Promise<Array<Omit<User, "password">>> {
+    const rows = await getMysqlDb().select().from(users).orderBy(desc(users.createdAt));
+    return (rows as unknown as User[]).map(({ password: _pw, ...rest }) => rest);
+  }
+
   async listAppsByOwner(ownerId: string): Promise<App[]> {
     const rows = await getMysqlDb()
       .select()
       .from(apps)
       .where(eq(apps.ownerId, ownerId))
       .orderBy(desc(apps.updatedAt));
+    return rows as unknown as App[];
+  }
+
+  async listAppsAll(): Promise<App[]> {
+    const rows = await getMysqlDb().select().from(apps).orderBy(desc(apps.updatedAt));
     return rows as unknown as App[];
   }
 
@@ -124,6 +139,57 @@ export class MysqlStorage {
       createdAt,
       ...payload,
     };
+  }
+
+  async createSupportTicket(requesterId: string, payload: InsertSupportTicket): Promise<SupportTicket> {
+    const id = randomUUID();
+    const now = new Date();
+
+    await getMysqlDb().insert(supportTickets).values({
+      id,
+      requesterId,
+      appId: payload.appId ?? null,
+      subject: payload.subject,
+      message: payload.message,
+      status: "open",
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const rows = await getMysqlDb().select().from(supportTickets).where(eq(supportTickets.id, id)).limit(1);
+    return rows[0] as unknown as SupportTicket;
+  }
+
+  async getSupportTicket(id: string): Promise<SupportTicket | undefined> {
+    const rows = await getMysqlDb().select().from(supportTickets).where(eq(supportTickets.id, id)).limit(1);
+    return rows[0] as unknown as SupportTicket | undefined;
+  }
+
+  async listSupportTicketsByRequester(requesterId: string): Promise<SupportTicket[]> {
+    const rows = await getMysqlDb()
+      .select()
+      .from(supportTickets)
+      .where(eq(supportTickets.requesterId, requesterId))
+      .orderBy(desc(supportTickets.updatedAt));
+    return rows as unknown as SupportTicket[];
+  }
+
+  async listSupportTicketsAll(): Promise<SupportTicket[]> {
+    const rows = await getMysqlDb().select().from(supportTickets).orderBy(desc(supportTickets.updatedAt));
+    return rows as unknown as SupportTicket[];
+  }
+
+  async updateSupportTicketStatus(id: string, status: SupportTicketStatus): Promise<SupportTicket | undefined> {
+    await getMysqlDb()
+      .update(supportTickets)
+      .set({
+        status,
+        updatedAt: new Date(),
+      })
+      .where(eq(supportTickets.id, id));
+
+    const rows = await getMysqlDb().select().from(supportTickets).where(eq(supportTickets.id, id)).limit(1);
+    return rows[0] as unknown as SupportTicket | undefined;
   }
 
   async enqueueBuildJob(ownerId: string, appId: string): Promise<BuildJob> {

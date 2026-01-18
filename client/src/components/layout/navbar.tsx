@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Smartphone, Plus, LogOut, Menu } from "lucide-react";
+import { LayoutDashboard, Plus, LogOut, Menu, LifeBuoy } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Sheet, SheetClose, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -53,6 +53,8 @@ export function Navbar() {
   });
 
   const isAuthed = !!me;
+  const role = ((me as any)?.role as string | undefined) || "user";
+  const isStaff = role === "admin" || role === "support";
 
   const initials = (() => {
     const name = (me as any)?.name as string | null | undefined;
@@ -113,6 +115,12 @@ export function Navbar() {
                   Dashboard
                 </Button>
               </Link>
+              <Link href="/tickets">
+                <Button variant={location === "/tickets" ? "secondary" : "ghost"} size="sm" className="gap-2">
+                  <LifeBuoy className="h-4 w-4" />
+                  Tickets
+                </Button>
+              </Link>
               <Link href="/create">
                 <Button variant={location === "/create" ? "secondary" : "ghost"} size="sm" className="gap-2">
                   <Plus className="h-4 w-4" />
@@ -131,6 +139,12 @@ export function Navbar() {
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => setLocation("/profile")}>Profile</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setLocation("/billing")}>Billing</DropdownMenuItem>
+                  {isStaff && (
+                    <DropdownMenuItem onClick={() => setLocation("/ops")}>Ops</DropdownMenuItem>
+                  )}
+                  {role === "admin" && (
+                    <DropdownMenuItem onClick={() => setLocation("/admin/team")}>Team</DropdownMenuItem>
+                  )}
                   <DropdownMenuItem className="text-destructive" onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Log out
@@ -178,6 +192,7 @@ export function Navbar() {
                 ) : (
                   <>
                     <MobileLink label="Dashboard" onClick={() => setLocation("/dashboard")} />
+                    <MobileLink label="My Tickets" onClick={() => setLocation("/tickets")} />
                     <MobileLink label="Create App" onClick={() => setLocation("/create")} />
                     <MobileLink label="Profile" onClick={() => setLocation("/profile")} />
                     <MobileLink label="Billing" onClick={() => setLocation("/billing")} />

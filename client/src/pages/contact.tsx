@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { motion } from "framer-motion";
 import { Mail, Phone, MapPin, Send } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -20,6 +20,20 @@ export default function Contact() {
     subject: "",
     message: "",
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const subject = params.get("subject") || "";
+    const message = params.get("message") || "";
+
+    if (!subject && !message) return;
+
+    setForm((prev) => ({
+      ...prev,
+      subject: prev.subject || subject,
+      message: prev.message || message,
+    }));
+  }, []);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

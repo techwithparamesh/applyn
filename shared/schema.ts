@@ -10,11 +10,15 @@ export const insertUserSchema = z.object({
   password: z.string().min(8).max(200),
 });
 
+export const userRoleSchema = z.enum(["admin", "support", "user"]);
+export type UserRole = z.infer<typeof userRoleSchema>;
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = {
   id: string;
   name: string | null;
   username: string;
+  role: UserRole;
   password: string;
   createdAt: Date;
   updatedAt: Date;
@@ -71,4 +75,27 @@ export type InsertContactSubmission = z.infer<typeof insertContactSubmissionSche
 export type ContactSubmission = InsertContactSubmission & {
   id: string;
   createdAt: Date;
+};
+
+export const supportTicketStatusSchema = z.enum(["open", "closed"]);
+export type SupportTicketStatus = z.infer<typeof supportTicketStatusSchema>;
+
+export const insertSupportTicketSchema = z
+  .object({
+    appId: z.string().uuid().optional().nullable(),
+    subject: z.string().min(2).max(200),
+    message: z.string().min(10).max(5000),
+  })
+  .strict();
+
+export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
+export type SupportTicket = {
+  id: string;
+  requesterId: string;
+  appId: string | null;
+  subject: string;
+  message: string;
+  status: SupportTicketStatus;
+  createdAt: Date;
+  updatedAt: Date;
 };

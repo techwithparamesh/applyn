@@ -14,6 +14,9 @@ import FAQ from "@/pages/faq";
 import Contact from "@/pages/contact";
 import Profile from "@/pages/profile";
 import Billing from "@/pages/billing";
+import AdminTeam from "@/pages/admin-team";
+import Ops from "@/pages/ops";
+import Tickets from "@/pages/tickets";
 
 function Router() {
   return (
@@ -25,6 +28,9 @@ function Router() {
       <Route path="/contact" component={Contact} />
       <Route path="/profile" component={Profile} />
       <Route path="/billing" component={Billing} />
+      <Route path="/admin/team" component={AdminTeam} />
+      <Route path="/ops" component={Ops} />
+      <Route path="/tickets" component={Tickets} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/create" component={CreateApp} />
       <Route path="/login" component={Login} />
