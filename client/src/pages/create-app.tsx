@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Navbar } from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,8 @@ import { ArrowRight, ArrowLeft, Loader2, Smartphone, Check, Palette, Globe, Cred
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
 
 const STEPS = [
   { id: 1, name: "Details", icon: Globe },
@@ -23,6 +25,24 @@ export default function CreateApp() {
   const [loading, setLoading] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+
+  const { data: me, isLoading } = useQuery({
+    queryKey: ["/api/me"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+  });
+
+  useEffect(() => {
+    if (!isLoading && !me) setLocation(`/login?returnTo=${encodeURIComponent("/create")}`);
+  }, [isLoading, me, setLocation]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col">
+        <Navbar />
+        <main className="container mx-auto px-4 py-8">Loading...</main>
+      </div>
+    );
+  }
 
   const [formData, setFormData] = useState({
     url: "https://",
@@ -50,12 +70,35 @@ export default function CreateApp() {
         setStep(step + 1);
       }, 500);
     } else {
-        // Handle payment/submit
-        toast({
-            title: "Success!",
-            description: "Redirecting to payment gateway...",
-        });
-        setTimeout(() => setLocation("/dashboard"), 1500);
+      // Handle payment/submit
+      (async () => {
+        setLoading(true);
+        try {
+          await apiRequest("POST", "/api/apps", {
+            name: formData.appName,
+            url: formData.url,
+            icon: formData.icon,
+            primaryColor: formData.primaryColor,
+            platform: formData.platform,
+            status: "processing",
+          });
+
+          await queryClient.invalidateQueries({ queryKey: ["/api/apps"] });
+          toast({
+            title: "App creation started",
+            description: "We are building your app now.",
+          });
+          setLocation("/dashboard");
+        } catch (err: any) {
+          toast({
+            title: "Could not create app",
+            description: err?.message || "Please try again",
+            variant: "destructive",
+          });
+        } finally {
+          setLoading(false);
+        }
+      })();
     }
   };
 

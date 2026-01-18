@@ -1,6 +1,9 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { LayoutDashboard, Smartphone, Plus, LogOut, Menu } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
+import { Sheet, SheetClose, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,47 +11,98 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import logoImg from "@assets/ChatGPT_Image_Jan_17,_2026,_01_09_57_PM_1768635605492.png";
+
+function NavItem({
+  href,
+  label,
+  currentPath,
+}: {
+  href: string;
+  label: string;
+  currentPath: string;
+}) {
+  const active = currentPath === href;
+  return (
+    <Link href={href}>
+      <a
+        aria-current={active ? "page" : undefined}
+        className={
+          "relative text-sm font-semibold transition-colors" +
+          (active
+            ? " text-white"
+            : " text-slate-200/80 hover:text-white")
+        }
+      >
+        {label}
+        <span
+          className={
+            "pointer-events-none absolute -bottom-2 left-0 h-px w-full bg-primary transition-opacity" +
+            (active ? " opacity-100" : " opacity-0")
+          }
+        />
+      </a>
+    </Link>
+  );
+}
 
 export function Navbar() {
-  const [location] = useLocation();
-  const isDashboard = location.startsWith("/dashboard") || location.startsWith("/create");
+  const [location, setLocation] = useLocation();
+  const { data: me } = useQuery({
+    queryKey: ["/api/me"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+  });
+
+  const isAuthed = !!me;
+
+  const initials = (() => {
+    const name = (me as any)?.name as string | null | undefined;
+    const username = (me as any)?.username as string | undefined;
+    const base = (name && name.trim().length > 0 ? name : username) || "";
+    const first = base.trim()[0]?.toUpperCase();
+    return first || "U";
+  })();
+
+  const handleLogout = async () => {
+    try {
+      await apiRequest("POST", "/api/auth/logout");
+    } finally {
+      queryClient.clear();
+      setLocation("/");
+    }
+  };
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b border-white/5 bg-slate-100 shadow-sm">
-      <div className="container mx-auto flex h-28 items-center justify-between px-4">
+    <nav className="sticky top-0 z-50 w-full border-b border-white/10 bg-background/70 backdrop-blur-xl">
+      <div className="container mx-auto flex h-24 items-center justify-between px-4">
         <Link href="/">
           <div className="flex items-center cursor-pointer group">
-            <img 
-              src={logoImg} 
-              alt="Applyn Logo" 
-              className="h-24 w-auto object-contain transition-transform group-hover:scale-105" 
-              style={{ filter: 'contrast(1.1) brightness(0.95)' }}
-            />
+            <span className="text-xl font-semibold tracking-tight bg-gradient-to-r from-violet-400 via-indigo-400 to-sky-300 bg-clip-text text-transparent">
+              Applyn
+            </span>
           </div>
         </Link>
 
-        <div className="hidden md:flex items-center gap-6">
-          {!isDashboard ? (
+        <div className="hidden md:flex items-center gap-8">
+          {!isAuthed ? (
             <>
-              <Link href="/">
-                <a className={`text-sm font-semibold transition-colors hover:text-primary ${location === "/" ? "text-primary" : "text-slate-600"}`}>Home</a>
-              </Link>
-              <Link href="/features">
-                <a className={`text-sm font-semibold transition-colors hover:text-primary ${location === "/features" ? "text-primary" : "text-slate-600"}`}>Features</a>
-              </Link>
-              <Link href="/pricing">
-                <a className={`text-sm font-semibold transition-colors hover:text-primary ${location === "/pricing" ? "text-primary" : "text-slate-600"}`}>Pricing</a>
-              </Link>
-              <Link href="/faq">
-                <a className={`text-sm font-semibold transition-colors hover:text-primary ${location === "/faq" ? "text-primary" : "text-slate-600"}`}>FAQ</a>
-              </Link>
-              <div className="h-6 w-px bg-slate-200" />
+              <NavItem href="/" label="Home" currentPath={location} />
+              <NavItem href="/features" label="Features" currentPath={location} />
+              <NavItem href="/pricing" label="Pricing" currentPath={location} />
+              <NavItem href="/faq" label="FAQ" currentPath={location} />
+              <NavItem href="/contact" label="Contact" currentPath={location} />
+              <div className="h-6 w-px bg-white/10" />
               <Link href="/login">
-                <Button variant="ghost" size="sm" className="font-semibold text-slate-600 hover:text-primary hover:bg-primary/5">Sign in</Button>
+                <Button variant="ghost" size="sm" className="font-semibold text-slate-200/80 hover:text-white hover:bg-white/5">
+                  Sign in
+                </Button>
               </Link>
-              <Link href="/login">
-                <Button size="sm" className="bg-primary hover:bg-primary/90 text-black font-bold px-6 rounded-xl shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95">Get Started</Button>
+              <Link href="/login?returnTo=%2Fcreate">
+                <Button
+                  size="sm"
+                  className="bg-primary hover:bg-primary/90 text-black font-extrabold px-6 rounded-xl shadow-lg shadow-primary/20 transition-transform hover:scale-[1.03] active:scale-[0.98]"
+                >
+                  Get Started
+                </Button>
               </Link>
             </>
           ) : (
@@ -65,19 +119,19 @@ export function Navbar() {
                   New App
                 </Button>
               </Link>
-              <div className="h-6 w-px bg-border" />
+              <div className="h-6 w-px bg-white/10" />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full">
-                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                      JD
+                  <Button variant="ghost" size="icon" className="rounded-full hover:bg-white/5">
+                    <div className="h-8 w-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-100 font-bold">
+                      {initials}
                     </div>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem>Profile</DropdownMenuItem>
-                  <DropdownMenuItem>Billing</DropdownMenuItem>
-                  <DropdownMenuItem className="text-destructive">
+                  <DropdownMenuItem onClick={() => setLocation("/profile")}>Profile</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setLocation("/billing")}>Billing</DropdownMenuItem>
+                  <DropdownMenuItem className="text-destructive" onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Log out
                   </DropdownMenuItem>
@@ -89,11 +143,78 @@ export function Navbar() {
 
         {/* Mobile Menu */}
         <div className="md:hidden">
-          <Button variant="ghost" size="icon">
-            <Menu className="h-6 w-6" />
-          </Button>
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="Menu">
+                <Menu className="h-6 w-6" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="bg-background text-slate-100 border-white/10">
+              <div className="mt-10 space-y-4">
+                {!isAuthed ? (
+                  <>
+                    <MobileLink label="Home" onClick={() => setLocation("/")} />
+                    <MobileLink label="Features" onClick={() => setLocation("/features")} />
+                    <MobileLink label="Pricing" onClick={() => setLocation("/pricing")} />
+                    <MobileLink label="FAQ" onClick={() => setLocation("/faq")} />
+                    <MobileLink label="Contact" onClick={() => setLocation("/contact")} />
+                    <div className="pt-4 space-y-2">
+                      <SheetClose asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => setLocation("/login")}
+                        >
+                          Sign in
+                        </Button>
+                      </SheetClose>
+                      <SheetClose asChild>
+                        <Button className="w-full" onClick={() => setLocation("/login?returnTo=%2Fcreate")}>
+                          Get Started
+                        </Button>
+                      </SheetClose>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <MobileLink label="Dashboard" onClick={() => setLocation("/dashboard")} />
+                    <MobileLink label="Create App" onClick={() => setLocation("/create")} />
+                    <MobileLink label="Profile" onClick={() => setLocation("/profile")} />
+                    <MobileLink label="Billing" onClick={() => setLocation("/billing")} />
+                    <div className="pt-4">
+                      <SheetClose asChild>
+                        <Button className="w-full" variant="destructive" onClick={handleLogout}>
+                          Log out
+                        </Button>
+                      </SheetClose>
+                    </div>
+                  </>
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
     </nav>
+  );
+}
+
+function MobileLink({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <SheetClose asChild>
+      <Button
+        variant="ghost"
+        className="w-full justify-start text-base text-slate-200/90 hover:text-white hover:bg-white/5"
+        onClick={onClick}
+      >
+        {label}
+      </Button>
+    </SheetClose>
   );
 }

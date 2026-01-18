@@ -48,7 +48,7 @@ export default function Home() {
                     />
                   </div>
                   <Button 
-                    onClick={() => setLocation("/create")}
+                    onClick={() => setLocation(`/login?returnTo=${encodeURIComponent("/create")}`)}
                     size="lg" 
                     className="h-14 px-8 text-lg font-bold rounded-2xl shadow-xl shadow-primary/25 hover:scale-105 transition-all active:scale-95"
                   >

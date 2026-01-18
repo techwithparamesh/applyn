@@ -8,19 +8,52 @@ import { Link, useLocation } from "wouter";
 import { Smartphone, Mail, Lock, Chrome } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AuthPage() {
   const [, setLocation] = useLocation();
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
+    try {
+      if (isLogin) {
+        await apiRequest("POST", "/api/auth/login", {
+          email,
+          password,
+        });
+      } else {
+        await apiRequest("POST", "/api/auth/register", {
+          name: fullName,
+          username: email,
+          password,
+        });
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      const returnTo = params.get("returnTo");
+      if (returnTo && returnTo.startsWith("/")) {
+        setLocation(returnTo);
+      } else {
+        setLocation("/dashboard");
+      }
+    } catch (err: any) {
+      toast({
+        title: "Authentication failed",
+        description: err?.message || "Please try again",
+        variant: "destructive",
+      });
+    } finally {
       setLoading(false);
-      setLocation("/dashboard");
-    }, 1200);
+    }
   };
 
   return (
@@ -79,6 +112,8 @@ export default function AuthPage() {
                             id="name" 
                             placeholder="Arjun Reddy" 
                             required 
+                            value={fullName}
+                            onChange={(e) => setFullName(e.target.value)}
                             className="h-12 bg-white/5 border-white/10 focus:border-primary/50 transition-all rounded-xl"
                           />
                         </div>
@@ -93,6 +128,8 @@ export default function AuthPage() {
                           type="email" 
                           placeholder="name@company.com" 
                           required 
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
                           className="h-12 bg-white/5 border-white/10 focus:border-primary/50 transition-all rounded-xl"
                         />
                       </div>
@@ -100,7 +137,7 @@ export default function AuthPage() {
 
                     <div className="space-y-2">
                       <div className="flex items-center justify-between ml-1">
-                        <Label htmlFor="password" text-slate-300>Password</Label>
+                        <Label htmlFor="password" className="text-slate-300">Password</Label>
                         {isLogin && (
                           <Link href="#" className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors">
                             Forgot password?
@@ -111,6 +148,8 @@ export default function AuthPage() {
                         id="password" 
                         type="password" 
                         required 
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
                         className="h-12 bg-white/5 border-white/10 focus:border-primary/50 transition-all rounded-xl"
                       />
                     </div>

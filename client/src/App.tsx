@@ -12,6 +12,8 @@ import Features from "@/pages/features";
 import Pricing from "@/pages/pricing";
 import FAQ from "@/pages/faq";
 import Contact from "@/pages/contact";
+import Profile from "@/pages/profile";
+import Billing from "@/pages/billing";
 
 function Router() {
   return (
@@ -21,6 +23,8 @@ function Router() {
       <Route path="/pricing" component={Pricing} />
       <Route path="/faq" component={FAQ} />
       <Route path="/contact" component={Contact} />
+      <Route path="/profile" component={Profile} />
+      <Route path="/billing" component={Billing} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/create" component={CreateApp} />
       <Route path="/login" component={Login} />
