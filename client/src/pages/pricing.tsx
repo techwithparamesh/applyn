@@ -63,11 +63,11 @@ export default function Pricing() {
                 price="₹499"
                 description="Ideal for students and hobbyists wanting to see their project on a phone."
                 features={[
-                  "Basic Android .apk file",
-                  "Simple WebView container",
-                  "Standard Splash Screen",
-                  "Community Support",
-                  "Single Build"
+                  "Android .apk file (debug)",
+                  "Basic WebView wrapper",
+                  "Default Splash Screen",
+                  "Community Support (forum)",
+                  "Single Build – no rebuilds"
                 ]}
                 buttonText="Get Started"
                 variant="outline"
@@ -76,33 +76,33 @@ export default function Pricing() {
               <PricingCard 
                 title="Standard Build"
                 price="₹999"
-                description="Perfect for individual bloggers and small shop owners looking for an Android presence."
+                description="Perfect for bloggers and small shop owners launching their first Android app."
                 features={[
-                  "Full Android .apk & .aab files",
-                  "Automated WebView Setup",
-                  "Basic Push Notification Setup",
-                  "Standard App Icon & Splash",
-                  "Email Support (24h turnaround)",
-                  "1 Year of Technical Updates"
+                  "Android .apk & .aab (release)",
+                  "Custom App Icon & Splash",
+                  "Push Notification Ready",
+                  "Email Support (48h response)",
+                  "1 Free Rebuild within 30 days",
+                  "Play Store upload guide"
                 ]}
                 buttonText="Get Android Build"
                 variant="outline"
                 onSelect={() => handleSelectPlan("standard")}
               />
               <PricingCard 
-                title="Enterprise Pro"
+                title="Pro Build"
                 price="₹2,499"
-                description="The complete solution for established brands and scaling agencies across all platforms."
+                description="For brands & agencies needing a polished, store-ready Android app with priority support."
                 features={[
-                  "Android + iOS Ready Files",
-                  "Unlimited Firebase Notifications",
-                  "Custom Branding (White-Label)",
-                  "Advanced Offline Caching",
+                  "Android .apk & .aab (signed)",
+                  "Push Notifications Integrated",
+                  "White-Label Branding",
+                  "Offline Caching Support",
                   "Priority WhatsApp Support",
-                  "Lifetime Platform Updates",
-                  "Ready for Store Submission"
+                  "3 Free Rebuilds within 90 days",
+                  "Play Store ready package"
                 ]}
-                buttonText="Get Full Access"
+                buttonText="Get Pro Build"
                 variant="default"
                 popular
                 onSelect={() => handleSelectPlan("pro")}

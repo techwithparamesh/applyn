@@ -101,6 +101,8 @@ export interface IStorage {
   getPaymentByOrderId(orderId: string): Promise<Payment | undefined>;
   updatePaymentStatus(id: string, status: PaymentStatus, providerPaymentId?: string | null): Promise<Payment | undefined>;
   listPaymentsByUser(userId: string): Promise<Payment[]>;
+  getCompletedPaymentForApp(appId: string): Promise<Payment | undefined>;
+  countCompletedBuildsForApp(appId: string, sinceDate?: Date): Promise<number>;
 
   // Push Notifications
   createPushToken(token: InsertPushToken): Promise<PushToken>;
@@ -462,6 +464,22 @@ export class MemStorage implements IStorage {
     return Array.from(this.payments.values())
       .filter((p) => p.userId === userId)
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  }
+
+  async getCompletedPaymentForApp(appId: string): Promise<Payment | undefined> {
+    return Array.from(this.payments.values()).find(
+      (p) => p.appId === appId && p.status === "completed"
+    );
+  }
+
+  async countCompletedBuildsForApp(appId: string, sinceDate?: Date): Promise<number> {
+    // Count build jobs that completed successfully for this app
+    return Array.from(this.buildJobs.values()).filter((j) => {
+      if (j.appId !== appId) return false;
+      if (j.status !== "completed") return false;
+      if (sinceDate && j.createdAt < sinceDate) return false;
+      return true;
+    }).length;
   }
 
   // --- Push Notification methods ---

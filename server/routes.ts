@@ -82,6 +82,65 @@ function requireAuth(req: any, res: any, next: any) {
   return res.status(401).json({ message: "Unauthorized" });
 }
 
+// --- Plan-based limits configuration ---
+const PLAN_LIMITS: Record<string, { rebuilds: number; rebuildWindowDays: number; pushEnabled: boolean }> = {
+  starter: { rebuilds: 0, rebuildWindowDays: 0, pushEnabled: false },
+  standard: { rebuilds: 1, rebuildWindowDays: 30, pushEnabled: true },
+  pro: { rebuilds: 3, rebuildWindowDays: 90, pushEnabled: true },
+};
+
+function getPlanLimits(plan: string) {
+  return PLAN_LIMITS[plan] || PLAN_LIMITS.starter;
+}
+
+// Helper to get the plan for an app (from the completed payment)
+async function getAppPlanInfo(appId: string): Promise<{ plan: string; paidAt: Date | null; limits: typeof PLAN_LIMITS.starter }> {
+  const payment = await storage.getCompletedPaymentForApp(appId);
+  const plan = payment?.plan || "starter";
+  return {
+    plan,
+    paidAt: payment?.createdAt || null,
+    limits: getPlanLimits(plan),
+  };
+}
+
+// Check if a rebuild is allowed for an app based on plan limits
+async function checkRebuildAllowed(appId: string): Promise<{ allowed: boolean; reason?: string; used: number; limit: number }> {
+  const { plan, paidAt, limits } = await getAppPlanInfo(appId);
+  
+  // No payment = no builds allowed (first build happens after payment)
+  if (!paidAt) {
+    return { allowed: false, reason: "No completed payment found for this app", used: 0, limit: 0 };
+  }
+  
+  // Starter plan = no rebuilds allowed
+  if (limits.rebuilds === 0) {
+    return { allowed: false, reason: "Starter plan does not include rebuilds. Upgrade to Standard or Pro.", used: 0, limit: 0 };
+  }
+  
+  // Calculate rebuild window
+  const windowStart = new Date(paidAt.getTime());
+  const windowEnd = new Date(paidAt.getTime() + limits.rebuildWindowDays * 24 * 60 * 60 * 1000);
+  const now = new Date();
+  
+  if (now > windowEnd) {
+    return { allowed: false, reason: `Rebuild window expired (${limits.rebuildWindowDays} days from purchase)`, used: 0, limit: limits.rebuilds };
+  }
+  
+  // Count completed builds since payment (first build + rebuilds)
+  const completedBuilds = await storage.countCompletedBuildsForApp(appId, paidAt);
+  
+  // First build is free; rebuilds are counted after that
+  // So if completedBuilds >= 1 + limits.rebuilds, they've exhausted their rebuilds
+  const rebuildsUsed = Math.max(0, completedBuilds - 1);
+  
+  if (rebuildsUsed >= limits.rebuilds) {
+    return { allowed: false, reason: `Rebuild limit reached (${limits.rebuilds} rebuilds on ${plan} plan)`, used: rebuildsUsed, limit: limits.rebuilds };
+  }
+  
+  return { allowed: true, used: rebuildsUsed, limit: limits.rebuilds };
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express,
@@ -414,6 +473,18 @@ export async function registerRoutes(
       const appItem = await storage.getApp(req.params.id);
       if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
         return res.status(404).json({ message: "Not found" });
+      }
+
+      // --- Enforce plan-based rebuild limits (staff bypass) ---
+      if (!isStaff(user)) {
+        const rebuildCheck = await checkRebuildAllowed(appItem.id);
+        if (!rebuildCheck.allowed) {
+          return res.status(403).json({
+            message: rebuildCheck.reason,
+            rebuildsUsed: rebuildCheck.used,
+            rebuildsLimit: rebuildCheck.limit,
+          });
+        }
       }
 
       await storage.updateAppBuild(appItem.id, { status: "processing", buildError: null });
@@ -775,6 +846,43 @@ export async function registerRoutes(
     }
   });
 
+  // Get plan limits and usage for an app (for frontend display)
+  app.get("/api/apps/:id/plan", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const appItem = await storage.getApp(req.params.id);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "App not found" });
+      }
+
+      const { plan, paidAt, limits } = await getAppPlanInfo(appItem.id);
+      const rebuildCheck = paidAt ? await checkRebuildAllowed(appItem.id) : { allowed: false, used: 0, limit: 0 };
+      
+      // Calculate window expiry
+      let windowExpiresAt: Date | null = null;
+      if (paidAt && limits.rebuildWindowDays > 0) {
+        windowExpiresAt = new Date(paidAt.getTime() + limits.rebuildWindowDays * 24 * 60 * 60 * 1000);
+      }
+
+      return res.json({
+        plan,
+        paidAt,
+        limits,
+        rebuilds: {
+          used: rebuildCheck.used,
+          limit: rebuildCheck.limit,
+          remaining: Math.max(0, rebuildCheck.limit - rebuildCheck.used),
+          allowed: rebuildCheck.allowed,
+          windowExpiresAt,
+        },
+      });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
   // --- Push Notifications ---
   
   // Register a device token (called from the mobile app)
@@ -827,6 +935,14 @@ export async function registerRoutes(
         return res.status(404).json({ message: "App not found" });
       }
 
+      // --- Enforce plan-based push access (staff bypass) ---
+      if (!isStaff(user)) {
+        const { limits } = await getAppPlanInfo(appItem.id);
+        if (!limits.pushEnabled) {
+          return res.status(403).json({ message: "Push notifications are not available on Starter plan. Upgrade to Standard or Pro." });
+        }
+      }
+
       const tokens = await storage.listPushTokensByApp(req.params.id);
       return res.json({ count: tokens.length, tokens });
     } catch (err) {
@@ -843,6 +959,14 @@ export async function registerRoutes(
       const appItem = await storage.getApp(req.params.id);
       if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
         return res.status(404).json({ message: "App not found" });
+      }
+
+      // --- Enforce plan-based push access (staff bypass) ---
+      if (!isStaff(user)) {
+        const { limits } = await getAppPlanInfo(appItem.id);
+        if (!limits.pushEnabled) {
+          return res.status(403).json({ message: "Push notifications are not available on Starter plan. Upgrade to Standard or Pro." });
+        }
       }
 
       const payload = insertPushNotificationSchema.omit({ appId: true }).parse(req.body);

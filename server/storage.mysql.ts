@@ -432,6 +432,32 @@ export class MysqlStorage {
     return rows as unknown as Payment[];
   }
 
+  async getCompletedPaymentForApp(appId: string): Promise<Payment | undefined> {
+    const rows = await getMysqlDb()
+      .select()
+      .from(payments)
+      .where(and(eq(payments.appId, appId), eq(payments.status, "completed")))
+      .limit(1);
+    return rows[0] as unknown as Payment | undefined;
+  }
+
+  async countCompletedBuildsForApp(appId: string, sinceDate?: Date): Promise<number> {
+    let query = getMysqlDb()
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(buildJobs)
+      .where(
+        sinceDate
+          ? and(
+              eq(buildJobs.appId, appId),
+              eq(buildJobs.status, "completed"),
+              sql`${buildJobs.createdAt} >= ${sinceDate}`
+            )
+          : and(eq(buildJobs.appId, appId), eq(buildJobs.status, "completed"))
+      );
+    const rows = await query;
+    return Number(rows[0]?.count ?? 0);
+  }
+
   // --- Push Notification methods ---
   async createPushToken(token: InsertPushToken): Promise<PushToken> {
     const id = randomUUID();
