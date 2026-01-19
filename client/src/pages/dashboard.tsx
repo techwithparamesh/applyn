@@ -279,8 +279,8 @@ export default function Dashboard() {
                     )}
 
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>Edit App</DropdownMenuItem>
-                    <DropdownMenuItem>Push Notifications</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/edit`)}>Edit App</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/push`)}>Push Notifications</DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-destructive"
                       onClick={() => handleDelete(app.id)}

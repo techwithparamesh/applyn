@@ -5,12 +5,13 @@
   "license": "MIT",
   "scripts": {
     "dev:client": "vite dev --port 5000",
-    "dev": "cross-env NODE_ENV=development tsx server/index.ts",
+    "dev": "cross-env NODE_ENV=development node --import tsx server/index.ts",
     "build": "tsx script/build.ts",
     "start": "cross-env NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
+    "e2e:sanity": "cross-env NODE_ENV=development tsx script/e2e-sanity.ts",
     "db:push": "drizzle-kit push",
-    "worker": "cross-env NODE_ENV=production tsx server/worker.ts",
+    "worker": "cross-env NODE_ENV=production node --import tsx server/worker.ts",
     "docker:android-builder": "docker build -f docker/android-builder/Dockerfile -t applyn-android-builder:latest ."
   },
   "dependencies": {
@@ -62,6 +63,7 @@
     "mysql2": "^3.16.1",
     "next-themes": "^0.4.6",
     "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
     "passport-local": "^1.0.0",
     "react": "^19.2.0",
     "react-day-picker": "^9.11.1",
@@ -88,6 +90,7 @@
     "@types/express-session": "^1.18.0",
     "@types/node": "^20.19.0",
     "@types/passport": "^1.0.16",
+    "@types/passport-google-oauth20": "^2.0.16",
     "@types/passport-local": "^1.0.38",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",

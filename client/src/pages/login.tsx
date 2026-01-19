@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { Link, useLocation } from "wouter";
 import { Smartphone, Mail, Lock, Chrome } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -20,6 +20,25 @@ export default function AuthPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const err = params.get("error");
+    if (!err) return;
+    if (err === "google_not_configured") {
+      toast({
+        title: "Google sign-in unavailable",
+        description: "Google OAuth is not configured on the server yet.",
+        variant: "destructive",
+      });
+    } else if (err === "google_failed") {
+      toast({
+        title: "Google sign-in failed",
+        description: "Please try again or use email/password.",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,7 +158,7 @@ export default function AuthPage() {
                       <div className="flex items-center justify-between ml-1">
                         <Label htmlFor="password" className="text-slate-300">Password</Label>
                         {isLogin && (
-                          <Link href="#" className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors">
+                          <Link href="/forgot-password" className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors">
                             Forgot password?
                           </Link>
                         )}
@@ -175,6 +194,12 @@ export default function AuthPage() {
                       variant="outline" 
                       className="w-full h-12 border-white/10 bg-white/5 hover:bg-white/10 text-white rounded-xl flex items-center gap-3 transition-all font-semibold" 
                       type="button"
+                      onClick={() => {
+                        const params = new URLSearchParams(window.location.search);
+                        const returnTo = params.get("returnTo") || "/dashboard";
+                        const safeReturnTo = returnTo.startsWith("/") ? returnTo : "/dashboard";
+                        window.location.href = `/api/auth/google?returnTo=${encodeURIComponent(safeReturnTo)}`;
+                      }}
                     >
                       <Chrome className="h-5 w-5" />
                       Google

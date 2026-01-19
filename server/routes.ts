@@ -11,11 +11,25 @@ import {
   insertSupportTicketSchema,
   insertUserSchema,
   supportTicketStatusSchema,
+  updateUserSchema,
+  insertPushTokenSchema,
+  insertPushNotificationSchema,
   type User,
   userRoleSchema,
 } from "@shared/schema";
 import { storage } from "./storage";
-import { hashPassword, sanitizeUser } from "./auth";
+import { hashPassword, sanitizeUser, verifyPassword } from "./auth";
+import crypto from "crypto";
+
+function isGoogleConfigured() {
+  return !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+}
+
+function safeReturnTo(raw: unknown) {
+  const s = typeof raw === "string" ? raw : "";
+  if (s && s.startsWith("/")) return s;
+  return "/dashboard";
+}
 
 function safeArtifactsRoot() {
   const root = process.env.ARTIFACTS_DIR || path.resolve(process.cwd(), "artifacts");
@@ -249,6 +263,35 @@ export async function registerRoutes(
     )(req, res, next);
   });
 
+  // --- Google OAuth (optional) ---
+  app.get("/api/auth/google", (req, res, next) => {
+    if (!isGoogleConfigured()) {
+      return res.redirect("/login?error=google_not_configured");
+    }
+
+    const returnTo = safeReturnTo(req.query.returnTo);
+    const state = encodeURIComponent(returnTo);
+
+    return passport.authenticate("google", {
+      scope: ["profile", "email"],
+      prompt: "select_account",
+      state,
+    })(req, res, next);
+  });
+
+  app.get(
+    "/api/auth/google/callback",
+    passport.authenticate("google", {
+      failureRedirect: "/login?error=google_failed",
+    }),
+    (req, res) => {
+      const returnTo = safeReturnTo(
+        typeof req.query.state === "string" ? decodeURIComponent(req.query.state) : "/dashboard",
+      );
+      return res.redirect(returnTo);
+    },
+  );
+
   app.post("/api/auth/logout", requireAuth, (req, res, next) => {
     const logout = (req as any).logout as
       | undefined
@@ -301,16 +344,19 @@ export async function registerRoutes(
       const user = getAuthedUser(req);
       if (!user) return res.status(401).json({ message: "Unauthorized" });
 
-      const payload = insertAppSchema
-        .extend({
-          status: z
-            .enum(["draft", "processing", "live", "failed"])
-            .optional()
-            .default("processing"),
-        })
-        .parse(req.body);
+      // Clients must not be able to set server-owned states like "live" / "failed".
+      // Accept a simple buildNow flag instead.
+      const createSchema = insertAppSchema.extend({
+        buildNow: z.boolean().optional().default(true),
+      });
 
-      const created = await storage.createApp(user.id, payload);
+      const parsed = createSchema.parse(req.body);
+      const { buildNow, ...payload } = parsed;
+
+      const created = await storage.createApp(user.id, {
+        ...payload,
+        status: buildNow ? "processing" : "draft",
+      });
 
       // If the app is meant to be built immediately, enqueue a build job.
       // This avoids apps being stuck in "processing" with no job.
@@ -324,7 +370,7 @@ export async function registerRoutes(
     }
   });
 
-  const updateAppSchema = insertAppSchema.partial().strict();
+  const updateAppSchema = insertAppSchema.omit({ status: true }).partial().strict();
   app.patch("/api/apps/:id", requireAuth, async (req, res, next) => {
     try {
       const user = getAuthedUser(req);
@@ -467,6 +513,450 @@ export async function registerRoutes(
       }
     },
   );
+
+  // --- Profile management ---
+  app.patch("/api/me", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const payload = updateUserSchema.parse(req.body);
+      const updates: Partial<{ name: string; password: string }> = {};
+
+      if (payload.name !== undefined) {
+        updates.name = payload.name;
+      }
+
+      if (payload.newPassword) {
+        if (!payload.currentPassword) {
+          return res.status(400).json({ message: "Current password required" });
+        }
+        const ok = await verifyPassword(payload.currentPassword, user.password);
+        if (!ok) {
+          return res.status(400).json({ message: "Current password is incorrect" });
+        }
+        updates.password = await hashPassword(payload.newPassword);
+      }
+
+      if (Object.keys(updates).length === 0) {
+        return res.json(sanitizeUser(user));
+      }
+
+      const updated = await storage.updateUser(user.id, updates);
+      return res.json(sanitizeUser(updated!));
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Forgot password flow ---
+  const forgotPasswordSchema = z.object({
+    email: z.string().email().max(320).transform((s) => s.trim().toLowerCase()),
+  }).strict();
+
+  app.post("/api/auth/forgot-password", authLimiter, async (req, res, next) => {
+    try {
+      const { email } = forgotPasswordSchema.parse(req.body);
+      const user = await storage.getUserByUsername(email);
+
+      // Always return success to prevent email enumeration
+      if (!user) {
+        return res.json({ ok: true, message: "If that email exists, a reset link has been sent." });
+      }
+
+      // Generate reset token
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      await storage.setResetToken(user.id, token, expiresAt);
+
+      // In production, send email via nodemailer/resend/etc.
+      // For MVP, log to console (you can replace this with actual email sending)
+      const resetUrl = `${process.env.APP_URL || "http://localhost:5000"}/reset-password?token=${token}`;
+      console.log(`[PASSWORD RESET] Email: ${email}, URL: ${resetUrl}`);
+
+      // TODO: Integrate with email service (Resend, SendGrid, etc.)
+      // await sendEmail({ to: email, subject: "Reset your password", html: `<a href="${resetUrl}">Reset Password</a>` });
+
+      return res.json({ ok: true, message: "If that email exists, a reset link has been sent." });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  const resetPasswordSchema = z.object({
+    token: z.string().min(32).max(128),
+    password: z.string().min(8).max(200),
+  }).strict();
+
+  app.post("/api/auth/reset-password", authLimiter, async (req, res, next) => {
+    try {
+      const { token, password } = resetPasswordSchema.parse(req.body);
+
+      const user = await storage.getUserByResetToken(token);
+      if (!user) {
+        return res.status(400).json({ message: "Invalid or expired reset token" });
+      }
+
+      // Check if token is expired
+      const expiresAt = (user as any).resetTokenExpiresAt;
+      if (!expiresAt || new Date(expiresAt) < new Date()) {
+        await storage.clearResetToken(user.id);
+        return res.status(400).json({ message: "Reset token has expired" });
+      }
+
+      // Update password and clear token
+      const passwordHash = await hashPassword(password);
+      await storage.updateUser(user.id, { password: passwordHash });
+      await storage.clearResetToken(user.id);
+
+      return res.json({ ok: true, message: "Password has been reset successfully" });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Razorpay Payment Integration ---
+  const razorpayKeyId = (process.env.RAZORPAY_KEY_ID || "").trim();
+  const razorpayKeySecret = (process.env.RAZORPAY_KEY_SECRET || "").trim();
+
+  function isRazorpayConfigured() {
+    return !!(razorpayKeyId && razorpayKeySecret);
+  }
+
+  // Plan pricing (in paise)
+  const PLAN_PRICES: Record<string, number> = {
+    starter: 49900,   // ₹499
+    standard: 99900,  // ₹999
+    pro: 249900,      // ₹2499
+  };
+
+  const createOrderSchema = z.object({
+    plan: z.enum(["starter", "standard", "pro"]),
+    appId: z.string().uuid().optional().nullable(),
+  }).strict();
+
+  app.post("/api/payments/create-order", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      if (!isRazorpayConfigured()) {
+        return res.status(503).json({ message: "Payment gateway not configured" });
+      }
+
+      const { plan, appId } = createOrderSchema.parse(req.body);
+      const amountInPaise = PLAN_PRICES[plan];
+      if (!amountInPaise) {
+        return res.status(400).json({ message: "Invalid plan" });
+      }
+
+      // Create Razorpay order via API
+      const orderPayload = {
+        amount: amountInPaise,
+        currency: "INR",
+        receipt: `app_${appId || "new"}_${Date.now()}`,
+        notes: {
+          userId: user.id,
+          plan,
+          appId: appId || "",
+        },
+      };
+
+      const auth = Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString("base64");
+      const rzpRes = await fetch("https://api.razorpay.com/v1/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Basic ${auth}`,
+        },
+        body: JSON.stringify(orderPayload),
+      });
+
+      if (!rzpRes.ok) {
+        const errText = await rzpRes.text();
+        console.error("Razorpay order creation failed:", errText);
+        return res.status(502).json({ message: "Payment gateway error" });
+      }
+
+      const rzpOrder = (await rzpRes.json()) as { id: string; amount: number; currency: string };
+
+      // Save payment record
+      const payment = await storage.createPayment(user.id, {
+        appId: appId || null,
+        provider: "razorpay",
+        providerOrderId: rzpOrder.id,
+        amountInr: amountInPaise / 100,
+        plan,
+      });
+
+      return res.json({
+        orderId: rzpOrder.id,
+        amount: rzpOrder.amount,
+        currency: rzpOrder.currency,
+        keyId: razorpayKeyId,
+        paymentId: payment.id,
+        plan,
+      });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  const verifyPaymentSchema = z.object({
+    razorpay_order_id: z.string(),
+    razorpay_payment_id: z.string(),
+    razorpay_signature: z.string(),
+    paymentId: z.string().uuid(),
+  }).strict();
+
+  app.post("/api/payments/verify", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      if (!isRazorpayConfigured()) {
+        return res.status(503).json({ message: "Payment gateway not configured" });
+      }
+
+      const { razorpay_order_id, razorpay_payment_id, razorpay_signature, paymentId } =
+        verifyPaymentSchema.parse(req.body);
+
+      // Verify signature
+      const expectedSignature = crypto
+        .createHmac("sha256", razorpayKeySecret)
+        .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+        .digest("hex");
+
+      if (expectedSignature !== razorpay_signature) {
+        await storage.updatePaymentStatus(paymentId, "failed");
+        return res.status(400).json({ message: "Payment verification failed" });
+      }
+
+      // Update payment status
+      const payment = await storage.updatePaymentStatus(paymentId, "completed", razorpay_payment_id);
+      if (!payment) {
+        return res.status(404).json({ message: "Payment record not found" });
+      }
+
+      return res.json({ ok: true, payment });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // List user's payments (for billing page)
+  app.get("/api/payments", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const payments = await storage.listPaymentsByUser(user.id);
+      return res.json(payments);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Check payment status for an app
+  app.get("/api/payments/check/:appId", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const payments = await storage.listPaymentsByUser(user.id);
+      const appPayment = payments.find(
+        (p) => p.appId === req.params.appId && p.status === "completed"
+      );
+
+      return res.json({ paid: !!appPayment, payment: appPayment || null });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Push Notifications ---
+  
+  // Register a device token (called from the mobile app)
+  app.post("/api/push/register", async (req, res, next) => {
+    try {
+      const payload = insertPushTokenSchema.parse(req.body);
+      
+      // Check if app exists
+      const appItem = await storage.getApp(payload.appId);
+      if (!appItem) {
+        return res.status(404).json({ message: "App not found" });
+      }
+
+      // Check if token already exists for this app
+      const existing = await storage.getPushTokenByToken(payload.token);
+      if (existing && existing.appId === payload.appId) {
+        return res.json({ ok: true, tokenId: existing.id, message: "Token already registered" });
+      }
+
+      const token = await storage.createPushToken(payload);
+      return res.status(201).json({ ok: true, tokenId: token.id });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Unregister a device token
+  app.delete("/api/push/unregister/:token", async (req, res, next) => {
+    try {
+      const existing = await storage.getPushTokenByToken(req.params.token);
+      if (!existing) {
+        return res.json({ ok: true, message: "Token not found" });
+      }
+
+      await storage.deletePushToken(existing.id);
+      return res.json({ ok: true });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Get push tokens for an app (app owner only)
+  app.get("/api/apps/:id/push/tokens", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const appItem = await storage.getApp(req.params.id);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "App not found" });
+      }
+
+      const tokens = await storage.listPushTokensByApp(req.params.id);
+      return res.json({ count: tokens.length, tokens });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Send a push notification (app owner only)
+  app.post("/api/apps/:id/push/send", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const appItem = await storage.getApp(req.params.id);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "App not found" });
+      }
+
+      const payload = insertPushNotificationSchema.omit({ appId: true }).parse(req.body);
+      
+      // Create the notification record
+      const notification = await storage.createPushNotification({
+        ...payload,
+        appId: req.params.id,
+      });
+
+      // Get all tokens for this app
+      const tokens = await storage.listPushTokensByApp(req.params.id);
+      
+      if (tokens.length === 0) {
+        await storage.updatePushNotificationStatus(notification.id, "sent", 0, 0);
+        return res.json({ 
+          ok: true, 
+          notificationId: notification.id, 
+          message: "No devices registered",
+          sentCount: 0,
+          failedCount: 0,
+        });
+      }
+
+      // Send notifications via OneSignal or similar service
+      // For MVP: We'll use a simple fetch to OneSignal API
+      const onesignalAppId = (process.env.ONESIGNAL_APP_ID || "").trim();
+      const onesignalApiKey = (process.env.ONESIGNAL_API_KEY || "").trim();
+
+      if (!onesignalAppId || !onesignalApiKey) {
+        // OneSignal not configured - mark as sent but log warning
+        console.warn("[PUSH] OneSignal not configured. Notification saved but not delivered.");
+        await storage.updatePushNotificationStatus(notification.id, "sent", 0, tokens.length);
+        return res.json({
+          ok: true,
+          notificationId: notification.id,
+          message: "Push service not configured. Notification queued.",
+          sentCount: 0,
+          failedCount: tokens.length,
+        });
+      }
+
+      // Send via OneSignal
+      try {
+        const onesignalPayload = {
+          app_id: onesignalAppId,
+          include_player_ids: tokens.map((t) => t.token),
+          headings: { en: notification.title },
+          contents: { en: notification.body },
+          ...(notification.imageUrl && { big_picture: notification.imageUrl }),
+          ...(notification.actionUrl && { url: notification.actionUrl }),
+        };
+
+        const onesignalRes = await fetch("https://onesignal.com/api/v1/notifications", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Basic ${onesignalApiKey}`,
+          },
+          body: JSON.stringify(onesignalPayload),
+        });
+
+        const onesignalResult = await onesignalRes.json() as any;
+        
+        if (onesignalRes.ok) {
+          const sentCount = onesignalResult.recipients || tokens.length;
+          await storage.updatePushNotificationStatus(notification.id, "sent", sentCount, 0);
+          return res.json({
+            ok: true,
+            notificationId: notification.id,
+            sentCount,
+            failedCount: 0,
+          });
+        } else {
+          console.error("[PUSH] OneSignal error:", onesignalResult);
+          await storage.updatePushNotificationStatus(notification.id, "failed", 0, tokens.length);
+          return res.status(502).json({
+            ok: false,
+            notificationId: notification.id,
+            message: "Failed to send notifications",
+            error: onesignalResult.errors?.[0] || "Unknown error",
+          });
+        }
+      } catch (pushErr: any) {
+        console.error("[PUSH] Send error:", pushErr);
+        await storage.updatePushNotificationStatus(notification.id, "failed", 0, tokens.length);
+        return res.status(502).json({
+          ok: false,
+          notificationId: notification.id,
+          message: "Failed to send notifications",
+        });
+      }
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Get notification history for an app
+  app.get("/api/apps/:id/push/history", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const appItem = await storage.getApp(req.params.id);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "App not found" });
+      }
+
+      const notifications = await storage.listPushNotificationsByApp(req.params.id);
+      return res.json(notifications);
+    } catch (err) {
+      return next(err);
+    }
+  });
 
   return httpServer;
 

@@ -1,11 +1,16 @@
-import { mysqlTable, int, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { mysqlTable, int, text, timestamp, varchar, boolean } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: varchar("id", { length: 36 }).primaryKey(),
   name: text("name"),
   username: varchar("username", { length: 200 }).notNull().unique(),
+  googleId: varchar("google_id", { length: 255 }).unique(),
   role: varchar("role", { length: 16 }).notNull().default("user"),
   password: text("password").notNull(),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  emailVerifyToken: varchar("email_verify_token", { length: 128 }),
+  resetToken: varchar("reset_token", { length: 128 }),
+  resetTokenExpiresAt: timestamp("reset_token_expires_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });
@@ -53,6 +58,48 @@ export const supportTickets = mysqlTable("support_tickets", {
   subject: varchar("subject", { length: 200 }).notNull(),
   message: text("message").notNull(),
   status: varchar("status", { length: 16 }).notNull().default("open"),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+export const payments = mysqlTable("payments", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  userId: varchar("user_id", { length: 36 }).notNull(),
+  appId: varchar("app_id", { length: 36 }),
+  provider: varchar("provider", { length: 16 }).notNull().default("razorpay"),
+  providerOrderId: varchar("provider_order_id", { length: 128 }),
+  providerPaymentId: varchar("provider_payment_id", { length: 128 }),
+  amountInr: int("amount_inr").notNull(),
+  plan: varchar("plan", { length: 50 }).notNull().default("starter"),
+  status: varchar("status", { length: 16 }).notNull().default("pending"),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+// Push notification device tokens
+export const pushTokens = mysqlTable("push_tokens", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  appId: varchar("app_id", { length: 36 }).notNull(),
+  token: varchar("token", { length: 512 }).notNull(),
+  platform: varchar("platform", { length: 16 }).notNull().default("android"), // android, ios, web
+  deviceInfo: text("device_info"), // JSON with device details
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+// Push notifications queue/history
+export const pushNotifications = mysqlTable("push_notifications", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  appId: varchar("app_id", { length: 36 }).notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  body: text("body").notNull(),
+  imageUrl: text("image_url"),
+  actionUrl: text("action_url"),
+  status: varchar("status", { length: 16 }).notNull().default("pending"), // pending, sent, failed
+  sentCount: int("sent_count").notNull().default(0),
+  failedCount: int("failed_count").notNull().default(0),
+  scheduledAt: timestamp("scheduled_at", { mode: "date" }),
+  sentAt: timestamp("sent_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });

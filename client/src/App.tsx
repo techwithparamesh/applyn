@@ -8,6 +8,8 @@ import Home from "@/pages/home";
 import Dashboard from "@/pages/dashboard";
 import CreateApp from "@/pages/create-app";
 import Login from "@/pages/login";
+import ForgotPassword from "@/pages/forgot-password";
+import ResetPassword from "@/pages/reset-password";
 import Features from "@/pages/features";
 import Pricing from "@/pages/pricing";
 import FAQ from "@/pages/faq";
@@ -17,6 +19,8 @@ import Billing from "@/pages/billing";
 import AdminTeam from "@/pages/admin-team";
 import Ops from "@/pages/ops";
 import Tickets from "@/pages/tickets";
+import EditApp from "@/pages/edit-app";
+import PushNotifications from "@/pages/push-notifications";
 
 function Router() {
   return (
@@ -34,6 +38,10 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/create" component={CreateApp} />
       <Route path="/login" component={Login} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password" component={ResetPassword} />
+      <Route path="/apps/:id/edit" component={EditApp} />
+      <Route path="/apps/:id/push" component={PushNotifications} />
       <Route component={NotFound} />
     </Switch>
   );

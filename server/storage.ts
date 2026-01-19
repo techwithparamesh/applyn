@@ -9,11 +9,27 @@ import type {
   SupportTicketStatus,
   UserRole,
   User,
+  Payment,
+  InsertPayment,
+  PaymentStatus,
+  PushToken,
+  InsertPushToken,
+  PushNotification,
+  InsertPushNotification,
+  PushStatus,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { MysqlStorage } from "./storage.mysql";
 
 export type BuildJobStatus = "queued" | "running" | "succeeded" | "failed";
+
+function maxBuildAttempts() {
+  return Number(process.env.MAX_BUILD_ATTEMPTS || 3);
+}
+
+function jobLockTtlMs() {
+  return Number(process.env.BUILD_JOB_LOCK_TTL_MS || 30 * 60 * 1000);
+}
 
 export type BuildJob = {
   id: string;
@@ -46,7 +62,14 @@ export type AppBuildPatch = {
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByGoogleId(googleId: string): Promise<User | undefined>;
+  getUserByResetToken(token: string): Promise<User | undefined>;
   createUser(user: InsertUser & { role?: UserRole }): Promise<User>;
+  updateUser(id: string, patch: Partial<{ name: string; password: string }>): Promise<User | undefined>;
+  linkGoogleId(userId: string, googleId: string): Promise<User | undefined>;
+  setResetToken(userId: string, token: string, expiresAt: Date): Promise<User | undefined>;
+  clearResetToken(userId: string): Promise<User | undefined>;
+  setEmailVerified(userId: string, verified: boolean): Promise<User | undefined>;
 
   // Admin use-cases
   listUsers(): Promise<Array<Omit<User, "password">>>;
@@ -71,6 +94,25 @@ export interface IStorage {
   listSupportTicketsByRequester(requesterId: string): Promise<SupportTicket[]>;
   listSupportTicketsAll(): Promise<SupportTicket[]>;
   updateSupportTicketStatus(id: string, status: SupportTicketStatus): Promise<SupportTicket | undefined>;
+
+  // Payments
+  createPayment(userId: string, payment: InsertPayment): Promise<Payment>;
+  getPayment(id: string): Promise<Payment | undefined>;
+  getPaymentByOrderId(orderId: string): Promise<Payment | undefined>;
+  updatePaymentStatus(id: string, status: PaymentStatus, providerPaymentId?: string | null): Promise<Payment | undefined>;
+  listPaymentsByUser(userId: string): Promise<Payment[]>;
+
+  // Push Notifications
+  createPushToken(token: InsertPushToken): Promise<PushToken>;
+  getPushToken(id: string): Promise<PushToken | undefined>;
+  getPushTokenByToken(token: string): Promise<PushToken | undefined>;
+  listPushTokensByApp(appId: string): Promise<PushToken[]>;
+  deletePushToken(id: string): Promise<boolean>;
+  
+  createPushNotification(notification: InsertPushNotification): Promise<PushNotification>;
+  getPushNotification(id: string): Promise<PushNotification | undefined>;
+  listPushNotificationsByApp(appId: string): Promise<PushNotification[]>;
+  updatePushNotificationStatus(id: string, status: PushStatus, sentCount?: number, failedCount?: number): Promise<PushNotification | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -79,6 +121,9 @@ export class MemStorage implements IStorage {
   private contacts: Map<string, ContactSubmission>;
   private tickets: Map<string, SupportTicket>;
   private buildJobs: Map<string, BuildJob>;
+  private payments: Map<string, Payment>;
+  private pushTokens: Map<string, PushToken>;
+  private pushNotifications: Map<string, PushNotification>;
 
   constructor() {
     this.users = new Map();
@@ -86,6 +131,9 @@ export class MemStorage implements IStorage {
     this.contacts = new Map();
     this.tickets = new Map();
     this.buildJobs = new Map();
+    this.payments = new Map();
+    this.pushTokens = new Map();
+    this.pushNotifications = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -98,6 +146,14 @@ export class MemStorage implements IStorage {
     );
   }
 
+  async getUserByGoogleId(googleId: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find((u) => (u as any).googleId === googleId);
+  }
+
+  async getUserByResetToken(token: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find((u) => (u as any).resetToken === token);
+  }
+
   async createUser(insertUser: InsertUser & { role?: UserRole }): Promise<User> {
     const id = randomUUID();
     const now = new Date();
@@ -106,12 +162,75 @@ export class MemStorage implements IStorage {
       name: insertUser.name ?? null,
       username: insertUser.username,
       role: insertUser.role ?? "user",
+      googleId: (insertUser as any).googleId ?? null,
       password: insertUser.password,
       createdAt: now,
       updatedAt: now,
     };
     this.users.set(id, user);
     return user;
+  }
+
+  async updateUser(id: string, patch: Partial<{ name: string; password: string }>): Promise<User | undefined> {
+    const existing = this.users.get(id);
+    if (!existing) return undefined;
+    const updated: User = {
+      ...existing,
+      ...patch,
+      updatedAt: new Date(),
+    };
+    this.users.set(id, updated);
+    return updated;
+  }
+
+  async linkGoogleId(userId: string, googleId: string): Promise<User | undefined> {
+    const existing = this.users.get(userId);
+    if (!existing) return undefined;
+    const updated: User = {
+      ...existing,
+      googleId,
+      updatedAt: new Date(),
+    };
+    this.users.set(userId, updated);
+    return updated;
+  }
+
+  async setResetToken(userId: string, token: string, expiresAt: Date): Promise<User | undefined> {
+    const existing = this.users.get(userId);
+    if (!existing) return undefined;
+    const updated: any = {
+      ...existing,
+      resetToken: token,
+      resetTokenExpiresAt: expiresAt,
+      updatedAt: new Date(),
+    };
+    this.users.set(userId, updated);
+    return updated;
+  }
+
+  async clearResetToken(userId: string): Promise<User | undefined> {
+    const existing = this.users.get(userId);
+    if (!existing) return undefined;
+    const updated: any = {
+      ...existing,
+      resetToken: null,
+      resetTokenExpiresAt: null,
+      updatedAt: new Date(),
+    };
+    this.users.set(userId, updated);
+    return updated;
+  }
+
+  async setEmailVerified(userId: string, verified: boolean): Promise<User | undefined> {
+    const existing = this.users.get(userId);
+    if (!existing) return undefined;
+    const updated: any = {
+      ...existing,
+      emailVerified: verified,
+      updatedAt: new Date(),
+    };
+    this.users.set(userId, updated);
+    return updated;
   }
 
   async listUsers(): Promise<Array<Omit<User, "password">>> {
@@ -254,16 +373,24 @@ export class MemStorage implements IStorage {
   }
 
   async claimNextBuildJob(workerId: string): Promise<BuildJob | null> {
-    const queued = Array.from(this.buildJobs.values())
-      .filter((j) => j.status === "queued")
+    const maxAttempts = maxBuildAttempts();
+    const staleBefore = new Date(Date.now() - jobLockTtlMs());
+
+    const candidate = Array.from(this.buildJobs.values())
+      .filter((j) => {
+        const reclaimableRunning = j.status === "running" && !!j.lockedAt && j.lockedAt < staleBefore;
+        const eligible = j.status === "queued" || reclaimableRunning;
+        return eligible && j.attempts < maxAttempts;
+      })
       .sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1))[0];
-    if (!queued) return null;
+
+    if (!candidate) return null;
 
     const lockToken = `${workerId}:${randomUUID()}`;
     const updated: BuildJob = {
-      ...queued,
+      ...candidate,
       status: "running",
-      attempts: queued.attempts + 1,
+      attempts: candidate.attempts + 1,
       lockToken,
       lockedAt: new Date(),
       updatedAt: new Date(),
@@ -286,6 +413,141 @@ export class MemStorage implements IStorage {
       updatedAt: new Date(),
     };
     this.buildJobs.set(jobId, updated);
+    return updated;
+  }
+
+  // --- Payment methods ---
+  async createPayment(userId: string, payment: InsertPayment): Promise<Payment> {
+    const id = randomUUID();
+    const now = new Date();
+    const row: Payment = {
+      id,
+      userId,
+      appId: payment.appId ?? null,
+      provider: payment.provider ?? "razorpay",
+      providerOrderId: payment.providerOrderId ?? null,
+      providerPaymentId: payment.providerPaymentId ?? null,
+      amountInr: payment.amountInr,
+      plan: payment.plan ?? "starter",
+      status: "pending",
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.payments.set(id, row);
+    return row;
+  }
+
+  async getPayment(id: string): Promise<Payment | undefined> {
+    return this.payments.get(id);
+  }
+
+  async getPaymentByOrderId(orderId: string): Promise<Payment | undefined> {
+    return Array.from(this.payments.values()).find((p) => p.providerOrderId === orderId);
+  }
+
+  async updatePaymentStatus(id: string, status: PaymentStatus, providerPaymentId?: string | null): Promise<Payment | undefined> {
+    const existing = this.payments.get(id);
+    if (!existing) return undefined;
+    const updated: Payment = {
+      ...existing,
+      status,
+      providerPaymentId: providerPaymentId ?? existing.providerPaymentId,
+      updatedAt: new Date(),
+    };
+    this.payments.set(id, updated);
+    return updated;
+  }
+
+  async listPaymentsByUser(userId: string): Promise<Payment[]> {
+    return Array.from(this.payments.values())
+      .filter((p) => p.userId === userId)
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  }
+
+  // --- Push Notification methods ---
+  async createPushToken(token: InsertPushToken): Promise<PushToken> {
+    const id = randomUUID();
+    const now = new Date();
+    const row: PushToken = {
+      id,
+      appId: token.appId,
+      token: token.token,
+      platform: token.platform ?? "android",
+      deviceInfo: token.deviceInfo ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.pushTokens.set(id, row);
+    return row;
+  }
+
+  async getPushToken(id: string): Promise<PushToken | undefined> {
+    return this.pushTokens.get(id);
+  }
+
+  async getPushTokenByToken(token: string): Promise<PushToken | undefined> {
+    return Array.from(this.pushTokens.values()).find((t) => t.token === token);
+  }
+
+  async listPushTokensByApp(appId: string): Promise<PushToken[]> {
+    return Array.from(this.pushTokens.values())
+      .filter((t) => t.appId === appId)
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  }
+
+  async deletePushToken(id: string): Promise<boolean> {
+    return this.pushTokens.delete(id);
+  }
+
+  async createPushNotification(notification: InsertPushNotification): Promise<PushNotification> {
+    const id = randomUUID();
+    const now = new Date();
+    const row: PushNotification = {
+      id,
+      appId: notification.appId,
+      title: notification.title,
+      body: notification.body,
+      imageUrl: notification.imageUrl ?? null,
+      actionUrl: notification.actionUrl ?? null,
+      status: "pending",
+      sentCount: 0,
+      failedCount: 0,
+      scheduledAt: notification.scheduledAt ?? null,
+      sentAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.pushNotifications.set(id, row);
+    return row;
+  }
+
+  async getPushNotification(id: string): Promise<PushNotification | undefined> {
+    return this.pushNotifications.get(id);
+  }
+
+  async listPushNotificationsByApp(appId: string): Promise<PushNotification[]> {
+    return Array.from(this.pushNotifications.values())
+      .filter((n) => n.appId === appId)
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  }
+
+  async updatePushNotificationStatus(
+    id: string,
+    status: PushStatus,
+    sentCount?: number,
+    failedCount?: number
+  ): Promise<PushNotification | undefined> {
+    const existing = this.pushNotifications.get(id);
+    if (!existing) return undefined;
+    const updated: PushNotification = {
+      ...existing,
+      status,
+      sentCount: sentCount ?? existing.sentCount,
+      failedCount: failedCount ?? existing.failedCount,
+      sentAt: status === "sent" ? new Date() : existing.sentAt,
+      updatedAt: new Date(),
+    };
+    this.pushNotifications.set(id, updated);
     return updated;
   }
 }

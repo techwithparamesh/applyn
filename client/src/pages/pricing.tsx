@@ -3,9 +3,26 @@ import { Footer } from "@/components/layout/footer";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { getQueryFn } from "@/lib/queryClient";
 import pricingImg from "@assets/generated_images/saas_pricing_plans_illustration.png";
 
 export default function Pricing() {
+  const [, setLocation] = useLocation();
+  const { data: me } = useQuery({
+    queryKey: ["/api/me"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+  });
+
+  const handleSelectPlan = (plan: string) => {
+    if (me) {
+      setLocation(`/create?plan=${plan}`);
+    } else {
+      setLocation(`/login?returnTo=${encodeURIComponent(`/create?plan=${plan}`)}`);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-mesh selection:bg-primary/30 flex flex-col">
       <Navbar />
@@ -54,6 +71,7 @@ export default function Pricing() {
                 ]}
                 buttonText="Get Started"
                 variant="outline"
+                onSelect={() => handleSelectPlan("starter")}
               />
               <PricingCard 
                 title="Standard Build"
@@ -69,6 +87,7 @@ export default function Pricing() {
                 ]}
                 buttonText="Get Android Build"
                 variant="outline"
+                onSelect={() => handleSelectPlan("standard")}
               />
               <PricingCard 
                 title="Enterprise Pro"
@@ -86,6 +105,7 @@ export default function Pricing() {
                 buttonText="Get Full Access"
                 variant="default"
                 popular
+                onSelect={() => handleSelectPlan("pro")}
               />
             </div>
             
@@ -102,7 +122,7 @@ export default function Pricing() {
   );
 }
 
-function PricingCard({ title, price, description, features, buttonText, variant, popular = false }: any) {
+function PricingCard({ title, price, description, features, buttonText, variant, popular = false, onSelect }: any) {
   return (
     <motion.div 
       whileHover={{ y: -5 }}
@@ -126,7 +146,11 @@ function PricingCard({ title, price, description, features, buttonText, variant,
         ))}
       </ul>
       
-      <Button variant={variant} className={`w-full h-12 text-base font-bold rounded-xl transition-all ${popular ? 'shadow-lg shadow-primary/20 hover:scale-[1.02] bg-primary text-black hover:bg-primary/90' : 'hover:bg-white/10 text-white border-white/20'}`}>
+      <Button 
+        variant={variant} 
+        onClick={onSelect}
+        className={`w-full h-12 text-base font-bold rounded-xl transition-all ${popular ? 'shadow-lg shadow-primary/20 hover:scale-[1.02] bg-primary text-black hover:bg-primary/90' : 'hover:bg-white/10 text-white border-white/20'}`}
+      >
         {buttonText}
       </Button>
     </motion.div>

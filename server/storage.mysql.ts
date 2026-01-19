@@ -11,10 +11,26 @@ import type {
   SupportTicketStatus,
   UserRole,
   User,
+  Payment,
+  InsertPayment,
+  PaymentStatus,
+  PushToken,
+  InsertPushToken,
+  PushNotification,
+  InsertPushNotification,
+  PushStatus,
 } from "@shared/schema";
-import { apps, buildJobs, contactSubmissions, supportTickets, users } from "@shared/db.mysql";
+import { apps, buildJobs, contactSubmissions, supportTickets, users, payments, pushTokens, pushNotifications } from "@shared/db.mysql";
 import { getMysqlDb } from "./db-mysql";
 import type { AppBuildPatch, BuildJob, BuildJobStatus } from "./storage";
+
+function maxBuildAttempts() {
+  return Number(process.env.MAX_BUILD_ATTEMPTS || 3);
+}
+
+function jobLockTtlMs() {
+  return Number(process.env.BUILD_JOB_LOCK_TTL_MS || 30 * 60 * 1000);
+}
 
 export class MysqlStorage {
   async getUser(id: string): Promise<User | undefined> {
@@ -31,7 +47,25 @@ export class MysqlStorage {
     return rows[0] as unknown as User;
   }
 
-  async createUser(user: InsertUser & { role?: UserRole }): Promise<User> {
+  async getUserByGoogleId(googleId: string): Promise<User | undefined> {
+    const rows = await getMysqlDb()
+      .select()
+      .from(users)
+      .where(eq(users.googleId, googleId))
+      .limit(1);
+    return rows[0] as unknown as User;
+  }
+
+  async getUserByResetToken(token: string): Promise<User | undefined> {
+    const rows = await getMysqlDb()
+      .select()
+      .from(users)
+      .where(eq(users.resetToken, token))
+      .limit(1);
+    return rows[0] as unknown as User;
+  }
+
+  async createUser(user: InsertUser & { role?: UserRole; googleId?: string | null }): Promise<User> {
     const id = randomUUID();
     const now = new Date();
 
@@ -39,6 +73,7 @@ export class MysqlStorage {
       id,
       name: user.name ?? null,
       username: user.username,
+      googleId: user.googleId ?? null,
       role: user.role ?? "user",
       password: user.password,
       createdAt: now,
@@ -46,6 +81,63 @@ export class MysqlStorage {
     });
 
     return (await this.getUser(id))!;
+  }
+
+  async updateUser(id: string, patch: Partial<{ name: string; password: string }>): Promise<User | undefined> {
+    await getMysqlDb()
+      .update(users)
+      .set({
+        ...patch,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id));
+    return await this.getUser(id);
+  }
+
+  async setResetToken(userId: string, token: string, expiresAt: Date): Promise<User | undefined> {
+    await getMysqlDb()
+      .update(users)
+      .set({
+        resetToken: token,
+        resetTokenExpiresAt: expiresAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+    return await this.getUser(userId);
+  }
+
+  async clearResetToken(userId: string): Promise<User | undefined> {
+    await getMysqlDb()
+      .update(users)
+      .set({
+        resetToken: null,
+        resetTokenExpiresAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+    return await this.getUser(userId);
+  }
+
+  async setEmailVerified(userId: string, verified: boolean): Promise<User | undefined> {
+    await getMysqlDb()
+      .update(users)
+      .set({
+        emailVerified: verified,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+    return await this.getUser(userId);
+  }
+
+  async linkGoogleId(userId: string, googleId: string): Promise<User | undefined> {
+    await getMysqlDb()
+      .update(users)
+      .set({
+        googleId,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+    return await this.getUser(userId);
   }
 
   async listUsers(): Promise<Array<Omit<User, "password">>> {
@@ -214,10 +306,19 @@ export class MysqlStorage {
   }
 
   async claimNextBuildJob(workerId: string): Promise<BuildJob | null> {
+    const maxAttempts = maxBuildAttempts();
+    const staleBefore = new Date(Date.now() - jobLockTtlMs());
+
+    // Prefer queued jobs; reclaim stale running jobs if a worker died mid-build.
     const rows = await getMysqlDb()
       .select()
       .from(buildJobs)
-      .where(eq(buildJobs.status, "queued"))
+      .where(
+        and(
+          sql`(${buildJobs.status} = 'queued' OR (${buildJobs.status} = 'running' AND ${buildJobs.lockedAt} < ${staleBefore}))`,
+          sql`${buildJobs.attempts} < ${maxAttempts}`,
+        ),
+      )
       .orderBy(buildJobs.createdAt)
       .limit(1);
 
@@ -236,7 +337,13 @@ export class MysqlStorage {
         lockedAt: now,
         updatedAt: now,
       })
-      .where(and(eq(buildJobs.id, candidate.id), eq(buildJobs.status, "queued")));
+      .where(
+        and(
+          eq(buildJobs.id, candidate.id),
+          sql`(${buildJobs.status} = 'queued' OR (${buildJobs.status} = 'running' AND ${buildJobs.lockedAt} < ${staleBefore}))`,
+          sql`${buildJobs.attempts} < ${maxAttempts}`,
+        ),
+      );
 
     const affected = (result as any)?.rowsAffected ?? (result as any)?.affectedRows ?? 0;
     if (affected !== 1) return null;
@@ -262,5 +369,172 @@ export class MysqlStorage {
 
     const rows = await getMysqlDb().select().from(buildJobs).where(eq(buildJobs.id, jobId)).limit(1);
     return rows[0] as unknown as BuildJob;
+  }
+
+  // --- Payment methods ---
+  async createPayment(userId: string, payment: InsertPayment): Promise<Payment> {
+    const id = randomUUID();
+    const now = new Date();
+
+    await getMysqlDb().insert(payments).values({
+      id,
+      userId,
+      appId: payment.appId ?? null,
+      provider: payment.provider ?? "razorpay",
+      providerOrderId: payment.providerOrderId ?? null,
+      providerPaymentId: payment.providerPaymentId ?? null,
+      amountInr: payment.amountInr,
+      plan: payment.plan ?? "starter",
+      status: "pending",
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return (await this.getPayment(id))!;
+  }
+
+  async getPayment(id: string): Promise<Payment | undefined> {
+    const rows = await getMysqlDb().select().from(payments).where(eq(payments.id, id)).limit(1);
+    return rows[0] as unknown as Payment;
+  }
+
+  async getPaymentByOrderId(orderId: string): Promise<Payment | undefined> {
+    const rows = await getMysqlDb()
+      .select()
+      .from(payments)
+      .where(eq(payments.providerOrderId, orderId))
+      .limit(1);
+    return rows[0] as unknown as Payment;
+  }
+
+  async updatePaymentStatus(id: string, status: PaymentStatus, providerPaymentId?: string | null): Promise<Payment | undefined> {
+    const existing = await this.getPayment(id);
+    if (!existing) return undefined;
+
+    await getMysqlDb()
+      .update(payments)
+      .set({
+        status,
+        providerPaymentId: providerPaymentId ?? existing.providerPaymentId,
+        updatedAt: new Date(),
+      })
+      .where(eq(payments.id, id));
+
+    return await this.getPayment(id);
+  }
+
+  async listPaymentsByUser(userId: string): Promise<Payment[]> {
+    const rows = await getMysqlDb()
+      .select()
+      .from(payments)
+      .where(eq(payments.userId, userId))
+      .orderBy(desc(payments.createdAt));
+    return rows as unknown as Payment[];
+  }
+
+  // --- Push Notification methods ---
+  async createPushToken(token: InsertPushToken): Promise<PushToken> {
+    const id = randomUUID();
+    const now = new Date();
+
+    await getMysqlDb().insert(pushTokens).values({
+      id,
+      appId: token.appId,
+      token: token.token,
+      platform: token.platform ?? "android",
+      deviceInfo: token.deviceInfo ?? null,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return (await this.getPushToken(id))!;
+  }
+
+  async getPushToken(id: string): Promise<PushToken | undefined> {
+    const rows = await getMysqlDb().select().from(pushTokens).where(eq(pushTokens.id, id)).limit(1);
+    return rows[0] as unknown as PushToken;
+  }
+
+  async getPushTokenByToken(token: string): Promise<PushToken | undefined> {
+    const rows = await getMysqlDb()
+      .select()
+      .from(pushTokens)
+      .where(eq(pushTokens.token, token))
+      .limit(1);
+    return rows[0] as unknown as PushToken;
+  }
+
+  async listPushTokensByApp(appId: string): Promise<PushToken[]> {
+    const rows = await getMysqlDb()
+      .select()
+      .from(pushTokens)
+      .where(eq(pushTokens.appId, appId))
+      .orderBy(desc(pushTokens.createdAt));
+    return rows as unknown as PushToken[];
+  }
+
+  async deletePushToken(id: string): Promise<boolean> {
+    const result = await getMysqlDb().delete(pushTokens).where(eq(pushTokens.id, id));
+    return (result as any).affectedRows > 0;
+  }
+
+  async createPushNotification(notification: InsertPushNotification): Promise<PushNotification> {
+    const id = randomUUID();
+    const now = new Date();
+
+    await getMysqlDb().insert(pushNotifications).values({
+      id,
+      appId: notification.appId,
+      title: notification.title,
+      body: notification.body,
+      imageUrl: notification.imageUrl ?? null,
+      actionUrl: notification.actionUrl ?? null,
+      status: "pending",
+      sentCount: 0,
+      failedCount: 0,
+      scheduledAt: notification.scheduledAt ?? null,
+      sentAt: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return (await this.getPushNotification(id))!;
+  }
+
+  async getPushNotification(id: string): Promise<PushNotification | undefined> {
+    const rows = await getMysqlDb().select().from(pushNotifications).where(eq(pushNotifications.id, id)).limit(1);
+    return rows[0] as unknown as PushNotification;
+  }
+
+  async listPushNotificationsByApp(appId: string): Promise<PushNotification[]> {
+    const rows = await getMysqlDb()
+      .select()
+      .from(pushNotifications)
+      .where(eq(pushNotifications.appId, appId))
+      .orderBy(desc(pushNotifications.createdAt));
+    return rows as unknown as PushNotification[];
+  }
+
+  async updatePushNotificationStatus(
+    id: string,
+    status: PushStatus,
+    sentCount?: number,
+    failedCount?: number
+  ): Promise<PushNotification | undefined> {
+    const existing = await this.getPushNotification(id);
+    if (!existing) return undefined;
+
+    await getMysqlDb()
+      .update(pushNotifications)
+      .set({
+        status,
+        sentCount: sentCount ?? existing.sentCount,
+        failedCount: failedCount ?? existing.failedCount,
+        sentAt: status === "sent" ? new Date() : existing.sentAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(pushNotifications.id, id));
+
+    return await this.getPushNotification(id);
   }
 }

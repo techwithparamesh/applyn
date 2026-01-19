@@ -1,14 +1,35 @@
+import { useState } from "react";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CheckCircle2, ArrowRight, Zap, Globe, Smartphone, ShieldCheck, Star } from "lucide-react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { getQueryFn } from "@/lib/queryClient";
 import heroImg from "@assets/generated_images/website_to_mobile_app_conversion_isometric_illustration.png";
 import { motion } from "framer-motion";
 
 export default function Home() {
   const [, setLocation] = useLocation();
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  
+  const { data: me } = useQuery({
+    queryKey: ["/api/me"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+  });
+
+  const handleGetStarted = () => {
+    const createPath = websiteUrl.trim()
+      ? `/create?url=${encodeURIComponent(websiteUrl.trim())}`
+      : "/create";
+    
+    if (me) {
+      setLocation(createPath);
+    } else {
+      setLocation(`/login?returnTo=${encodeURIComponent(createPath)}`);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-mesh selection:bg-primary/30">
@@ -43,12 +64,15 @@ export default function Home() {
                   <div className="relative flex-1 group">
                     <Globe className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-primary transition-colors" />
                     <Input 
-                      placeholder="https://yourbusiness.com" 
+                      placeholder="https://yourbusiness.com"
+                      value={websiteUrl}
+                      onChange={(e) => setWebsiteUrl(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleGetStarted()}
                       className="h-14 pl-12 text-lg rounded-2xl border-white/10 bg-white/5 shadow-sm focus:ring-primary/20 text-white placeholder:text-slate-500"
                     />
                   </div>
                   <Button 
-                    onClick={() => setLocation(`/login?returnTo=${encodeURIComponent("/create")}`)}
+                    onClick={handleGetStarted}
                     size="lg" 
                     className="h-14 px-8 text-lg font-bold rounded-2xl shadow-xl shadow-primary/25 hover:scale-105 transition-all active:scale-95"
                   >
