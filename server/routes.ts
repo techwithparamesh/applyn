@@ -572,7 +572,7 @@ export async function registerRoutes(
 
       // In production, send email via nodemailer/resend/etc.
       // For MVP, log to console (you can replace this with actual email sending)
-      const resetUrl = `${process.env.APP_URL || "http://localhost:5000"}/reset-password?token=${token}`;
+      const resetUrl = `${process.env.APP_URL || "http://localhost:5004"}/reset-password?token=${token}`;
       console.log(`[PASSWORD RESET] Email: ${email}, URL: ${resetUrl}`);
 
       // TODO: Integrate with email service (Resend, SendGrid, etc.)

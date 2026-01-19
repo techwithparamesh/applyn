@@ -4,7 +4,7 @@ import path from "path";
 type Json = any;
 
 function baseUrl() {
-  return (process.env.BASE_URL || "http://localhost:5000").replace(/\/$/, "");
+  return (process.env.BASE_URL || "http://localhost:5004").replace(/\/$/, "");
 }
 
 function originHeader() {
