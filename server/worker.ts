@@ -433,8 +433,8 @@ export async function runWorkerLoop() {
   // eslint-disable-next-line no-constant-condition
   while (true) {
     pollCount++;
-    if (pollCount % 30 === 1) {
-      console.log(`[Worker] Polling for jobs... (poll #${pollCount})`);
+    if (pollCount % 150 === 1) {  // Log every 5 minutes (150 * 2 seconds)
+      console.log(`[Worker] Worker alive, poll #${pollCount}`);
     }
     // run one job at a time
     await handleOneJob(workerId);

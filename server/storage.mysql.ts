@@ -313,6 +313,23 @@ export class MysqlStorage {
   }
 
   async enqueueBuildJob(ownerId: string, appId: string): Promise<BuildJob> {
+    // Check if there's already a queued or running job for this app
+    const existing = await getMysqlDb()
+      .select()
+      .from(buildJobs)
+      .where(
+        and(
+          eq(buildJobs.appId, appId),
+          sql`${buildJobs.status} IN ('queued', 'running')`
+        )
+      )
+      .limit(1);
+    
+    if (existing.length > 0) {
+      console.log(`[Storage] Job already exists for app ${appId}, returning existing job ${existing[0].id}`);
+      return existing[0] as unknown as BuildJob;
+    }
+
     const id = randomUUID();
     const now = new Date();
 
@@ -329,6 +346,7 @@ export class MysqlStorage {
       updatedAt: now,
     });
 
+    console.log(`[Storage] Created new build job ${id} for app ${appId}`);
     const rows = await getMysqlDb().select().from(buildJobs).where(eq(buildJobs.id, id)).limit(1);
     return rows[0] as unknown as BuildJob;
   }
@@ -336,8 +354,6 @@ export class MysqlStorage {
   async claimNextBuildJob(workerId: string): Promise<BuildJob | null> {
     const maxAttempts = maxBuildAttempts();
     const staleBefore = new Date(Date.now() - jobLockTtlMs());
-
-    console.log(`[Storage] Looking for jobs: maxAttempts=${maxAttempts}, staleBefore=${staleBefore.toISOString()}`);
 
     // Prefer queued jobs; reclaim stale running jobs if a worker died mid-build.
     const rows = await getMysqlDb()
@@ -352,17 +368,11 @@ export class MysqlStorage {
       .orderBy(buildJobs.createdAt)
       .limit(1);
 
-    console.log(`[Storage] Found ${rows.length} candidate jobs`);
-
     const candidate = rows[0] as unknown as BuildJob | undefined;
     if (!candidate) return null;
 
-    console.log(`[Storage] Candidate job: ${candidate.id}, status=${candidate.status}, attempts=${candidate.attempts}`);
-
     const lockToken = `${workerId}:${randomUUID()}`;
     const now = new Date();
-
-    console.log(`[Storage] Attempting to claim job ${candidate.id} with lockToken=${lockToken}`);
 
     try {
       const result = await getMysqlDb()
@@ -383,15 +393,12 @@ export class MysqlStorage {
         );
 
       const affected = (result as any)?.rowsAffected ?? (result as any)?.affectedRows ?? (result as any)?.[0]?.affectedRows ?? 0;
-      console.log(`[Storage] Update result: affected=${affected}, result=`, JSON.stringify(result));
       
       if (affected !== 1) {
-        console.log(`[Storage] Failed to claim job - affected rows != 1`);
         return null;
       }
 
       const claimed = await getMysqlDb().select().from(buildJobs).where(eq(buildJobs.id, candidate.id)).limit(1);
-      console.log(`[Storage] Successfully claimed job ${candidate.id}`);
       return (claimed[0] as unknown as BuildJob) ?? null;
     } catch (err) {
       console.error(`[Storage] Error claiming job:`, err);
