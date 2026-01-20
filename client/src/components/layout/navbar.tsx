@@ -102,7 +102,7 @@ export function Navbar() {
                   Sign in
                 </Button>
               </Link>
-              <Link href="/login?returnTo=%2Fcreate">
+              <Link href="/login">
                 <Button
                   size="sm"
                   className="bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold px-5 rounded-lg shadow-lg glow-primary"
@@ -230,7 +230,7 @@ export function Navbar() {
                         </Button>
                       </SheetClose>
                       <SheetClose asChild>
-                        <Button className="w-full" onClick={() => setLocation("/login?returnTo=%2Fcreate")}>
+                        <Button className="w-full" onClick={() => setLocation("/login")}>
                           Get Started
                         </Button>
                       </SheetClose>
