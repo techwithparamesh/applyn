@@ -12,6 +12,7 @@ export async function runDockerGradleBuild(params: {
   const args = [
     "run",
     "--rm",
+    "--user", "root",  // Run as root to avoid permission issues with mounted volumes
     "-v",
     `${projectDir}:/work`,
     "-w",
