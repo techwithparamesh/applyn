@@ -145,9 +145,33 @@ export class MysqlStorage {
     return (rows as unknown as User[]).map(({ password: _pw, ...rest }) => rest);
   }
 
+  // Helper to get app columns (avoiding api_secret which may not exist in older schemas)
+  private getAppColumns() {
+    return {
+      id: apps.id,
+      ownerId: apps.ownerId,
+      name: apps.name,
+      url: apps.url,
+      icon: apps.icon,
+      primaryColor: apps.primaryColor,
+      platform: apps.platform,
+      status: apps.status,
+      packageName: apps.packageName,
+      versionCode: apps.versionCode,
+      artifactPath: apps.artifactPath,
+      artifactMime: apps.artifactMime,
+      artifactSize: apps.artifactSize,
+      buildLogs: apps.buildLogs,
+      buildError: apps.buildError,
+      lastBuildAt: apps.lastBuildAt,
+      createdAt: apps.createdAt,
+      updatedAt: apps.updatedAt,
+    };
+  }
+
   async listAppsByOwner(ownerId: string): Promise<App[]> {
     const rows = await getMysqlDb()
-      .select()
+      .select(this.getAppColumns())
       .from(apps)
       .where(eq(apps.ownerId, ownerId))
       .orderBy(desc(apps.updatedAt));
@@ -155,12 +179,16 @@ export class MysqlStorage {
   }
 
   async listAppsAll(): Promise<App[]> {
-    const rows = await getMysqlDb().select().from(apps).orderBy(desc(apps.updatedAt));
+    const rows = await getMysqlDb().select(this.getAppColumns()).from(apps).orderBy(desc(apps.updatedAt));
     return rows as unknown as App[];
   }
 
   async getApp(id: string): Promise<App | undefined> {
-    const rows = await getMysqlDb().select().from(apps).where(eq(apps.id, id)).limit(1);
+    const rows = await getMysqlDb()
+      .select(this.getAppColumns())
+      .from(apps)
+      .where(eq(apps.id, id))
+      .limit(1);
     return rows[0] as unknown as App;
   }
 
