@@ -93,6 +93,7 @@ export default function Dashboard() {
   const [logsOpen, setLogsOpen] = useState(false);
   const [logsTitle, setLogsTitle] = useState<string>("Build logs");
   const [logsText, setLogsText] = useState<string | null>(null);
+  const [viewingAppId, setViewingAppId] = useState<string | null>(null);
   
   // Filter state for apps
   const [statusFilter, setStatusFilter] = useState<"all" | "live" | "processing" | "failed" | "draft">("all");
@@ -165,9 +166,10 @@ export default function Dashboard() {
     }
   };
 
-  const handleViewBuildStatus = async (app: AppItem) => {
+  // Fetch build status for an app
+  const fetchBuildStatus = async (appId: string, appName: string) => {
     try {
-      const res = await apiRequest("GET", `/api/apps/${app.id}/build-status`);
+      const res = await apiRequest("GET", `/api/apps/${appId}/build-status`);
       const data = await res.json();
       
       let logsContent = "";
@@ -194,17 +196,49 @@ export default function Dashboard() {
         logsContent = "Build is in progress. No logs available yet.\n\nThe build worker processes jobs periodically. Please check back in a minute.";
       }
       
-      setLogsTitle(`${app.name} • Build Status`);
+      setLogsTitle(`${appName} • Build Status`);
       setLogsText(logsContent);
-      setLogsOpen(true);
+      
+      return data.job?.status;
     } catch (err: any) {
-      toast({
-        title: "Failed to fetch build status",
-        description: err?.message || "Please try again",
-        variant: "destructive",
-      });
+      console.error("Failed to fetch build status:", err);
+      return null;
     }
   };
+
+  const handleViewBuildStatus = async (app: AppItem) => {
+    setViewingAppId(app.id);
+    setLogsOpen(true);
+    await fetchBuildStatus(app.id, app.name);
+  };
+
+  // Auto-refresh build status when modal is open and build is in progress
+  useEffect(() => {
+    if (!logsOpen || !viewingAppId) return;
+    
+    const app = apps?.find(a => a.id === viewingAppId);
+    if (!app) return;
+    
+    // Only auto-refresh for processing/queued status
+    if (app.status !== "processing") return;
+    
+    const interval = setInterval(async () => {
+      const jobStatus = await fetchBuildStatus(viewingAppId, app.name);
+      // Stop refreshing if job completed
+      if (jobStatus === "succeeded" || jobStatus === "failed") {
+        queryClient.invalidateQueries({ queryKey: ["/api/apps"] });
+      }
+    }, 3000);
+    
+    return () => clearInterval(interval);
+  }, [logsOpen, viewingAppId, apps]);
+
+  // Clear viewingAppId when modal closes
+  useEffect(() => {
+    if (!logsOpen) {
+      setViewingAppId(null);
+    }
+  }, [logsOpen]);
 
   const handleDownload = (id: string, platform?: string) => {
     if (platform === "ios") {

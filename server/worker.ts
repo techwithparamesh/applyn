@@ -256,6 +256,17 @@ async function handleAndroidBuild(job: any, app: any, pkg: string, versionCode: 
     workDir = path.join(os.tmpdir(), `applyn-build-${job.id}-${randomUUID()}`);
     await ensureDir(workDir);
 
+    // Write initial build log so admin can see progress
+    logs = `[${new Date().toISOString()}] Starting Android build for ${app.name}\n`;
+    logs += `[${new Date().toISOString()}] Package: ${pkg}\n`;
+    logs += `[${new Date().toISOString()}] Version Code: ${versionCode}\n`;
+    logs += `[${new Date().toISOString()}] Generating Android project...\n`;
+    
+    await storage.updateAppBuild(app.id, {
+      buildLogs: logs,
+      buildError: null,
+    });
+
     const { projectDir } = await generateAndroidWrapperProject(
       {
         appId: app.id,
@@ -268,6 +279,14 @@ async function handleAndroidBuild(job: any, app: any, pkg: string, versionCode: 
       workDir,
     );
 
+    logs += `[${new Date().toISOString()}] Project generated. Starting Gradle build...\n`;
+    logs += `[${new Date().toISOString()}] Docker image: ${builderImage()}\n`;
+    logs += `[${new Date().toISOString()}] This may take 5-10 minutes...\n`;
+    
+    await storage.updateAppBuild(app.id, {
+      buildLogs: logs,
+    });
+
     // Build release APK and AAB (bundle)
     const build = await runDockerGradleBuild({
       image: builderImage(),
@@ -276,7 +295,8 @@ async function handleAndroidBuild(job: any, app: any, pkg: string, versionCode: 
       timeoutMs: buildTimeoutMs(),
     });
 
-    logs = build.output;
+    logs += `\n=== Gradle Build Output ===\n`;
+    logs += build.output;
 
     if (!build.ok) {
       const msg = "Android build failed";
