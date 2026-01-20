@@ -23,15 +23,18 @@ export function MobilePreview({
   const domain = url.replace(/^https?:\/\//, "").replace(/\/$/, "").split('/')[0];
   const normalizedUrl = url.startsWith("http") ? url : `https://${url}`;
   
-  // Use thum.io for free website screenshots with mobile viewport
-  // viewportWidth=375 simulates iPhone screen width for proper mobile rendering
-  const screenshotUrl = `https://image.thum.io/get/viewportWidth/375/width/375/crop/700/noanimate/${normalizedUrl}?v=${retryCount}`;
+  // Use thum.io with mobile viewport - capture at higher resolution for quality
+  // viewportWidth=414 (iPhone Plus), width=414 to match, then scale down in CSS
+  const screenshotUrl = `https://image.thum.io/get/viewportWidth/414/width/414/noanimate/${normalizedUrl}?v=${retryCount}`;
   
   const handleRetry = () => {
     setImageError(false);
     setImageLoaded(false);
     setRetryCount(prev => prev + 1);
   };
+  
+  // Calculate display dimensions - phone screen is 272px wide (300 - 28px borders)
+  const phoneScreenWidth = 272;
   
   return (
     <div className="flex flex-col items-center gap-3">
@@ -61,7 +64,7 @@ export function MobilePreview({
           <motion.div 
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="h-12 flex items-center justify-between px-4 shadow-md z-10 shrink-0"
+            className="h-11 flex items-center justify-between px-4 shadow-md z-10 shrink-0"
             style={{ backgroundColor: primaryColor }}
           >
             <div className="text-white font-bold flex items-center gap-2 text-sm">
@@ -72,13 +75,12 @@ export function MobilePreview({
           </motion.div>
 
           {/* Website Screenshot Content */}
-          <div className="flex-1 bg-gray-100 relative overflow-hidden">
+          <div className="flex-1 bg-white relative overflow-hidden">
             {/* Loading State */}
             {!imageLoaded && !imageError && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10">
                 <Loader2 className="w-8 h-8 animate-spin text-gray-400 mb-3" />
                 <p className="text-xs text-gray-500 font-medium">Loading preview...</p>
-                <p className="text-[10px] text-gray-400 mt-1">Capturing mobile view</p>
               </div>
             )}
             
@@ -87,7 +89,6 @@ export function MobilePreview({
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10 p-4">
                 <Globe className="w-10 h-10 text-gray-300 mb-3" />
                 <p className="text-xs text-gray-500 font-medium text-center">Unable to load preview</p>
-                <p className="text-[10px] text-gray-400 mt-1 text-center">The website might be temporarily unavailable</p>
                 <button 
                   onClick={handleRetry}
                   className="mt-3 flex items-center gap-1 text-xs text-cyan-500 hover:text-cyan-400 transition-colors"
@@ -98,34 +99,41 @@ export function MobilePreview({
               </div>
             )}
             
-            {/* Actual Screenshot - scaled to fit properly */}
-            <motion.img
-              src={screenshotUrl}
-              alt={`Preview of ${domain}`}
-              className={`w-full object-cover object-top transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
-              style={{ minHeight: '100%' }}
-              onLoad={() => setImageLoaded(true)}
-              onError={() => setImageError(true)}
-            />
+            {/* Actual Screenshot - scaled to fit width exactly */}
+            <div 
+              className={`w-full transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+              style={{ 
+                transform: `scale(${phoneScreenWidth / 414})`,
+                transformOrigin: 'top left',
+                width: '414px',
+              }}
+            >
+              <img
+                src={screenshotUrl}
+                alt={`Preview of ${domain}`}
+                className="w-full"
+                onLoad={() => setImageLoaded(true)}
+                onError={() => setImageError(true)}
+              />
+            </div>
           </div>
           
           {/* Bottom Navigation */}
-          <div className="h-14 bg-white border-t border-gray-200 flex items-center justify-around px-4 pb-1 shrink-0">
-            <div className="flex flex-col items-center gap-1">
+          <div className="h-12 bg-white border-t border-gray-200 flex items-center justify-around px-4 shrink-0">
+            <div className="flex flex-col items-center">
               <Home className="w-5 h-5" style={{ color: primaryColor }} />
-              <div className="h-1 w-1 rounded-full" style={{ backgroundColor: primaryColor }}></div>
             </div>
-            <div className="flex flex-col items-center gap-1">
+            <div className="flex flex-col items-center">
               <Search className="w-5 h-5 text-gray-400" />
             </div>
-            <div className="flex flex-col items-center gap-1">
+            <div className="flex flex-col items-center">
               <User className="w-5 h-5 text-gray-400" />
             </div>
           </div>
         </div>
       </div>
       
-      {/* Simple Label - just app name */}
+      {/* App name label */}
       <p className="text-sm text-muted-foreground text-center">
         <span className="text-white font-medium">{appName}</span>
       </p>
