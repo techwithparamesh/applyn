@@ -101,14 +101,26 @@ async function cleanupArtifactsForApp(appId: string) {
 }
 
 export async function handleOneJob(workerId: string) {
-  const job = await storage.claimNextBuildJob(workerId);
+  let job;
+  try {
+    job = await storage.claimNextBuildJob(workerId);
+  } catch (err) {
+    console.error(`[Worker] Error claiming job:`, err);
+    return;
+  }
+  
   if (!job) return;
+
+  console.log(`[Worker] Claimed job ${job.id} for app ${job.appId}`);
 
   const app = await storage.getApp(job.appId);
   if (!app) {
+    console.log(`[Worker] App not found for job ${job.id}`);
     await storage.completeBuildJob(job.id, "failed", "App not found");
     return;
   }
+
+  console.log(`[Worker] Building app: ${app.name} (${app.id})`);
 
   const platform = (app as any).platform || "android";
   const pkg = app.packageName || safePackageName(app.id);
@@ -396,10 +408,20 @@ async function handleAndroidBuild(job: any, app: any, pkg: string, versionCode: 
 
 export async function runWorkerLoop() {
   const workerId = process.env.WORKER_ID || os.hostname();
+  console.log(`[Worker] Starting worker with ID: ${workerId}`);
+  console.log(`[Worker] Artifacts root: ${artifactsRoot()}`);
+  console.log(`[Worker] Docker image: ${builderImage()}`);
+  console.log(`[Worker] Poll interval: ${pollIntervalMs()}ms`);
+  
   await ensureDir(artifactsRoot());
 
+  let pollCount = 0;
   // eslint-disable-next-line no-constant-condition
   while (true) {
+    pollCount++;
+    if (pollCount % 30 === 1) {
+      console.log(`[Worker] Polling for jobs... (poll #${pollCount})`);
+    }
     // run one job at a time
     await handleOneJob(workerId);
     await new Promise((r) => setTimeout(r, pollIntervalMs()));
