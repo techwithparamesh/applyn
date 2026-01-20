@@ -21,6 +21,8 @@ import Ops from "@/pages/ops";
 import Tickets from "@/pages/tickets";
 import EditApp from "@/pages/edit-app";
 import PushNotifications from "@/pages/push-notifications";
+import Privacy from "@/pages/privacy";
+import Terms from "@/pages/terms";
 
 function Router() {
   return (
@@ -32,6 +34,8 @@ function Router() {
       <Route path="/contact" component={Contact} />
       <Route path="/profile" component={Profile} />
       <Route path="/billing" component={Billing} />
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/terms" component={Terms} />
       <Route path="/admin/team" component={AdminTeam} />
       <Route path="/ops" component={Ops} />
       <Route path="/tickets" component={Tickets} />

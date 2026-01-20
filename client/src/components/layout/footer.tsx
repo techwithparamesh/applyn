@@ -49,8 +49,8 @@ export function Footer() {
             <ul className="space-y-3 text-sm">
               <li><Link href="/contact" className="text-muted-foreground hover:text-white transition-colors">Contact Us</Link></li>
               <li><Link href="/faq" className="text-muted-foreground hover:text-white transition-colors">FAQ</Link></li>
-              <li><a href="#" className="text-muted-foreground hover:text-white transition-colors">Privacy Policy</a></li>
-              <li><a href="#" className="text-muted-foreground hover:text-white transition-colors">Terms of Service</a></li>
+              <li><Link href="/privacy" className="text-muted-foreground hover:text-white transition-colors">Privacy Policy</Link></li>
+              <li><Link href="/terms" className="text-muted-foreground hover:text-white transition-colors">Terms of Service</Link></li>
             </ul>
           </div>
 
@@ -89,8 +89,8 @@ export function Footer() {
         <div className="pt-8 border-t border-white/[0.08] flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-muted-foreground">
           <p>© 2026 Applyn. All rights reserved.</p>
           <div className="flex gap-6">
-            <a href="#" className="hover:text-white transition-colors">Privacy</a>
-            <a href="#" className="hover:text-white transition-colors">Cookies</a>
+            <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
+            <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
             <a href="#" className="hover:text-white transition-colors">Security</a>
           </div>
         </div>

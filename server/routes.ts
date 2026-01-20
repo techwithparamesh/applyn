@@ -707,9 +707,9 @@ export async function registerRoutes(
 
   // Plan pricing (in paise)
   const PLAN_PRICES: Record<string, number> = {
-    starter: 49900,   // ₹499
-    standard: 99900,  // ₹999
-    pro: 249900,      // ₹2499
+    starter: 49900,    // ₹499 - Android only
+    standard: 149900,  // ₹1,499 - Android + iOS
+    pro: 299900,       // ₹2,999 - Full package with App Store ready
   };
 
   const createOrderSchema = z.object({

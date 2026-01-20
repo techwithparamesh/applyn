@@ -70,7 +70,7 @@ export default function Pricing() {
               <PricingCard 
                 title="Starter Build"
                 price="₹499"
-                description="Ideal for students and hobbyists wanting to see their project on a phone."
+                description="Ideal for students and hobbyists wanting to see their Android app on a phone."
                 features={[
                   "Android .apk (release signed)",
                   "WebView app wrapper",
@@ -78,39 +78,39 @@ export default function Pricing() {
                   "Community Support",
                   "Single Build – no rebuilds"
                 ]}
-                buttonText="Get Started"
+                buttonText="Get Android Only"
                 variant="outline"
                 onSelect={() => handleSelectPlan("starter")}
               />
               <PricingCard 
                 title="Standard Build"
-                price="₹999"
-                description="Perfect for bloggers and small shop owners launching their first Android app."
+                price="₹1,499"
+                description="Perfect for businesses launching on both Android and iOS platforms."
                 features={[
                   "Android .apk & .aab (release)",
+                  "iOS .ipa (Ad-Hoc signed)",
                   "Custom Branded Splash",
                   "Push Notifications Ready",
                   "Email Support (48h response)",
-                  "1 Free Rebuild within 30 days",
-                  "Play Store upload guide"
+                  "1 Free Rebuild within 30 days"
                 ]}
-                buttonText="Get Android Build"
+                buttonText="Get Android + iOS"
                 variant="outline"
                 onSelect={() => handleSelectPlan("standard")}
               />
               <PricingCard 
                 title="Pro Build"
-                price="₹2,499"
-                description="For brands & agencies needing a polished, store-ready Android app with priority support."
+                price="₹2,999"
+                description="For brands & agencies needing store-ready apps for both Play Store & App Store."
                 features={[
                   "Android .apk & .aab (signed)",
+                  "iOS .ipa (App Store ready)",
                   "Push Notifications Integrated",
                   "White-Label Branding",
                   "Priority WhatsApp Support",
-                  "3 Free Rebuilds within 90 days",
-                  "Play Store ready package"
+                  "3 Free Rebuilds within 90 days"
                 ]}
-                buttonText="Get Pro Build"
+                buttonText="Get Full Package"
                 variant="default"
                 popular
                 onSelect={() => handleSelectPlan("pro")}
