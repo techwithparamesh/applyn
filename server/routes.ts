@@ -784,6 +784,38 @@ export async function registerRoutes(
     }
   });
 
+  // --- Admin Payment Bypass ---
+  // Allows admin users to create apps without payment
+  const adminBypassSchema = z.object({
+    plan: z.enum(["starter", "standard", "pro"]),
+    appId: z.string().uuid(),
+  }).strict();
+
+  app.post("/api/payments/admin-bypass", requireAuth, requireRole(["admin"]), async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const { plan, appId } = adminBypassSchema.parse(req.body);
+
+      // Create a completed payment record with 0 amount for admin
+      const payment = await storage.createPayment(user.id, {
+        appId,
+        provider: "razorpay",
+        providerOrderId: `admin_bypass_${Date.now()}`,
+        amountInr: 0,
+        plan,
+      });
+
+      // Mark as completed immediately
+      await storage.updatePaymentStatus(payment.id, "completed", `admin_${user.id}_${Date.now()}`);
+
+      return res.json({ ok: true, payment, message: "Admin bypass - payment skipped" });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
   const verifyPaymentSchema = z.object({
     razorpay_order_id: z.string(),
     razorpay_payment_id: z.string(),

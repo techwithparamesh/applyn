@@ -28,19 +28,13 @@ function NavItem({
       <a
         aria-current={active ? "page" : undefined}
         className={
-          "relative text-sm font-semibold transition-colors" +
+          "relative px-3 py-2 text-[15px] font-medium transition-colors rounded-lg" +
           (active
-            ? " text-white"
-            : " text-slate-200/80 hover:text-white")
+            ? " text-white bg-white/5"
+            : " text-slate-300 hover:text-white hover:bg-white/5")
         }
       >
         {label}
-        <span
-          className={
-            "pointer-events-none absolute -bottom-2 left-0 h-px w-full bg-primary transition-opacity" +
-            (active ? " opacity-100" : " opacity-0")
-          }
-        />
       </a>
     </Link>
   );
@@ -88,7 +82,7 @@ export function Navbar() {
           </div>
         </Link>
 
-        <div className="hidden md:flex items-center gap-2">
+        <div className="hidden md:flex items-center gap-1">
           {!isAuthed ? (
             <>
               <NavItem href="/" label="Home" currentPath={location} />
@@ -96,18 +90,17 @@ export function Navbar() {
               <NavItem href="/pricing" label="Pricing" currentPath={location} />
               <NavItem href="/faq" label="FAQ" currentPath={location} />
               <NavItem href="/contact" label="Contact" currentPath={location} />
-              <div className="h-6 w-px bg-white/10 mx-2" />
+              <div className="h-5 w-px bg-white/10 mx-4" />
               <Link href="/login">
-                <Button variant="ghost" size="sm" className="font-medium text-muted-foreground hover:text-white hover:bg-white/5">
+                <Button variant="ghost" className="font-medium text-[15px] text-slate-300 hover:text-white hover:bg-white/5 px-4 h-10">
                   Sign in
                 </Button>
               </Link>
-              <Link href="/login">
+              <Link href="/create">
                 <Button
-                  size="sm"
-                  className="bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold px-5 rounded-lg shadow-lg glow-primary"
+                  className="bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold px-6 h-10 rounded-lg shadow-lg glow-primary ml-2"
                 >
-                  Get Started
+                  Try Free
                 </Button>
               </Link>
             </>
@@ -116,11 +109,10 @@ export function Navbar() {
               <Link href="/dashboard">
                 <Button 
                   variant="ghost" 
-                  size="sm" 
-                  className={`gap-2 font-medium ${
+                  className={`gap-2 font-medium h-10 px-4 ${
                     location === "/dashboard" 
                       ? "bg-white/10 text-white" 
-                      : "text-muted-foreground hover:text-white hover:bg-white/5"
+                      : "text-slate-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
                   <LayoutDashboard className="h-4 w-4" />
@@ -130,11 +122,10 @@ export function Navbar() {
               <Link href="/tickets">
                 <Button 
                   variant="ghost" 
-                  size="sm" 
-                  className={`gap-2 font-medium ${
+                  className={`gap-2 font-medium h-10 px-4 ${
                     location === "/tickets" 
                       ? "bg-white/10 text-white" 
-                      : "text-muted-foreground hover:text-white hover:bg-white/5"
+                      : "text-slate-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
                   <LifeBuoy className="h-4 w-4" />
@@ -143,14 +134,13 @@ export function Navbar() {
               </Link>
               <Link href="/create">
                 <Button 
-                  size="sm" 
-                  className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold"
+                  className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold h-10 px-5"
                 >
                   <Plus className="h-4 w-4" />
                   New App
                 </Button>
               </Link>
-              <div className="h-6 w-px bg-white/10 mx-2" />
+              <div className="h-5 w-px bg-white/10 mx-3" />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="rounded-full hover:bg-white/5">
@@ -230,8 +220,8 @@ export function Navbar() {
                         </Button>
                       </SheetClose>
                       <SheetClose asChild>
-                        <Button className="w-full" onClick={() => setLocation("/login")}>
-                          Get Started
+                        <Button className="w-full" onClick={() => setLocation("/create")}>
+                          Try Free
                         </Button>
                       </SheetClose>
                     </div>

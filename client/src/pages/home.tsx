@@ -3,32 +3,22 @@ import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CheckCircle2, ArrowRight, Zap, Globe, Smartphone, ShieldCheck, Star } from "lucide-react";
+import { ArrowRight, Zap, Globe, ShieldCheck } from "lucide-react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { getQueryFn } from "@/lib/queryClient";
 import heroImg from "@assets/generated_images/website_to_mobile_app_conversion_isometric_illustration.png";
 import { motion } from "framer-motion";
 
 export default function Home() {
   const [, setLocation] = useLocation();
   const [websiteUrl, setWebsiteUrl] = useState("");
-  
-  const { data: me } = useQuery({
-    queryKey: ["/api/me"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
-  });
 
   const handleGetStarted = () => {
     const createPath = websiteUrl.trim()
       ? `/create?url=${encodeURIComponent(websiteUrl.trim())}`
       : "/create";
     
-    if (me) {
-      setLocation(createPath);
-    } else {
-      setLocation(`/login?returnTo=${encodeURIComponent(createPath)}`);
-    }
+    // Direct access - no login required to try the app builder
+    setLocation(createPath);
   };
 
   return (
@@ -76,14 +66,14 @@ export default function Home() {
                     size="lg" 
                     className="h-14 px-8 text-lg font-semibold rounded-xl bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 shadow-xl glow-primary transition-all hover:scale-[1.02] active:scale-[0.98]"
                   >
-                    Get Started <ArrowRight className="ml-2 h-5 w-5" />
+                    Try Free Preview <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </div>
 
                 <div className="flex items-center gap-8 pt-2">
                   {[
-                    { label: "Play Store Ready", icon: ShieldCheck },
-                    { label: "WhatsApp Updates", icon: Zap }
+                    { label: "No signup required", icon: Zap },
+                    { label: "Play Store Ready", icon: ShieldCheck }
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                       <item.icon className="h-5 w-5 text-cyan-400" />

@@ -21,8 +21,8 @@ declare global {
 
 const STEPS = [
   { id: 1, name: "Details", icon: Globe },
-  { id: 2, name: "Plan", icon: CreditCard },
-  { id: 3, name: "Customize", icon: Palette },
+  { id: 2, name: "Customize", icon: Palette },
+  { id: 3, name: "Plan", icon: CreditCard },
   { id: 4, name: "Review", icon: Smartphone },
 ];
 
@@ -111,6 +111,9 @@ export default function CreateApp() {
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
+  // Check if user is admin (admins get free access)
+  const isAdmin = (me as any)?.role === "admin";
+
   // Get URL and plan from query params if provided (from home/pricing page)
   const params = new URLSearchParams(search);
   const urlFromQuery = params.get("url") || "";
@@ -171,9 +174,42 @@ export default function CreateApp() {
   const splashInputRef = useRef<HTMLInputElement>(null);
   const [splashImage, setSplashImage] = useState<string | null>(null);
 
+  // Check if resuming after login
+  const isResuming = params.get("resume") === "true";
+
+  // Save form data to localStorage for anonymous users
   useEffect(() => {
-    if (!isLoading && !me) setLocation(`/login?returnTo=${encodeURIComponent("/create")}`);
-  }, [isLoading, me, setLocation]);
+    if (!me && formData.url !== "https://") {
+      localStorage.setItem("applyn_draft", JSON.stringify({ formData, selectedPlan, step }));
+    }
+  }, [formData, selectedPlan, step, me]);
+
+  // Load draft from localStorage on mount or after login
+  useEffect(() => {
+    const draft = localStorage.getItem("applyn_draft");
+    if (draft) {
+      try {
+        const parsed = JSON.parse(draft);
+        if (parsed.formData) setFormData(parsed.formData);
+        if (parsed.selectedPlan) setSelectedPlan(parsed.selectedPlan);
+        
+        // If user just logged in and is resuming, go to Plan step
+        if (me && isResuming && parsed.step) {
+          setStep(parsed.step);
+        } else if (!me && parsed.step && parsed.step <= 2) {
+          // Anonymous user - restore up to Customize step only
+          setStep(parsed.step);
+        }
+      } catch (e) {
+        // Invalid draft, ignore
+      }
+    }
+  }, [me, isResuming]);
+
+  // Clear draft after successful app creation
+  const clearDraft = () => {
+    localStorage.removeItem("applyn_draft");
+  };
 
   // Load Razorpay script
   useEffect(() => {
@@ -210,6 +246,19 @@ export default function CreateApp() {
         });
         return;
       }
+      
+      // Step 2 → Step 3 (Plan): Require login
+      if (step === 2 && !me) {
+        // Save current state before redirecting
+        localStorage.setItem("applyn_draft", JSON.stringify({ formData, selectedPlan, step: 3 }));
+        toast({
+          title: "Almost there! 🎉",
+          description: "Sign in to select your plan and build your app.",
+        });
+        setLocation(`/login?returnTo=${encodeURIComponent("/create?resume=true")}`);
+        return;
+      }
+      
       setLoading(true);
       setTimeout(() => {
         setLoading(false);
@@ -235,6 +284,27 @@ export default function CreateApp() {
       });
       const app = await appRes.json();
 
+      // Admin bypass - skip payment and directly build
+      if (isAdmin) {
+        // Create a free payment record for admin
+        await apiRequest("POST", "/api/payments/admin-bypass", {
+          plan: selectedPlan,
+          appId: app.id,
+        });
+
+        // Trigger build
+        await apiRequest("POST", `/api/apps/${app.id}/build`);
+
+        clearDraft(); // Clear saved draft after successful creation
+        await queryClient.invalidateQueries({ queryKey: ["/api/apps"] });
+        toast({
+          title: "App created successfully!",
+          description: "Your app is now being built (Admin - no payment required).",
+        });
+        setLocation("/dashboard");
+        return;
+      }
+
       // Create payment order
       const orderRes = await apiRequest("POST", "/api/payments/create-order", {
         plan: selectedPlan,
@@ -251,7 +321,7 @@ export default function CreateApp() {
         key: orderData.keyId,
         amount: orderData.amount,
         currency: orderData.currency,
-        name: "WebToApp",
+        name: "Applyn",
         description: `${PLANS.find((p) => p.id === selectedPlan)?.name} - ${formData.appName}`,
         order_id: orderData.orderId,
         handler: async function (response: any) {
@@ -267,6 +337,7 @@ export default function CreateApp() {
             // Trigger build
             await apiRequest("POST", `/api/apps/${app.id}/build`);
 
+            clearDraft(); // Clear saved draft after successful creation
             await queryClient.invalidateQueries({ queryKey: ["/api/apps"] });
             toast({
               title: "Payment successful!",
@@ -401,12 +472,27 @@ export default function CreateApp() {
                 </div>
               )}
 
-              {step === 2 && (
+              {step === 3 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-500">
                   <div>
                     <h2 className="text-2xl font-bold text-white">Choose Your Plan</h2>
                     <p className="text-muted-foreground mt-1">Select a plan to unlock features. You can upgrade anytime.</p>
                   </div>
+
+                  {/* Admin Free Access Banner */}
+                  {isAdmin && (
+                    <div className="p-4 rounded-xl bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-green-500/20 flex items-center justify-center">
+                          <Crown className="h-5 w-5 text-green-400" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-green-400">Admin Access</p>
+                          <p className="text-sm text-green-400/80">Payment will be skipped - all plans are free for you!</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="space-y-4">
                     {PLANS.map((plan) => (
@@ -439,8 +525,17 @@ export default function CreateApp() {
                             </p>
                           </div>
                           <div className="text-right">
-                            <span className="text-2xl font-bold text-gradient">₹{plan.price.toLocaleString()}</span>
-                            <p className="text-xs text-muted-foreground">one-time</p>
+                            {isAdmin ? (
+                              <>
+                                <span className="text-2xl font-bold text-green-400">FREE</span>
+                                <p className="text-xs text-green-400/70 line-through">₹{plan.price.toLocaleString()}</p>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-2xl font-bold text-gradient">₹{plan.price.toLocaleString()}</span>
+                                <p className="text-xs text-muted-foreground">one-time</p>
+                              </>
+                            )}
                           </div>
                         </div>
                         
@@ -490,16 +585,11 @@ export default function CreateApp() {
                 </div>
               )}
 
-              {step === 3 && (
+              {step === 2 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-500">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-2xl font-bold text-white">Customize Your App</h2>
-                      <p className="text-muted-foreground mt-1">Brand your app with custom logo, colors, and settings.</p>
-                    </div>
-                    <Badge className="bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-400 border-cyan-500/30">
-                      {selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)} Plan
-                    </Badge>
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">Customize Your App</h2>
+                    <p className="text-muted-foreground mt-1">Preview your app with custom branding before you decide on a plan!</p>
                   </div>
 
                   <div className="space-y-6">
@@ -969,7 +1059,14 @@ export default function CreateApp() {
                         </div>
                         <div className="flex justify-between text-base font-medium border-t border-white/10 mt-3 pt-3">
                           <span className="text-white">Total:</span>
-                          <span className="text-cyan-400">₹{PLANS.find(p => p.id === selectedPlan)?.price.toLocaleString()}</span>
+                          {isAdmin ? (
+                            <span className="text-green-400 flex items-center gap-2">
+                              FREE
+                              <span className="text-xs text-muted-foreground line-through">₹{PLANS.find(p => p.id === selectedPlan)?.price.toLocaleString()}</span>
+                            </span>
+                          ) : (
+                            <span className="text-cyan-400">₹{PLANS.find(p => p.id === selectedPlan)?.price.toLocaleString()}</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1000,7 +1097,7 @@ export default function CreateApp() {
                   disabled={loading}
                 >
                   {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {step === 4 ? `Pay ₹${PLANS.find((p) => p.id === selectedPlan)?.price.toLocaleString()}` : "Next Step"}
+                  {step === 4 ? (isAdmin ? "Create App (Free)" : `Pay ₹${PLANS.find((p) => p.id === selectedPlan)?.price.toLocaleString()}`) : "Next Step"}
                   {!loading && step !== 4 && <ArrowRight className="ml-2 h-4 w-4" />}
                 </Button>
               </div>
