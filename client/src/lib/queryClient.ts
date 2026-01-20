@@ -2,25 +2,29 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
-    const contentType = res.headers.get("content-type") || "";
-    if (contentType.includes("application/json")) {
-      try {
-        const json = (await res.json()) as any;
-        const msg =
-          typeof json?.message === "string"
-            ? json.message
-            : res.statusText || "Request failed";
-        const details = typeof json?.details === "string" ? json.details : "";
-        throw new Error(details ? `${msg} (${details})` : msg);
-      } catch {
-        // fallthrough to text
+    let errorMessage = res.statusText || "Request failed";
+    
+    try {
+      // Clone the response so we can read the body
+      const text = await res.text();
+      
+      if (text) {
+        // Try to parse as JSON
+        try {
+          const json = JSON.parse(text);
+          const msg = typeof json?.message === "string" ? json.message : errorMessage;
+          const details = typeof json?.details === "string" ? json.details : "";
+          errorMessage = details ? `${msg} (${details})` : msg;
+        } catch {
+          // Not JSON, use text directly (truncated if too long)
+          errorMessage = text.length > 400 ? `${text.slice(0, 400)}…` : text;
+        }
       }
+    } catch {
+      // Could not read body at all
     }
-
-    const text = (await res.text()) || res.statusText || "Request failed";
-    // Avoid dumping huge HTML into toasts.
-    const short = text.length > 400 ? `${text.slice(0, 400)}…` : text;
-    throw new Error(`${res.status}: ${short}`);
+    
+    throw new Error(errorMessage);
   }
 }
 

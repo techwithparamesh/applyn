@@ -8,7 +8,7 @@ import { Link, useLocation } from "wouter";
 import { Smartphone, Mail, Lock, Chrome } from "lucide-react";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 export default function AuthPage() {
@@ -56,6 +56,9 @@ export default function AuthPage() {
           password,
         });
       }
+
+      // Invalidate the /api/me query so dashboard knows user is logged in
+      await queryClient.invalidateQueries({ queryKey: ["/api/me"] });
 
       const params = new URLSearchParams(window.location.search);
       const returnTo = params.get("returnTo");
