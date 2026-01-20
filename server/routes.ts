@@ -290,7 +290,11 @@ export async function registerRoutes(
 
       (req as any).login(user, (err: any) => {
         if (err) return next(err);
-        return res.status(201).json(sanitizeUser(user));
+        // Ensure session is saved to MySQL before responding
+        (req as any).session.save((saveErr: any) => {
+          if (saveErr) return next(saveErr);
+          return res.status(201).json(sanitizeUser(user));
+        });
       });
     } catch (err) {
       return next(err);
@@ -317,7 +321,11 @@ export async function registerRoutes(
 
         (req as any).login(user, (loginErr: any) => {
           if (loginErr) return next(loginErr);
-          return res.json(sanitizeUser(user));
+          // Ensure session is saved to MySQL before responding
+          (req as any).session.save((saveErr: any) => {
+            if (saveErr) return next(saveErr);
+            return res.json(sanitizeUser(user));
+          });
         });
       },
     )(req, res, next);
