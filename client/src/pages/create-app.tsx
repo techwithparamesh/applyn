@@ -173,40 +173,44 @@ export default function CreateApp() {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const splashInputRef = useRef<HTMLInputElement>(null);
   const [splashImage, setSplashImage] = useState<string | null>(null);
+  
+  // State for plan selection modal
+  const [showPlanModal, setShowPlanModal] = useState(false);
 
   // Check if resuming after login
   const isResuming = params.get("resume") === "true";
 
-  // Save form data to localStorage for anonymous users
+  // Save form data to localStorage for anonymous users (only if they've made progress)
   useEffect(() => {
-    if (!me && formData.url !== "https://") {
+    if (!me && formData.url !== "https://" && formData.url.includes(".")) {
       localStorage.setItem("applyn_draft", JSON.stringify({ formData, selectedPlan, step }));
     }
   }, [formData, selectedPlan, step, me]);
 
-  // Load draft from localStorage on mount or after login
+  // Load draft from localStorage ONLY when resuming after login
   useEffect(() => {
     const draft = localStorage.getItem("applyn_draft");
-    if (draft) {
+    if (draft && isResuming) {
       try {
         const parsed = JSON.parse(draft);
         if (parsed.formData) setFormData(parsed.formData);
         if (parsed.selectedPlan) setSelectedPlan(parsed.selectedPlan);
         
-        // If user just logged in and is resuming
-        if (me && isResuming && parsed.step) {
+        // User just logged in and is resuming - go to Review step
+        if (me && parsed.step) {
           setStep(parsed.step);
           // If they were trying to download, show plan modal
           if (parsed.showPlan) {
             setTimeout(() => setShowPlanModal(true), 500);
           }
-        } else if (!me && parsed.step && parsed.step <= 3) {
-          // Anonymous user - restore step
-          setStep(parsed.step);
         }
       } catch (e) {
         // Invalid draft, ignore
       }
+    }
+    // Clear draft if not resuming (fresh start)
+    if (!isResuming) {
+      localStorage.removeItem("applyn_draft");
     }
   }, [me, isResuming]);
 
@@ -239,9 +243,6 @@ export default function CreateApp() {
       </div>
     );
   }
-
-  // State for plan selection modal
-  const [showPlanModal, setShowPlanModal] = useState(false);
 
   const handleNext = () => {
     if (step < 3) {
@@ -907,7 +908,7 @@ export default function CreateApp() {
 
       {/* Plan Selection Modal */}
       <Dialog open={showPlanModal} onOpenChange={setShowPlanModal}>
-        <DialogContent className="max-w-2xl bg-background border-white/10 max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl bg-background border-white/10 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-white flex items-center gap-2">
               <CreditCard className="h-6 w-6 text-cyan-400" />
@@ -933,57 +934,107 @@ export default function CreateApp() {
             </div>
           )}
 
-          <div className="space-y-3 mt-4">
+          <div className="grid md:grid-cols-3 gap-4 mt-4">
             {PLANS.map((plan) => (
               <div
                 key={plan.id}
                 onClick={() => setSelectedPlan(plan.id as any)}
-                className={`border-2 rounded-xl p-4 relative overflow-hidden cursor-pointer transition-all ${
+                className={`border-2 rounded-xl p-5 relative overflow-hidden cursor-pointer transition-all flex flex-col ${
                   selectedPlan === plan.id
                     ? "border-cyan-500/50 bg-gradient-to-br from-cyan-500/10 to-purple-500/5 shadow-lg shadow-cyan-500/10"
                     : "border-white/10 bg-white/5 hover:border-white/20"
                 }`}
               >
                 {plan.recommended && (
-                  <div className="absolute top-0 right-0 bg-gradient-to-r from-cyan-500 to-purple-500 text-white text-xs px-3 py-1 rounded-bl-xl font-semibold flex items-center gap-1">
+                  <div className="absolute top-0 right-0 bg-gradient-to-r from-cyan-500 to-purple-500 text-white text-[10px] px-2 py-1 rounded-bl-xl font-semibold flex items-center gap-1">
                     <Crown className="h-3 w-3" /> BEST VALUE
                   </div>
                 )}
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <h3 className="font-bold text-lg text-white flex items-center gap-2">
-                      {plan.name}
-                      {selectedPlan === plan.id && <Check className="h-4 w-4 text-cyan-400" />}
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {plan.id === "starter" && "Android only"}
-                      {plan.id === "standard" && "Android + iOS (Ad-Hoc)"}
-                      {plan.id === "pro" && "Android + iOS (App Store Ready)"}
-                    </p>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {plan.features.slice(0, 3).map((feature) => (
-                        <span key={feature} className="text-xs bg-white/5 px-2 py-1 rounded text-muted-foreground">
-                          {feature}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="text-right ml-4">
+                
+                {/* Header */}
+                <div className="text-center mb-4">
+                  <h3 className="font-bold text-lg text-white flex items-center justify-center gap-2">
+                    {plan.name}
+                    {selectedPlan === plan.id && <Check className="h-4 w-4 text-cyan-400" />}
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {plan.id === "starter" && "Android only"}
+                    {plan.id === "standard" && "Android + iOS (Ad-Hoc)"}
+                    {plan.id === "pro" && "Android + iOS (App Store Ready)"}
+                  </p>
+                  <div className="mt-3">
                     {isAdmin ? (
                       <>
-                        <span className="text-2xl font-bold text-green-400">FREE</span>
+                        <span className="text-3xl font-bold text-green-400">FREE</span>
                         <p className="text-xs text-muted-foreground line-through">₹{plan.price.toLocaleString()}</p>
                       </>
                     ) : (
                       <>
-                        <span className="text-2xl font-bold text-gradient">₹{plan.price.toLocaleString()}</span>
-                        <p className="text-xs text-muted-foreground">one-time</p>
+                        <span className="text-3xl font-bold text-gradient">₹{plan.price.toLocaleString()}</span>
+                        <p className="text-xs text-muted-foreground">one-time payment</p>
                       </>
                     )}
                   </div>
                 </div>
+
+                {/* Features List */}
+                <div className="flex-1 space-y-2 mb-4">
+                  {plan.features.map((feature) => (
+                    <div key={feature} className="flex items-start gap-2">
+                      <Check className="h-4 w-4 text-green-400 shrink-0 mt-0.5" />
+                      <span className="text-sm text-white/90">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Limitations */}
+                {plan.limitations.length > 0 && (
+                  <div className="space-y-1 pt-3 border-t border-white/10">
+                    {plan.limitations.map((limitation) => (
+                      <div key={limitation} className="flex items-start gap-2">
+                        <X className="h-3 w-3 text-red-400/60 shrink-0 mt-1" />
+                        <span className="text-xs text-muted-foreground">{limitation}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Selection Indicator */}
+                <div className={`mt-4 py-2 rounded-lg text-center text-sm font-medium transition-all ${
+                  selectedPlan === plan.id 
+                    ? "bg-gradient-to-r from-cyan-500 to-purple-500 text-white" 
+                    : "bg-white/5 text-muted-foreground hover:bg-white/10"
+                }`}>
+                  {selectedPlan === plan.id ? "Selected" : "Select Plan"}
+                </div>
               </div>
             ))}
+          </div>
+
+          {/* Feature Comparison Summary */}
+          <div className="mt-6 p-4 rounded-xl bg-white/5 border border-white/10">
+            <h4 className="font-semibold text-white mb-3 flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-cyan-400" />
+              What's Included in All Plans
+            </h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Check className="h-3 w-3 text-green-400" />
+                <span>WebView App</span>
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Check className="h-3 w-3 text-green-400" />
+                <span>Splash Screen</span>
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Check className="h-3 w-3 text-green-400" />
+                <span>Loading Indicator</span>
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Check className="h-3 w-3 text-green-400" />
+                <span>Lifetime Access</span>
+              </div>
+            </div>
           </div>
 
           <div className="flex gap-3 mt-6">
