@@ -3,7 +3,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowRight, Zap, Globe, ShieldCheck } from "lucide-react";
+import { ArrowRight, Zap, Globe, ShieldCheck, Smartphone } from "lucide-react";
 import { useLocation } from "wouter";
 import heroImg from "@assets/generated_images/website_to_mobile_app_conversion_isometric_illustration.png";
 import { motion } from "framer-motion";
