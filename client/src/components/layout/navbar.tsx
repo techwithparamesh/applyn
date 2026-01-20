@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Plus, LogOut, Menu, LifeBuoy } from "lucide-react";
+import { LayoutDashboard, Plus, LogOut, Menu, LifeBuoy, Sparkles } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Sheet, SheetClose, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -9,6 +9,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
 
@@ -74,17 +75,20 @@ export function Navbar() {
   };
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b border-white/10 bg-background/70 backdrop-blur-xl">
-      <div className="container mx-auto flex h-24 items-center justify-between px-4">
+    <nav className="sticky top-0 z-50 w-full border-b border-white/[0.08] bg-background/80 backdrop-blur-xl">
+      <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/">
-          <div className="flex items-center cursor-pointer group">
-            <span className="text-xl font-semibold tracking-tight bg-gradient-to-r from-violet-400 via-indigo-400 to-sky-300 bg-clip-text text-transparent">
+          <div className="flex items-center cursor-pointer group gap-2">
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center">
+              <Sparkles className="h-4 w-4 text-white" />
+            </div>
+            <span className="text-xl font-bold tracking-tight text-gradient">
               Applyn
             </span>
           </div>
         </Link>
 
-        <div className="hidden md:flex items-center gap-8">
+        <div className="hidden md:flex items-center gap-2">
           {!isAuthed ? (
             <>
               <NavItem href="/" label="Home" currentPath={location} />
@@ -92,16 +96,16 @@ export function Navbar() {
               <NavItem href="/pricing" label="Pricing" currentPath={location} />
               <NavItem href="/faq" label="FAQ" currentPath={location} />
               <NavItem href="/contact" label="Contact" currentPath={location} />
-              <div className="h-6 w-px bg-white/10" />
+              <div className="h-6 w-px bg-white/10 mx-2" />
               <Link href="/login">
-                <Button variant="ghost" size="sm" className="font-semibold text-slate-200/80 hover:text-white hover:bg-white/5">
+                <Button variant="ghost" size="sm" className="font-medium text-muted-foreground hover:text-white hover:bg-white/5">
                   Sign in
                 </Button>
               </Link>
               <Link href="/login?returnTo=%2Fcreate">
                 <Button
                   size="sm"
-                  className="bg-primary hover:bg-primary/90 text-black font-extrabold px-6 rounded-xl shadow-lg shadow-primary/20 transition-transform hover:scale-[1.03] active:scale-[0.98]"
+                  className="bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold px-5 rounded-lg shadow-lg glow-primary"
                 >
                   Get Started
                 </Button>
@@ -110,42 +114,85 @@ export function Navbar() {
           ) : (
             <>
               <Link href="/dashboard">
-                <Button variant={location === "/dashboard" ? "secondary" : "ghost"} size="sm" className="gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className={`gap-2 font-medium ${
+                    location === "/dashboard" 
+                      ? "bg-white/10 text-white" 
+                      : "text-muted-foreground hover:text-white hover:bg-white/5"
+                  }`}
+                >
                   <LayoutDashboard className="h-4 w-4" />
                   Dashboard
                 </Button>
               </Link>
               <Link href="/tickets">
-                <Button variant={location === "/tickets" ? "secondary" : "ghost"} size="sm" className="gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className={`gap-2 font-medium ${
+                    location === "/tickets" 
+                      ? "bg-white/10 text-white" 
+                      : "text-muted-foreground hover:text-white hover:bg-white/5"
+                  }`}
+                >
                   <LifeBuoy className="h-4 w-4" />
                   Tickets
                 </Button>
               </Link>
               <Link href="/create">
-                <Button variant={location === "/create" ? "secondary" : "ghost"} size="sm" className="gap-2">
+                <Button 
+                  size="sm" 
+                  className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold"
+                >
                   <Plus className="h-4 w-4" />
                   New App
                 </Button>
               </Link>
-              <div className="h-6 w-px bg-white/10" />
+              <div className="h-6 w-px bg-white/10 mx-2" />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="rounded-full hover:bg-white/5">
-                    <div className="h-8 w-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-100 font-bold">
+                    <div className="h-8 w-8 rounded-full bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-white/10 flex items-center justify-center text-white font-semibold text-sm">
                       {initials}
                     </div>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setLocation("/profile")}>Profile</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setLocation("/billing")}>Billing</DropdownMenuItem>
+                <DropdownMenuContent align="end" className="glass border-white/10 w-48">
+                  <DropdownMenuItem 
+                    onClick={() => setLocation("/profile")}
+                    className="text-muted-foreground hover:text-white focus:text-white"
+                  >
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setLocation("/billing")}
+                    className="text-muted-foreground hover:text-white focus:text-white"
+                  >
+                    Billing
+                  </DropdownMenuItem>
                   {isStaff && (
-                    <DropdownMenuItem onClick={() => setLocation("/ops")}>Ops</DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => setLocation("/ops")}
+                      className="text-muted-foreground hover:text-white focus:text-white"
+                    >
+                      Ops
+                    </DropdownMenuItem>
                   )}
                   {role === "admin" && (
-                    <DropdownMenuItem onClick={() => setLocation("/admin/team")}>Team</DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => setLocation("/admin/team")}
+                      className="text-muted-foreground hover:text-white focus:text-white"
+                    >
+                      Team
+                    </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem className="text-destructive" onClick={handleLogout}>
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  <DropdownMenuItem 
+                    className="text-red-400 hover:text-red-300 focus:text-red-300" 
+                    onClick={handleLogout}
+                  >
                     <LogOut className="mr-2 h-4 w-4" />
                     Log out
                   </DropdownMenuItem>

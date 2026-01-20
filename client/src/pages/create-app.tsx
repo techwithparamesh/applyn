@@ -94,9 +94,14 @@ export default function CreateApp() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="min-h-screen bg-background flex flex-col">
         <Navbar />
-        <main className="container mx-auto px-4 py-8">Loading...</main>
+        <main className="flex-1 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+        </main>
       </div>
     );
   }
@@ -218,11 +223,11 @@ export default function CreateApp() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
 
       {/* Progress Bar */}
-      <div className="w-full bg-white border-b sticky top-16 z-40">
+      <div className="w-full glass border-b border-white/[0.08] sticky top-16 z-40">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between max-w-4xl mx-auto">
             {STEPS.map((s, i) => {
@@ -233,19 +238,19 @@ export default function CreateApp() {
               return (
                 <div key={s.id} className="flex flex-col items-center relative z-10 group">
                   <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center border-2 transition-all duration-300 ${
                       isActive
-                        ? "border-primary bg-primary text-white scale-110 shadow-lg shadow-primary/30"
+                        ? "border-cyan-500/50 bg-gradient-to-br from-cyan-500/20 to-purple-500/20 text-cyan-400 scale-110 shadow-lg shadow-cyan-500/20"
                         : isCompleted
-                        ? "border-green-500 bg-green-500 text-white"
-                        : "border-slate-200 bg-white text-slate-300"
+                        ? "border-green-500/50 bg-green-500/20 text-green-400"
+                        : "border-white/10 bg-white/5 text-muted-foreground"
                     }`}
                   >
                     {isCompleted ? <Check className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
                   </div>
                   <span
                     className={`text-xs font-medium mt-2 transition-colors duration-300 ${
-                      isActive ? "text-primary" : "text-slate-400"
+                      isActive ? "text-cyan-400" : "text-muted-foreground"
                     }`}
                   >
                     {s.name}
@@ -254,7 +259,7 @@ export default function CreateApp() {
                   {i !== STEPS.length - 1 && (
                     <div
                       className={`absolute top-5 left-1/2 w-full h-[2px] -z-10 ${
-                        s.id < step ? "bg-green-500" : "bg-slate-100"
+                        s.id < step ? "bg-green-500/50" : "bg-white/10"
                       }`}
                       style={{ width: "calc(100% * 6)" }}
                     ></div>
@@ -269,33 +274,33 @@ export default function CreateApp() {
       <main className="flex-1 container mx-auto px-4 py-8 flex flex-col lg:flex-row gap-8 max-w-6xl">
         {/* Left Panel: Form */}
         <div className="flex-1 order-2 lg:order-1">
-          <Card className="border-none shadow-xl bg-white/80 backdrop-blur-sm h-full">
+          <Card className="border-white/[0.08] glass shadow-2xl h-full">
             <CardContent className="p-8">
               {step === 1 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-500">
                   <div>
-                    <h2 className="text-2xl font-bold text-slate-900">Let's start with your website</h2>
+                    <h2 className="text-2xl font-bold text-white">Let's start with your website</h2>
                     <p className="text-muted-foreground mt-1">Enter the URL you want to convert.</p>
                   </div>
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="url">Website URL</Label>
+                      <Label htmlFor="url" className="text-muted-foreground">Website URL</Label>
                       <Input
                         id="url"
                         value={formData.url}
                         onChange={(e) => setFormData({ ...formData, url: e.target.value })}
                         placeholder="https://yourwebsite.com"
-                        className="h-12 text-lg"
+                        className="h-12 text-lg bg-white/5 border-white/10 focus:border-cyan-500/50 text-white rounded-lg"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="appName">App Name</Label>
+                      <Label htmlFor="appName" className="text-muted-foreground">App Name</Label>
                       <Input
                         id="appName"
                         value={formData.appName}
                         onChange={(e) => setFormData({ ...formData, appName: e.target.value })}
                         placeholder="e.g. My Shop"
-                        className="h-12"
+                        className="h-12 bg-white/5 border-white/10 focus:border-cyan-500/50 text-white rounded-lg"
                       />
                     </div>
                   </div>
@@ -305,18 +310,18 @@ export default function CreateApp() {
               {step === 2 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-500">
                   <div>
-                    <h2 className="text-2xl font-bold text-slate-900">Customize Look & Feel</h2>
+                    <h2 className="text-2xl font-bold text-white">Customize Look & Feel</h2>
                     <p className="text-muted-foreground mt-1">Make it look like a native app.</p>
                   </div>
 
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label>App Icon (Emoji)</Label>
+                      <Label className="text-muted-foreground">App Icon (Emoji)</Label>
                       <div className="flex gap-4">
                         <Input
                           value={formData.icon}
                           onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-                          className="w-20 text-center text-2xl h-12"
+                          className="w-20 text-center text-2xl h-12 bg-white/5 border-white/10 focus:border-cyan-500/50 rounded-lg"
                           maxLength={2}
                         />
                         <div className="flex gap-2 flex-wrap">
@@ -326,7 +331,7 @@ export default function CreateApp() {
                               type="button"
                               onClick={() => setFormData({ ...formData, icon: emoji })}
                               className={`w-10 h-10 text-xl rounded-lg border-2 transition-all ${
-                                formData.icon === emoji ? "border-primary bg-primary/10" : "border-slate-200 hover:border-slate-400"
+                                formData.icon === emoji ? "border-cyan-500/50 bg-cyan-500/10" : "border-white/10 bg-white/5 hover:border-white/20"
                               }`}
                             >
                               {emoji}
@@ -337,15 +342,15 @@ export default function CreateApp() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Primary Color</Label>
+                      <Label className="text-muted-foreground">Primary Color</Label>
                       <div className="grid grid-cols-8 gap-2">
-                        {["#2563EB", "#16A34A", "#DC2626", "#9333EA", "#EA580C", "#0891B2", "#CA8A04", "#000000"].map(
+                        {["#00E5FF", "#A855F7", "#16A34A", "#DC2626", "#EA580C", "#0891B2", "#CA8A04", "#000000"].map(
                           (color) => (
                             <div
                               key={color}
                               onClick={() => setFormData({ ...formData, primaryColor: color })}
                               className={`h-10 w-10 rounded-full cursor-pointer border-2 transition-all ${
-                                formData.primaryColor === color ? "border-slate-900 scale-110" : "border-transparent"
+                                formData.primaryColor === color ? "border-white scale-110 shadow-lg" : "border-transparent hover:scale-105"
                               }`}
                               style={{ backgroundColor: color }}
                             />
@@ -355,13 +360,13 @@ export default function CreateApp() {
                           type="color"
                           value={formData.primaryColor}
                           onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
-                          className="h-10 w-10 p-1 rounded-full cursor-pointer"
+                          className="h-10 w-10 p-1 rounded-full cursor-pointer bg-transparent border-white/10"
                         />
                       </div>
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Target Platform</Label>
+                      <Label className="text-muted-foreground">Target Platform</Label>
                       <div className="grid grid-cols-3 gap-3">
                         {[
                           { id: "android", label: "Android", desc: "APK & AAB" },
@@ -371,13 +376,13 @@ export default function CreateApp() {
                           <div
                             key={platform.id}
                             onClick={() => setFormData({ ...formData, platform: platform.id })}
-                            className={`border-2 rounded-lg p-3 text-center cursor-pointer transition-all ${
+                            className={`border-2 rounded-xl p-3 text-center cursor-pointer transition-all ${
                               formData.platform === platform.id
-                                ? "border-primary bg-primary/5"
-                                : "border-slate-200 hover:border-slate-400"
+                                ? "border-cyan-500/50 bg-cyan-500/10"
+                                : "border-white/10 bg-white/5 hover:border-white/20"
                             }`}
                           >
-                            <div className="font-medium">{platform.label}</div>
+                            <div className="font-medium text-white">{platform.label}</div>
                             <div className="text-xs text-muted-foreground">{platform.desc}</div>
                           </div>
                         ))}
@@ -391,18 +396,18 @@ export default function CreateApp() {
               {step === 3 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-500">
                   <div>
-                    <h2 className="text-2xl font-bold text-slate-900">Review Your App</h2>
+                    <h2 className="text-2xl font-bold text-white">Review Your App</h2>
                     <p className="text-muted-foreground mt-1">Check how your app will look.</p>
                   </div>
 
-                  <div className="p-4 bg-slate-50 rounded-lg border text-sm space-y-2">
+                  <div className="p-4 bg-white/5 rounded-xl border border-white/10 text-sm space-y-3">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">URL:</span>
-                      <span className="font-medium truncate max-w-[200px]">{formData.url}</span>
+                      <span className="font-medium text-white truncate max-w-[200px]">{formData.url}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">App Name:</span>
-                      <span className="font-medium">{formData.appName}</span>
+                      <span className="font-medium text-white">{formData.appName}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Icon:</span>
@@ -411,13 +416,13 @@ export default function CreateApp() {
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">Primary Color:</span>
                       <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 rounded-full" style={{ backgroundColor: formData.primaryColor }} />
-                        <span className="font-mono text-xs">{formData.primaryColor}</span>
+                        <div className="w-5 h-5 rounded-full border border-white/20" style={{ backgroundColor: formData.primaryColor }} />
+                        <span className="font-mono text-xs text-muted-foreground">{formData.primaryColor}</span>
                       </div>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Platform:</span>
-                      <span className="font-medium capitalize">{formData.platform}</span>
+                      <span className="font-medium text-white capitalize">{formData.platform}</span>
                     </div>
                   </div>
                 </div>
@@ -426,7 +431,7 @@ export default function CreateApp() {
               {step === 4 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-500">
                   <div>
-                    <h2 className="text-2xl font-bold text-slate-900">Choose Your Plan</h2>
+                    <h2 className="text-2xl font-bold text-white">Choose Your Plan</h2>
                     <p className="text-muted-foreground mt-1">Select a plan that fits your needs.</p>
                   </div>
 
@@ -437,23 +442,23 @@ export default function CreateApp() {
                         onClick={() => setSelectedPlan(plan.id)}
                         className={`border-2 rounded-xl p-4 relative overflow-hidden cursor-pointer transition-all ${
                           selectedPlan === plan.id
-                            ? "border-primary bg-primary/5 shadow-md"
-                            : "border-slate-200 hover:border-slate-400"
+                            ? "border-cyan-500/50 bg-cyan-500/10 shadow-lg shadow-cyan-500/10"
+                            : "border-white/10 bg-white/5 hover:border-white/20"
                         }`}
                       >
                         {plan.recommended && (
-                          <div className="absolute top-0 right-0 bg-primary text-white text-xs px-2 py-1 rounded-bl font-medium">
+                          <div className="absolute top-0 right-0 bg-gradient-to-r from-cyan-500 to-purple-500 text-white text-xs px-3 py-1 rounded-bl-lg font-medium">
                             RECOMMENDED
                           </div>
                         )}
                         <div className="flex justify-between items-center mb-2">
-                          <h3 className="font-bold text-lg">{plan.name}</h3>
-                          <span className="text-2xl font-bold">₹{plan.price.toLocaleString()}</span>
+                          <h3 className="font-bold text-lg text-white">{plan.name}</h3>
+                          <span className="text-2xl font-bold text-gradient">₹{plan.price.toLocaleString()}</span>
                         </div>
-                        <ul className="text-sm space-y-1 text-slate-600">
+                        <ul className="text-sm space-y-1 text-muted-foreground">
                           {plan.features.map((feature) => (
                             <li key={feature} className="flex gap-2 items-center">
-                              <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
+                              <Check className="h-3 w-3 text-green-400 flex-shrink-0" />
                               {feature}
                             </li>
                           ))}
@@ -469,11 +474,15 @@ export default function CreateApp() {
                   variant="ghost"
                   onClick={handleBack}
                   disabled={step === 1}
-                  className={step === 1 ? "invisible" : ""}
+                  className={`text-muted-foreground hover:text-white hover:bg-white/5 ${step === 1 ? "invisible" : ""}`}
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" /> Back
                 </Button>
-                <Button onClick={handleNext} className="min-w-[140px] shadow-lg shadow-primary/20" disabled={loading}>
+                <Button 
+                  onClick={handleNext} 
+                  className="min-w-[140px] bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white shadow-lg glow-primary" 
+                  disabled={loading}
+                >
                   {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   {step === 4 ? `Pay ₹${PLANS.find((p) => p.id === selectedPlan)?.price.toLocaleString()}` : "Next Step"}
                   {!loading && step !== 4 && <ArrowRight className="ml-2 h-4 w-4" />}
@@ -492,7 +501,7 @@ export default function CreateApp() {
               primaryColor={formData.primaryColor}
               icon={formData.icon}
             />
-            <p className="text-center text-sm text-muted-foreground mt-4">Live Preview: {formData.appName}</p>
+            <p className="text-center text-sm text-muted-foreground mt-4">Live Preview: <span className="text-white">{formData.appName}</span></p>
           </div>
         </div>
       </main>

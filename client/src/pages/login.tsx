@@ -76,36 +76,36 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-mesh selection:bg-primary/30 flex flex-col">
+    <div className="min-h-screen bg-background bg-mesh selection:bg-primary/30 flex flex-col">
       <Navbar />
       
-      <main className="flex-1 flex items-center justify-center p-6 py-20">
-        <div className="w-full max-w-[440px] relative">
+      <main className="flex-1 flex items-center justify-center p-6 py-16">
+        <div className="w-full max-w-[420px] relative">
           {/* Decorative Glow */}
-          <div className="absolute -top-20 -left-20 w-64 h-64 bg-primary/10 rounded-full blur-[100px] -z-10" />
-          <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-emerald-500/10 rounded-full blur-[100px] -z-10" />
+          <div className="absolute -top-20 -left-20 w-64 h-64 bg-cyan-500/10 rounded-full blur-[100px] -z-10" />
+          <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-purple-500/10 rounded-full blur-[100px] -z-10" />
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <Card className="glass border-white/10 shadow-2xl rounded-[2.5rem] overflow-hidden">
-              <CardHeader className="space-y-4 pt-10 pb-6 text-center">
+            <Card className="glass border-white/[0.08] shadow-2xl rounded-2xl overflow-hidden">
+              <CardHeader className="space-y-4 pt-8 pb-4 text-center">
                 <div className="flex justify-center">
                   <motion.div 
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className="h-14 w-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary border border-primary/20"
+                    className="h-14 w-14 bg-gradient-to-br from-cyan-500/20 to-purple-500/20 rounded-xl flex items-center justify-center border border-white/10"
                   >
-                    <Smartphone className="h-7 w-7" />
+                    <Smartphone className="h-7 w-7 text-cyan-400" />
                   </motion.div>
                 </div>
                 <div className="space-y-2">
-                  <CardTitle className="text-3xl font-extrabold tracking-tight text-white">
+                  <CardTitle className="text-2xl font-bold tracking-tight text-white">
                     {isLogin ? "Welcome back" : "Create account"}
                   </CardTitle>
-                  <CardDescription className="text-slate-400 text-base">
+                  <CardDescription className="text-muted-foreground">
                     {isLogin 
                       ? "Enter your credentials to access your dashboard" 
                       : "Start transforming your website into a mobile app today"}
@@ -113,7 +113,7 @@ export default function AuthPage() {
                 </div>
               </CardHeader>
 
-              <CardContent className="px-8 pb-10">
+              <CardContent className="px-6 pb-8">
                 <AnimatePresence mode="wait">
                   <motion.form
                     key={isLogin ? "login" : "signup"}
@@ -121,44 +121,40 @@ export default function AuthPage() {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -10 }}
                     onSubmit={handleSubmit} 
-                    className="space-y-5"
+                    className="space-y-4"
                   >
                     {!isLogin && (
                       <div className="space-y-2">
-                        <Label htmlFor="name" className="text-slate-300 ml-1">Full Name</Label>
-                        <div className="relative group">
-                          <Input 
-                            id="name" 
-                            placeholder="Arjun Reddy" 
-                            required 
-                            value={fullName}
-                            onChange={(e) => setFullName(e.target.value)}
-                            className="h-12 bg-white/5 border-white/10 focus:border-primary/50 transition-all rounded-xl"
-                          />
-                        </div>
+                        <Label htmlFor="name" className="text-sm text-muted-foreground">Full Name</Label>
+                        <Input 
+                          id="name" 
+                          placeholder="Arjun Reddy" 
+                          required 
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          className="h-11 bg-white/5 border-white/10 focus:border-cyan-500/50 text-white placeholder:text-muted-foreground rounded-lg"
+                        />
                       </div>
                     )}
                     
                     <div className="space-y-2">
-                      <Label htmlFor="email" className="text-slate-300 ml-1">Email address</Label>
-                      <div className="relative group">
-                        <Input 
-                          id="email" 
-                          type="email" 
-                          placeholder="name@company.com" 
-                          required 
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="h-12 bg-white/5 border-white/10 focus:border-primary/50 transition-all rounded-xl"
-                        />
-                      </div>
+                      <Label htmlFor="email" className="text-sm text-muted-foreground">Email address</Label>
+                      <Input 
+                        id="email" 
+                        type="email" 
+                        placeholder="name@company.com" 
+                        required 
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="h-11 bg-white/5 border-white/10 focus:border-cyan-500/50 text-white placeholder:text-muted-foreground rounded-lg"
+                      />
                     </div>
 
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between ml-1">
-                        <Label htmlFor="password" className="text-slate-300">Password</Label>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="password" className="text-sm text-muted-foreground">Password</Label>
                         {isLogin && (
-                          <Link href="/forgot-password" className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors">
+                          <Link href="/forgot-password" className="text-xs font-medium text-cyan-400 hover:text-cyan-300 transition-colors">
                             Forgot password?
                           </Link>
                         )}
@@ -169,30 +165,30 @@ export default function AuthPage() {
                         required 
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="h-12 bg-white/5 border-white/10 focus:border-primary/50 transition-all rounded-xl"
+                        className="h-11 bg-white/5 border-white/10 focus:border-cyan-500/50 text-white rounded-lg"
                       />
                     </div>
 
                     <Button 
                       type="submit" 
-                      className="w-full h-12 text-base font-bold bg-primary hover:bg-primary/90 text-black rounded-xl shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]" 
+                      className="w-full h-11 text-base font-semibold bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white rounded-lg shadow-lg glow-primary transition-all hover:scale-[1.02] active:scale-[0.98]" 
                       disabled={loading}
                     >
                       {loading ? (isLogin ? "Signing in..." : "Creating account...") : (isLogin ? "Sign in" : "Get Started Free")}
                     </Button>
 
-                    <div className="relative py-2">
+                    <div className="relative py-3">
                       <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t border-white/5" />
+                        <span className="w-full border-t border-white/[0.08]" />
                       </div>
-                      <div className="relative flex justify-center text-[10px] uppercase tracking-widest font-bold">
-                        <span className="bg-[#0f172a] px-3 text-slate-500">Or continue with</span>
+                      <div className="relative flex justify-center text-[10px] uppercase tracking-widest font-medium">
+                        <span className="bg-card px-3 text-muted-foreground">Or continue with</span>
                       </div>
                     </div>
 
                     <Button 
                       variant="outline" 
-                      className="w-full h-12 border-white/10 bg-white/5 hover:bg-white/10 text-white rounded-xl flex items-center gap-3 transition-all font-semibold" 
+                      className="w-full h-11 border-white/10 bg-white/5 hover:bg-white/10 text-white rounded-lg flex items-center gap-3 transition-all font-medium" 
                       type="button"
                       onClick={() => {
                         const params = new URLSearchParams(window.location.search);
@@ -207,12 +203,12 @@ export default function AuthPage() {
                   </motion.form>
                 </AnimatePresence>
 
-                <div className="mt-8 text-center">
-                  <p className="text-sm text-slate-500">
+                <div className="mt-6 text-center">
+                  <p className="text-sm text-muted-foreground">
                     {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
                     <button 
                       onClick={() => setIsLogin(!isLogin)}
-                      className="font-bold text-primary hover:underline underline-offset-4 transition-all"
+                      className="font-semibold text-cyan-400 hover:text-cyan-300 transition-colors"
                     >
                       {isLogin ? "Sign up" : "Log in"}
                     </button>

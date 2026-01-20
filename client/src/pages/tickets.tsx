@@ -1,4 +1,5 @@
 import { Navbar } from "@/components/layout/navbar";
+import { Footer } from "@/components/layout/footer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -17,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
@@ -24,6 +26,19 @@ import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
+import { motion } from "framer-motion";
+import {
+  Plus,
+  MessageSquare,
+  Clock,
+  CheckCircle2,
+  Copy,
+  Eye,
+  LifeBuoy,
+  ArrowRight,
+  Sparkles,
+  Send,
+} from "lucide-react";
 
 type Role = "admin" | "support" | "user" | string;
 
@@ -106,7 +121,6 @@ export default function Tickets() {
     } catch {
       // fallthrough
     }
-
     try {
       const el = document.createElement("textarea");
       el.value = text;
@@ -153,6 +167,9 @@ export default function Tickets() {
       await apiRequest("PATCH", `/api/support/tickets/${t.id}`, { status: next });
       await queryClient.invalidateQueries({ queryKey: ["/api/support/tickets"] });
       toast({ title: "Updated", description: `Ticket marked ${next}.` });
+      if (viewOpen && activeTicket?.id === t.id) {
+        setActiveTicket({ ...t, status: next });
+      }
     } catch (err: any) {
       toast({
         title: "Update failed",
@@ -172,7 +189,7 @@ export default function Tickets() {
 
       await apiRequest("POST", "/api/support/tickets", payload);
       await queryClient.invalidateQueries({ queryKey: ["/api/support/tickets"] });
-      toast({ title: "Ticket created", description: "Support will get back to you." });
+      toast({ title: "Ticket created", description: "Support will get back to you soon." });
       setNewOpen(false);
       setNewAppId("");
       setNewSubject("");
@@ -186,119 +203,304 @@ export default function Tickets() {
     }
   };
 
+  // Stats
+  const stats = useMemo(() => {
+    const list = tickets || [];
+    return {
+      total: list.length,
+      open: list.filter((t) => t.status === "open").length,
+      closed: list.filter((t) => t.status === "closed").length,
+    };
+  }, [tickets]);
+
   if (meLoading) {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-background bg-mesh-subtle">
         <Navbar />
-        <main className="container mx-auto px-4 py-8">Loading...</main>
+        <main className="container mx-auto px-4 py-8">
+          <div className="flex items-center gap-3 text-muted-foreground">
+            <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            Loading...
+          </div>
+        </main>
       </div>
     );
   }
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 },
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-background bg-mesh-subtle flex flex-col">
       <Navbar />
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">
-              {isStaff ? "Tickets" : "My Tickets"}
-            </h1>
-            <p className="text-muted-foreground">
-              {isStaff
-                ? "Staff can view tickets in Ops"
-                : "Track your support requests"}
-            </p>
-          </div>
+      <main className="flex-1 container mx-auto px-4 py-8">
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="space-y-8"
+        >
+          {/* Header */}
+          <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-white">
+                {isStaff ? "Support Tickets" : "My Tickets"}
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                {isStaff
+                  ? "Manage and respond to customer support requests"
+                  : "Track your support requests and get help from our team"}
+              </p>
+            </div>
+            <Button 
+              onClick={() => setNewOpen(true)}
+              className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold shadow-lg glow-primary"
+            >
+              <Plus className="h-4 w-4" /> Create New Ticket
+            </Button>
+          </motion.div>
 
-          <Button onClick={() => setNewOpen(true)} variant="outline">
-            New ticket
-          </Button>
-        </div>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Recent tickets</CardTitle>
-            <CardDescription>
-              {isStaff
-                ? "You should use Ops for staff actions"
-                : "Only your tickets are shown"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {ticketsLoading && (
-              <div className="text-sm text-muted-foreground">Loading tickets...</div>
-            )}
-
-            {!ticketsLoading && (tickets || []).length === 0 && (
-              <div className="text-sm text-muted-foreground">No tickets yet.</div>
-            )}
-
-            <div className="space-y-3">
-              {(tickets || []).map((t) => (
-                <div
-                  key={t.id}
-                  className="flex items-start justify-between gap-3 rounded-md border bg-white p-3"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">{t.status}</Badge>
-                      <div className="text-sm font-medium text-slate-900 truncate">
-                        {t.subject}
-                      </div>
-                    </div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      Updated {formatDistanceToNow(new Date(t.updatedAt), { addSuffix: true })}
-                      {t.appId ? ` • App ${t.appId}` : ""}
-                    </div>
+          {/* Stats */}
+          <motion.div variants={itemVariants} className="grid grid-cols-3 gap-4">
+            <Card className="glass glass-hover border stat-gradient-1">
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Tickets</p>
+                    <p className="text-3xl font-bold text-white mt-1">{stats.total}</p>
                   </div>
-
-                  <div className="flex gap-2 shrink-0">
-                    <Button variant="outline" size="sm" onClick={() => handleView(t)}>
-                      View
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleCopy(t)}>
-                      Copy
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleToggleStatus(t)}>
-                      {t.status === "closed" ? "Reopen" : "Close"}
-                    </Button>
+                  <div className="h-12 w-12 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+                    <MessageSquare className="h-6 w-6 text-cyan-400" />
                   </div>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+
+            <Card className="glass glass-hover border stat-gradient-4">
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Open</p>
+                    <p className="text-3xl font-bold text-white mt-1">{stats.open}</p>
+                  </div>
+                  <div className="h-12 w-12 rounded-xl bg-yellow-500/10 flex items-center justify-center">
+                    <Clock className="h-6 w-6 text-yellow-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="glass glass-hover border stat-gradient-3">
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Resolved</p>
+                    <p className="text-3xl font-bold text-white mt-1">{stats.closed}</p>
+                  </div>
+                  <div className="h-12 w-12 rounded-xl bg-green-500/10 flex items-center justify-center">
+                    <CheckCircle2 className="h-6 w-6 text-green-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Quick Create Card */}
+          {(tickets || []).length === 0 && !ticketsLoading && (
+            <motion.div variants={itemVariants}>
+              <Card className="glass border-dashed border-white/10">
+                <CardContent className="p-12 text-center">
+                  <div className="mx-auto h-16 w-16 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center mb-4">
+                    <LifeBuoy className="h-8 w-8 text-cyan-400" />
+                  </div>
+                  <h3 className="font-semibold text-white text-lg">No tickets yet</h3>
+                  <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">
+                    Need help with your app? Create a support ticket and our team will get back to you within 24 hours.
+                  </p>
+                  <div className="mt-6">
+                    <Button 
+                      onClick={() => setNewOpen(true)}
+                      className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold"
+                    >
+                      <Plus className="h-4 w-4" /> Create Your First Ticket
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {/* Tickets List */}
+          {((tickets || []).length > 0 || ticketsLoading) && (
+            <motion.div variants={itemVariants}>
+              <Card className="glass overflow-hidden">
+                <CardHeader className="border-b border-white/5 pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg text-white">Recent Tickets</CardTitle>
+                      <CardDescription className="text-muted-foreground">
+                        {isStaff ? "All customer tickets" : "Your support history"}
+                      </CardDescription>
+                    </div>
+                    {isStaff && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="gap-1 text-muted-foreground hover:text-white"
+                        onClick={() => setLocation("/ops")}
+                      >
+                        Go to Ops <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {ticketsLoading && (
+                    <div className="p-6 text-sm text-muted-foreground flex items-center gap-3">
+                      <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                      Loading tickets...
+                    </div>
+                  )}
+
+                  <div className="divide-y divide-white/5">
+                    {(tickets || []).map((t) => (
+                      <div
+                        key={t.id}
+                        className="flex items-center justify-between gap-4 p-4 hover:bg-white/[0.02] transition-colors"
+                      >
+                        <div className="flex items-center gap-4 min-w-0 flex-1">
+                          <div className={`h-3 w-3 rounded-full shrink-0 ${
+                            t.status === "open" 
+                              ? "bg-yellow-400 shadow-lg shadow-yellow-400/30" 
+                              : "bg-green-400 shadow-lg shadow-green-400/30"
+                          }`} />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-3">
+                              <span className="font-medium text-white truncate">{t.subject}</span>
+                              <Badge 
+                                className={`shrink-0 ${
+                                  t.status === "open"
+                                    ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20"
+                                    : "bg-green-500/10 text-green-400 border-green-500/20"
+                                }`}
+                              >
+                                {t.status === "open" ? "Open" : "Closed"}
+                              </Badge>
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground truncate">
+                              Updated {formatDistanceToNow(new Date(t.updatedAt), { addSuffix: true })}
+                              {t.appId && ` • App: ${t.appId.slice(0, 8)}...`}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-white"
+                            onClick={() => handleView(t)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-white"
+                            onClick={() => handleCopy(t)}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className={`text-xs ${
+                              t.status === "closed" 
+                                ? "text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10" 
+                                : "text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                            }`}
+                            onClick={() => handleToggleStatus(t)}
+                          >
+                            {t.status === "closed" ? "Reopen" : "Close"}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </motion.div>
       </main>
 
+      <Footer />
+
+      {/* View Ticket Dialog */}
       <Dialog open={viewOpen} onOpenChange={setViewOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl glass border-white/10">
           <DialogHeader>
-            <DialogTitle>{activeTicket?.subject || "Ticket"}</DialogTitle>
-            <DialogDescription>
-              {activeTicket ? `Status: ${activeTicket.status} • Ticket: ${activeTicket.id}` : ""}
+            <DialogTitle className="text-white">{activeTicket?.subject || "Ticket"}</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              {activeTicket && (
+                <span className="flex items-center gap-2">
+                  <Badge 
+                    className={`${
+                      activeTicket.status === "open"
+                        ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20"
+                        : "bg-green-500/10 text-green-400 border-green-500/20"
+                    }`}
+                  >
+                    {activeTicket.status}
+                  </Badge>
+                  <span>• Ticket ID: {activeTicket.id.slice(0, 8)}...</span>
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
 
           {activeTicket && (
-            <div className="space-y-3">
-              <div className="text-xs text-muted-foreground">
-                {activeTicket.appId ? `App: ${activeTicket.appId}` : "General support"}
-              </div>
+            <div className="space-y-4">
+              {activeTicket.appId && (
+                <div className="text-xs text-muted-foreground">
+                  Related App: <span className="text-white">{activeTicket.appId}</span>
+                </div>
+              )}
 
-              <ScrollArea className="h-[320px] rounded-md border bg-slate-50 p-3">
-                <pre className="whitespace-pre-wrap text-sm text-slate-800">
+              <ScrollArea className="h-[300px] rounded-lg border border-white/10 bg-white/[0.02] p-4">
+                <pre className="whitespace-pre-wrap text-sm text-white/90 font-sans">
                   {activeTicket.message}
                 </pre>
               </ScrollArea>
 
               <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => handleCopy(activeTicket)}>
-                  Copy
+                <Button 
+                  variant="ghost" 
+                  onClick={() => handleCopy(activeTicket)}
+                  className="gap-2 text-muted-foreground hover:text-white"
+                >
+                  <Copy className="h-4 w-4" /> Copy
                 </Button>
-                <Button variant="outline" onClick={() => handleToggleStatus(activeTicket)}>
-                  {activeTicket.status === "closed" ? "Reopen" : "Close"}
+                <Button 
+                  onClick={() => handleToggleStatus(activeTicket)}
+                  className={`${
+                    activeTicket.status === "closed"
+                      ? "bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 border border-yellow-500/20"
+                      : "bg-green-500/10 text-green-400 hover:bg-green-500/20 border border-green-500/20"
+                  }`}
+                >
+                  {activeTicket.status === "closed" ? "Reopen Ticket" : "Mark as Resolved"}
                 </Button>
               </div>
             </div>
@@ -306,42 +508,69 @@ export default function Tickets() {
         </DialogContent>
       </Dialog>
 
+      {/* Create Ticket Dialog */}
       <Dialog open={newOpen} onOpenChange={setNewOpen}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="max-w-xl glass border-white/10">
           <DialogHeader>
-            <DialogTitle>New ticket</DialogTitle>
-            <DialogDescription>Send a message to support (authenticated)</DialogDescription>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center">
+                <Sparkles className="h-5 w-5 text-cyan-400" />
+              </div>
+              <div>
+                <DialogTitle className="text-white">Create Support Ticket</DialogTitle>
+                <DialogDescription className="text-muted-foreground">
+                  Tell us what you need help with
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
 
-          <div className="space-y-3">
-            <div className="text-xs text-muted-foreground">Optional: App ID</div>
-            <Input
-              value={newAppId}
-              onChange={(e) => setNewAppId(e.target.value)}
-              placeholder="e.g. 4f7b7b0c-..."
-            />
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label className="text-sm text-muted-foreground">App ID (optional)</Label>
+              <Input
+                value={newAppId}
+                onChange={(e) => setNewAppId(e.target.value)}
+                placeholder="e.g. 4f7b7b0c-..."
+                className="bg-white/5 border-white/10 focus:border-cyan-500/50 text-white placeholder:text-muted-foreground"
+              />
+            </div>
 
-            <div className="text-xs text-muted-foreground">Subject</div>
-            <Input
-              value={newSubject}
-              onChange={(e) => setNewSubject(e.target.value)}
-              placeholder="What do you need help with?"
-            />
+            <div className="space-y-2">
+              <Label className="text-sm text-muted-foreground">Subject <span className="text-red-400">*</span></Label>
+              <Input
+                value={newSubject}
+                onChange={(e) => setNewSubject(e.target.value)}
+                placeholder="What do you need help with?"
+                className="bg-white/5 border-white/10 focus:border-cyan-500/50 text-white placeholder:text-muted-foreground"
+              />
+            </div>
 
-            <div className="text-xs text-muted-foreground">Message</div>
-            <Textarea
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Describe the issue..."
-              rows={6}
-            />
+            <div className="space-y-2">
+              <Label className="text-sm text-muted-foreground">Message <span className="text-red-400">*</span></Label>
+              <Textarea
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Describe the issue in detail..."
+                rows={6}
+                className="bg-white/5 border-white/10 focus:border-cyan-500/50 text-white placeholder:text-muted-foreground resize-none"
+              />
+            </div>
 
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setNewOpen(false)}>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button 
+                variant="ghost" 
+                onClick={() => setNewOpen(false)}
+                className="text-muted-foreground hover:text-white"
+              >
                 Cancel
               </Button>
-              <Button onClick={handleCreate} disabled={!newSubject.trim() || !newMessage.trim()}>
-                Create ticket
+              <Button 
+                onClick={handleCreate} 
+                disabled={!newSubject.trim() || !newMessage.trim()}
+                className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold disabled:opacity-50"
+              >
+                <Send className="h-4 w-4" /> Submit Ticket
               </Button>
             </div>
           </div>
