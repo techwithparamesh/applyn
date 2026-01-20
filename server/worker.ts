@@ -113,43 +113,57 @@ export async function handleOneJob(workerId: string) {
 
   console.log(`[Worker] Claimed job ${job.id} for app ${job.appId}`);
 
-  const app = await storage.getApp(job.appId);
-  if (!app) {
-    console.log(`[Worker] App not found for job ${job.id}`);
-    await storage.completeBuildJob(job.id, "failed", "App not found");
-    return;
-  }
+  try {
+    const app = await storage.getApp(job.appId);
+    if (!app) {
+      console.log(`[Worker] App not found for job ${job.id}`);
+      await storage.completeBuildJob(job.id, "failed", "App not found");
+      return;
+    }
 
-  console.log(`[Worker] Building app: ${app.name} (${app.id})`);
+    console.log(`[Worker] Building app: ${app.name} (${app.id})`);
 
-  const platform = (app as any).platform || "android";
-  const pkg = app.packageName || safePackageName(app.id);
-  const versionCode = (app.versionCode ?? 0) + 1;
+    const platform = (app as any).platform || "android";
+    const pkg = app.packageName || safePackageName(app.id);
+    const versionCode = (app.versionCode ?? 0) + 1;
 
-  await storage.updateAppBuild(app.id, {
-    status: "processing",
-    packageName: pkg,
-    versionCode,
-    buildError: null,
-    buildLogs: null,
-  });
+    console.log(`[Worker] Platform: ${platform}, Package: ${pkg}, Version: ${versionCode}`);
 
-  // Route to the appropriate build handler based on platform
-  if (platform === "ios") {
-    await handleIOSBuild(job, app, pkg, versionCode);
-    return;
-  } else if (platform === "both") {
-    // For "both", we need to build Android first, then trigger iOS
-    // iOS build is async via GitHub Actions, so we handle Android here
-    // and iOS will be triggered separately
-    await handleAndroidBuild(job, app, pkg, versionCode);
-    // Trigger iOS build in background (doesn't block)
-    triggerIOSBuildAsync(app, pkg, versionCode);
-    return;
-  } else {
-    // Default: Android
-    await handleAndroidBuild(job, app, pkg, versionCode);
-    return;
+    await storage.updateAppBuild(app.id, {
+      status: "processing",
+      packageName: pkg,
+      versionCode,
+      buildError: null,
+      buildLogs: null,
+    });
+
+    console.log(`[Worker] Updated app status to processing`);
+
+    // Route to the appropriate build handler based on platform
+    if (platform === "ios") {
+      await handleIOSBuild(job, app, pkg, versionCode);
+      return;
+    } else if (platform === "both") {
+      // For "both", we need to build Android first, then trigger iOS
+      // iOS build is async via GitHub Actions, so we handle Android here
+      // and iOS will be triggered separately
+      await handleAndroidBuild(job, app, pkg, versionCode);
+      // Trigger iOS build in background (doesn't block)
+      triggerIOSBuildAsync(app, pkg, versionCode);
+      return;
+    } else {
+      // Default: Android
+      console.log(`[Worker] Starting Android build...`);
+      await handleAndroidBuild(job, app, pkg, versionCode);
+      return;
+    }
+  } catch (err: any) {
+    console.error(`[Worker] Error processing job ${job.id}:`, err);
+    try {
+      await storage.completeBuildJob(job.id, "failed", err?.message || String(err));
+    } catch (e) {
+      console.error(`[Worker] Failed to mark job as failed:`, e);
+    }
   }
 }
 
