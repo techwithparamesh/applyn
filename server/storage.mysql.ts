@@ -362,28 +362,41 @@ export class MysqlStorage {
     const lockToken = `${workerId}:${randomUUID()}`;
     const now = new Date();
 
-    const result = await getMysqlDb()
-      .update(buildJobs)
-      .set({
-        status: "running",
-        attempts: sql`${buildJobs.attempts} + 1`,
-        lockToken,
-        lockedAt: now,
-        updatedAt: now,
-      })
-      .where(
-        and(
-          eq(buildJobs.id, candidate.id),
-          sql`(${buildJobs.status} = 'queued' OR (${buildJobs.status} = 'running' AND ${buildJobs.lockedAt} < ${staleBefore}))`,
-          sql`${buildJobs.attempts} < ${maxAttempts}`,
-        ),
-      );
+    console.log(`[Storage] Attempting to claim job ${candidate.id} with lockToken=${lockToken}`);
 
-    const affected = (result as any)?.rowsAffected ?? (result as any)?.affectedRows ?? 0;
-    if (affected !== 1) return null;
+    try {
+      const result = await getMysqlDb()
+        .update(buildJobs)
+        .set({
+          status: "running",
+          attempts: sql`${buildJobs.attempts} + 1`,
+          lockToken,
+          lockedAt: now,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(buildJobs.id, candidate.id),
+            sql`(${buildJobs.status} = 'queued' OR (${buildJobs.status} = 'running' AND ${buildJobs.lockedAt} < ${staleBefore}))`,
+            sql`${buildJobs.attempts} < ${maxAttempts}`,
+          ),
+        );
 
-    const claimed = await getMysqlDb().select().from(buildJobs).where(eq(buildJobs.id, candidate.id)).limit(1);
-    return (claimed[0] as unknown as BuildJob) ?? null;
+      const affected = (result as any)?.rowsAffected ?? (result as any)?.affectedRows ?? (result as any)?.[0]?.affectedRows ?? 0;
+      console.log(`[Storage] Update result: affected=${affected}, result=`, JSON.stringify(result));
+      
+      if (affected !== 1) {
+        console.log(`[Storage] Failed to claim job - affected rows != 1`);
+        return null;
+      }
+
+      const claimed = await getMysqlDb().select().from(buildJobs).where(eq(buildJobs.id, candidate.id)).limit(1);
+      console.log(`[Storage] Successfully claimed job ${candidate.id}`);
+      return (claimed[0] as unknown as BuildJob) ?? null;
+    } catch (err) {
+      console.error(`[Storage] Error claiming job:`, err);
+      return null;
+    }
   }
 
   async completeBuildJob(
