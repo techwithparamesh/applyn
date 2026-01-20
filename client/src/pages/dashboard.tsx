@@ -122,9 +122,13 @@ export default function Dashboard() {
     }
   };
 
-  const handleDownload = (id: string) => {
-    // Use browser navigation so the APK streams/downloads with session cookies.
-    window.location.href = `/api/apps/${id}/download`;
+  const handleDownload = (id: string, platform?: string) => {
+    // Use browser navigation so the file streams/downloads with session cookies.
+    if (platform === "ios") {
+      window.location.href = `/api/apps/${id}/download-ios`;
+    } else {
+      window.location.href = `/api/apps/${id}/download`;
+    }
   };
 
   const copyText = async (text: string) => {
@@ -241,9 +245,14 @@ export default function Dashboard() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    {app.status === "live" && (
-                      <DropdownMenuItem onClick={() => handleDownload(app.id)}>
+                    {app.status === "live" && (app.platform === "android" || app.platform === "both") && (
+                      <DropdownMenuItem onClick={() => handleDownload(app.id, "android")}>
                         <Download /> Download APK
+                      </DropdownMenuItem>
+                    )}
+                    {app.status === "live" && (app.platform === "ios" || app.platform === "both") && (
+                      <DropdownMenuItem onClick={() => handleDownload(app.id, "ios")}>
+                        <Download /> Download iOS
                       </DropdownMenuItem>
                     )}
 
@@ -262,13 +271,13 @@ export default function Dashboard() {
 
                     {app.status === "draft" && (
                       <DropdownMenuItem onClick={() => handleBuild(app.id)}>
-                        <RefreshCw /> Build APK
+                        <RefreshCw /> Build App
                       </DropdownMenuItem>
                     )}
 
                     {app.status === "failed" && (
                       <DropdownMenuItem onClick={() => handleBuild(app.id)}>
-                        <RefreshCw /> Rebuild APK
+                        <RefreshCw /> Rebuild App
                       </DropdownMenuItem>
                     )}
 
@@ -367,22 +376,32 @@ export default function Dashboard() {
               <CardFooter className="bg-slate-50/50 border-t p-4 flex justify-between items-center">
                 <div className="flex gap-2 text-xs text-muted-foreground">
                   <Smartphone className="h-3 w-3" />
-                  {app.platform === "both"
-                    ? "Android & iOS"
-                    : app.platform === "ios"
-                      ? "iOS Only"
-                      : "Android Only"}
+                  {app.platform === "both" ? "Android & iOS" : app.platform === "ios" ? "iOS" : "Android"}
                 </div>
 
                 {app.status === "live" && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8"
-                    onClick={() => handleDownload(app.id)}
-                  >
-                    <Download className="mr-2 h-3 w-3" /> Download
-                  </Button>
+                  <div className="flex gap-2">
+                    {(app.platform === "android" || app.platform === "both") && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8"
+                        onClick={() => handleDownload(app.id, "android")}
+                      >
+                        <Download className="mr-1 h-3 w-3" /> APK
+                      </Button>
+                    )}
+                    {(app.platform === "ios" || app.platform === "both") && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8"
+                        onClick={() => handleDownload(app.id, "ios")}
+                      >
+                        <Download className="mr-1 h-3 w-3" /> iOS
+                      </Button>
+                    )}
+                  </div>
                 )}
 
                 {app.status === "processing" && (

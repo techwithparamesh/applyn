@@ -19,6 +19,7 @@ import {
 } from "@shared/schema";
 import { storage } from "./storage";
 import { hashPassword, sanitizeUser, verifyPassword } from "./auth";
+import { sendPasswordResetEmail, isEmailConfigured } from "./email";
 import crypto from "crypto";
 
 function isGoogleConfigured() {
@@ -641,13 +642,14 @@ export async function registerRoutes(
 
       await storage.setResetToken(user.id, token, expiresAt);
 
-      // In production, send email via nodemailer/resend/etc.
-      // For MVP, log to console (you can replace this with actual email sending)
+      // Build reset URL and send email
       const resetUrl = `${process.env.APP_URL || "http://localhost:5004"}/reset-password?token=${token}`;
-      console.log(`[PASSWORD RESET] Email: ${email}, URL: ${resetUrl}`);
-
-      // TODO: Integrate with email service (Resend, SendGrid, etc.)
-      // await sendEmail({ to: email, subject: "Reset your password", html: `<a href="${resetUrl}">Reset Password</a>` });
+      
+      // Send email (falls back to console log if SMTP not configured)
+      const emailSent = await sendPasswordResetEmail(email, resetUrl);
+      if (!emailSent && isEmailConfigured()) {
+        console.error(`[PASSWORD RESET] Failed to send email to ${email}`);
+      }
 
       return res.json({ ok: true, message: "If that email exists, a reset link has been sent." });
     } catch (err) {
@@ -793,6 +795,16 @@ export async function registerRoutes(
       const { razorpay_order_id, razorpay_payment_id, razorpay_signature, paymentId } =
         verifyPaymentSchema.parse(req.body);
 
+      // Verify payment belongs to this user
+      const existingPayment = await storage.getPayment(paymentId);
+      if (!existingPayment) {
+        return res.status(404).json({ message: "Payment record not found" });
+      }
+      if (existingPayment.userId !== user.id) {
+        console.log(`[Payment Verify] User ${user.id} tried to verify payment ${paymentId} owned by ${existingPayment.userId}`);
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
       // Verify signature
       const expectedSignature = crypto
         .createHmac("sha256", razorpayKeySecret)
@@ -886,6 +898,7 @@ export async function registerRoutes(
   // --- Push Notifications ---
   
   // Register a device token (called from the mobile app)
+  // Requires X-API-Secret header matching the app's apiSecret
   app.post("/api/push/register", async (req, res, next) => {
     try {
       const payload = insertPushTokenSchema.parse(req.body);
@@ -894,6 +907,12 @@ export async function registerRoutes(
       const appItem = await storage.getApp(payload.appId);
       if (!appItem) {
         return res.status(404).json({ message: "App not found" });
+      }
+
+      // Validate API secret (if app has one configured)
+      const apiSecret = req.headers["x-api-secret"] as string | undefined;
+      if ((appItem as any).apiSecret && apiSecret !== (appItem as any).apiSecret) {
+        return res.status(401).json({ message: "Invalid API secret" });
       }
 
       // Check if token already exists for this app
@@ -1077,6 +1096,141 @@ export async function registerRoutes(
 
       const notifications = await storage.listPushNotificationsByApp(req.params.id);
       return res.json(notifications);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- iOS Build Callback (from GitHub Actions) ---
+  const iosBuildCallbackSchema = z.object({
+    appId: z.string().uuid(),
+    status: z.enum(["success", "failure", "cancelled"]),
+    artifactUrl: z.string().url().optional(),
+    runId: z.string().optional(),
+    error: z.string().optional(),
+  });
+
+  const iosCallbackSecret = process.env.IOS_CALLBACK_SECRET || "";
+  
+  // Import iOS artifact download helper
+  const { downloadIOSArtifact } = await import("./build/github-ios");
+
+  app.post("/api/ios-build-callback", async (req, res, next) => {
+    try {
+      // Verify callback authentication
+      const authHeader = req.headers.authorization;
+      if (!iosCallbackSecret || authHeader !== `Bearer ${iosCallbackSecret}`) {
+        console.log("[iOS Callback] Unauthorized callback attempt");
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const payload = iosBuildCallbackSchema.parse(req.body);
+      
+      const appItem = await storage.getApp(payload.appId);
+      if (!appItem) {
+        return res.status(404).json({ message: "App not found" });
+      }
+
+      if (payload.status === "success") {
+        // iOS build succeeded - download artifact locally
+        let localArtifactPath: string | null = null;
+        let artifactSize: number | null = null;
+        
+        if (payload.runId) {
+          try {
+            const root = safeArtifactsRoot();
+            const fileName = `${appItem.id}-ios.zip`; // GitHub artifacts come as zip
+            const destPath = path.join(root, fileName);
+            
+            console.log(`[iOS Callback] Downloading artifact from run ${payload.runId}...`);
+            const downloaded = await downloadIOSArtifact(payload.runId, destPath);
+            
+            if (downloaded && fs.existsSync(destPath)) {
+              localArtifactPath = fileName;
+              artifactSize = fs.statSync(destPath).size;
+              console.log(`[iOS Callback] Artifact downloaded: ${destPath} (${artifactSize} bytes)`);
+            } else {
+              console.log(`[iOS Callback] Failed to download artifact, storing URL instead`);
+              localArtifactPath = payload.artifactUrl || null;
+            }
+          } catch (err) {
+            console.error(`[iOS Callback] Error downloading artifact:`, err);
+            localArtifactPath = payload.artifactUrl || null;
+          }
+        }
+        
+        await storage.updateAppBuild(appItem.id, {
+          status: "live",
+          buildError: null,
+          buildLogs: `iOS build completed successfully.\nRun ID: ${payload.runId || 'N/A'}`,
+          lastBuildAt: new Date(),
+          artifactPath: localArtifactPath,
+          artifactMime: "application/zip", // IPA in zip
+          artifactSize,
+        });
+        
+        console.log(`[iOS Callback] Build succeeded for app ${payload.appId}`);
+      } else {
+        // iOS build failed
+        await storage.updateAppBuild(appItem.id, {
+          status: "failed",
+          buildError: payload.error || `iOS build ${payload.status}`,
+          buildLogs: `iOS build ${payload.status}.\nRun ID: ${payload.runId || 'N/A'}\nError: ${payload.error || 'Unknown'}`,
+          lastBuildAt: new Date(),
+        });
+        
+        console.log(`[iOS Callback] Build failed for app ${payload.appId}: ${payload.error}`);
+      }
+
+      return res.json({ ok: true });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Download iOS artifact (serve local file or redirect)
+  app.get("/api/apps/:id/download-ios", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const appItem = await storage.getApp(req.params.id);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+
+      const platform = (appItem as any).platform;
+      if (platform !== "ios" && platform !== "both") {
+        return res.status(400).json({ message: "This app is not configured for iOS" });
+      }
+
+      if (appItem.status !== "live" || !appItem.artifactPath) {
+        return res.status(409).json({ message: "iOS build not ready" });
+      }
+
+      const artifactPath = appItem.artifactPath;
+      
+      // Check if it's a local file or external URL
+      if (artifactPath.startsWith("http")) {
+        // Fallback: redirect to GitHub (shouldn't happen normally)
+        return res.redirect(artifactPath);
+      }
+      
+      // Serve local file
+      const root = safeArtifactsRoot();
+      const abs = path.resolve(root, artifactPath);
+      if (!abs.startsWith(path.resolve(root))) {
+        return res.status(400).json({ message: "Invalid artifact path" });
+      }
+
+      if (!fs.existsSync(abs)) {
+        return res.status(404).json({ message: "iOS artifact file missing" });
+      }
+
+      const safeName = (appItem.name || "app").replace(/[^a-z0-9\-_. ]/gi, "").trim() || "app";
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", `attachment; filename="${safeName}-ios.zip"`);
+      return fs.createReadStream(abs).pipe(res);
     } catch (err) {
       return next(err);
     }

@@ -6,6 +6,7 @@ import { pathToFileURL } from "url";
 import { storage } from "./storage";
 import { generateAndroidWrapperProject } from "./build/android-wrapper";
 import { runDockerGradleBuild } from "./build/docker-gradle";
+import { triggerIOSBuild } from "./build/github-ios";
 
 function artifactsRoot() {
   return process.env.ARTIFACTS_DIR || path.resolve(process.cwd(), "artifacts");
@@ -13,6 +14,10 @@ function artifactsRoot() {
 
 function builderImage() {
   return process.env.ANDROID_BUILDER_IMAGE || "applyn-android-builder:latest";
+}
+
+function isIOSBuildConfigured() {
+  return !!(process.env.GITHUB_OWNER && process.env.GITHUB_REPO && process.env.GITHUB_TOKEN);
 }
 
 function pollIntervalMs() {
@@ -103,6 +108,7 @@ export async function handleOneJob(workerId: string) {
     return;
   }
 
+  const platform = (app as any).platform || "android";
   const pkg = app.packageName || safePackageName(app.id);
   const versionCode = (app.versionCode ?? 0) + 1;
 
@@ -114,6 +120,96 @@ export async function handleOneJob(workerId: string) {
     buildLogs: null,
   });
 
+  // Route to the appropriate build handler based on platform
+  if (platform === "ios") {
+    await handleIOSBuild(job, app, pkg, versionCode);
+    return;
+  } else if (platform === "both") {
+    // For "both", we need to build Android first, then trigger iOS
+    // iOS build is async via GitHub Actions, so we handle Android here
+    // and iOS will be triggered separately
+    await handleAndroidBuild(job, app, pkg, versionCode);
+    // Trigger iOS build in background (doesn't block)
+    triggerIOSBuildAsync(app, pkg, versionCode);
+    return;
+  } else {
+    // Default: Android
+    await handleAndroidBuild(job, app, pkg, versionCode);
+    return;
+  }
+}
+
+// iOS build via GitHub Actions
+async function handleIOSBuild(job: any, app: any, pkg: string, versionCode: number) {
+  if (!isIOSBuildConfigured()) {
+    await storage.updateAppBuild(app.id, {
+      status: "failed",
+      buildError: "iOS builds not configured. Please contact support.",
+      lastBuildAt: new Date(),
+    });
+    await storage.completeBuildJob(job.id, "failed", "iOS builds not configured");
+    return;
+  }
+
+  try {
+    const result = await triggerIOSBuild({
+      appId: app.id,
+      appName: app.name,
+      bundleId: pkg,
+      websiteUrl: app.url,
+      versionCode,
+    });
+
+    if (result.success) {
+      // iOS build is async - mark as processing and store the run ID
+      // The callback endpoint will update the status when done
+      await storage.updateAppBuild(app.id, {
+        status: "processing",
+        buildError: null,
+        buildLogs: `iOS build triggered. GitHub Actions run ID: ${result.runId || 'pending'}\nBuild will complete in 5-10 minutes.`,
+        lastBuildAt: new Date(),
+      });
+      // Don't complete the job yet - callback will do it
+      // But we need to release the job so worker can process other jobs
+      await storage.completeBuildJob(job.id, "succeeded", null);
+    } else {
+      await storage.updateAppBuild(app.id, {
+        status: "failed",
+        buildError: result.error || "Failed to trigger iOS build",
+        lastBuildAt: new Date(),
+      });
+      await storage.completeBuildJob(job.id, "failed", result.error || "iOS build trigger failed");
+    }
+  } catch (err: any) {
+    await storage.updateAppBuild(app.id, {
+      status: "failed",
+      buildError: err?.message || "iOS build failed",
+      lastBuildAt: new Date(),
+    });
+    await storage.completeBuildJob(job.id, "failed", err?.message || "iOS build failed");
+  }
+}
+
+// Fire-and-forget iOS build trigger for "both" platform
+async function triggerIOSBuildAsync(app: any, pkg: string, versionCode: number) {
+  if (!isIOSBuildConfigured()) return;
+  
+  try {
+    await triggerIOSBuild({
+      appId: app.id,
+      appName: app.name,
+      bundleId: pkg,
+      websiteUrl: app.url,
+      versionCode,
+    });
+    console.log(`[iOS] Triggered build for app ${app.id}`);
+  } catch (err) {
+    console.error(`[iOS] Failed to trigger build for app ${app.id}:`, err);
+  }
+}
+
+// Android build handler (extracted from original handleOneJob)
+async function handleAndroidBuild(job: any, app: any, pkg: string, versionCode: number) {
   let logs = "";
   let workDir: string | null = null;
   try {
@@ -170,10 +266,11 @@ export async function handleOneJob(workerId: string) {
       workDir,
     );
 
+    // Build release APK and AAB (bundle)
     const build = await runDockerGradleBuild({
       image: builderImage(),
       projectDir,
-      gradleTask: "assembleDebug",
+      gradleTask: "assembleRelease bundleRelease",
       timeoutMs: buildTimeoutMs(),
     });
 
@@ -207,7 +304,8 @@ export async function handleOneJob(workerId: string) {
       return;
     }
 
-    const apkSrc = path.join(projectDir, "app", "build", "outputs", "apk", "debug", "app-debug.apk");
+    // Copy release APK
+    const apkSrc = path.join(projectDir, "app", "build", "outputs", "apk", "release", "app-release.apk");
     const appDir = path.join(artifactsRoot(), app.id);
     await ensureDir(appDir);
 
@@ -216,6 +314,16 @@ export async function handleOneJob(workerId: string) {
 
     await fs.copyFile(apkSrc, apkDest);
     const st = await fs.stat(apkDest);
+
+    // Also copy AAB (Android App Bundle) for Play Store upload
+    const aabSrc = path.join(projectDir, "app", "build", "outputs", "bundle", "release", "app-release.aab");
+    const aabRel = path.join(app.id, `${job.id}.aab`);
+    const aabDest = path.join(artifactsRoot(), aabRel);
+    try {
+      await fs.copyFile(aabSrc, aabDest);
+    } catch {
+      // AAB might not exist in some build configurations, continue without it
+    }
 
     await storage.updateAppBuild(app.id, {
       status: "live",

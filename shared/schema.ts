@@ -61,6 +61,7 @@ export type App = {
   buildLogs?: string | null;
   buildError?: string | null;
   lastBuildAt?: Date | null;
+  apiSecret?: string | null; // For authenticating push token registration
   createdAt: Date;
   updatedAt: Date;
 };

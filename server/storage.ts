@@ -476,7 +476,7 @@ export class MemStorage implements IStorage {
     // Count build jobs that completed successfully for this app
     return Array.from(this.buildJobs.values()).filter((j) => {
       if (j.appId !== appId) return false;
-      if (j.status !== "completed") return false;
+      if (j.status !== "succeeded") return false;
       if (sinceDate && j.createdAt < sinceDate) return false;
       return true;
     }).length;

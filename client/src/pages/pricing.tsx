@@ -63,10 +63,10 @@ export default function Pricing() {
                 price="₹499"
                 description="Ideal for students and hobbyists wanting to see their project on a phone."
                 features={[
-                  "Android .apk file (debug)",
-                  "Basic WebView wrapper",
-                  "Default Splash Screen",
-                  "Community Support (forum)",
+                  "Android .apk (release signed)",
+                  "WebView app wrapper",
+                  "Branded Splash Screen",
+                  "Community Support",
                   "Single Build – no rebuilds"
                 ]}
                 buttonText="Get Started"
@@ -79,8 +79,8 @@ export default function Pricing() {
                 description="Perfect for bloggers and small shop owners launching their first Android app."
                 features={[
                   "Android .apk & .aab (release)",
-                  "Custom App Icon & Splash",
-                  "Push Notification Ready",
+                  "Custom Branded Splash",
+                  "Push Notifications Ready",
                   "Email Support (48h response)",
                   "1 Free Rebuild within 30 days",
                   "Play Store upload guide"
@@ -97,7 +97,6 @@ export default function Pricing() {
                   "Android .apk & .aab (signed)",
                   "Push Notifications Integrated",
                   "White-Label Branding",
-                  "Offline Caching Support",
                   "Priority WhatsApp Support",
                   "3 Free Rebuilds within 90 days",
                   "Play Store ready package"

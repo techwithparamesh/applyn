@@ -8,6 +8,7 @@ export type AndroidWrapperConfig = {
   primaryColor: string;
   packageName: string;
   versionCode: number;
+  onesignalAppId?: string; // Optional OneSignal App ID for push notifications
 };
 
 function escapeXml(value: string) {
@@ -47,6 +48,14 @@ async function replaceInFile(filePath: string, replacements: Record<string, stri
   if (next !== content) await fs.writeFile(filePath, next, "utf-8");
 }
 
+async function replaceInFileIfExists(filePath: string, replacements: Record<string, string>) {
+  try {
+    await replaceInFile(filePath, replacements);
+  } catch {
+    // File doesn't exist, skip
+  }
+}
+
 export async function generateAndroidWrapperProject(
   config: AndroidWrapperConfig,
   workDir: string,
@@ -65,10 +74,13 @@ export async function generateAndroidWrapperProject(
   // Copy template
   await fs.cp(templateDir, projectDir, { recursive: true });
 
+  const onesignalId = config.onesignalAppId || process.env.ONESIGNAL_APP_ID || "";
+
   const common = {
     "__PACKAGE_NAME__": config.packageName,
     "__PACKAGE_PATH__": config.packageName.replace(/\./g, path.sep),
     "__VERSION_CODE__": String(config.versionCode),
+    "__ONESIGNAL_APP_ID__": onesignalId,
   };
 
   const xmlReplacements = {
@@ -99,11 +111,14 @@ export async function generateAndroidWrapperProject(
   await fs.rename(path.join(oldPath, "MainActivity.kt"), path.join(newPath, "MainActivity.kt"));
   await fs.rm(oldPath, { recursive: true, force: true });
 
+  // Replace placeholders in all template files
   await replaceInFile(path.join(projectDir, "app", "build.gradle"), gradleReplacements);
   await replaceInFile(path.join(projectDir, "app", "src", "main", "AndroidManifest.xml"), xmlReplacements);
   await replaceInFile(path.join(projectDir, "app", "src", "main", "res", "values", "strings.xml"), xmlReplacements);
   await replaceInFile(path.join(projectDir, "app", "src", "main", "res", "values", "colors.xml"), xmlReplacements);
+  await replaceInFileIfExists(path.join(projectDir, "app", "src", "main", "res", "values", "themes.xml"), xmlReplacements);
   await replaceInFile(path.join(newPath, "MainActivity.kt"), kotlinReplacements);
+  await replaceInFileIfExists(path.join(projectDir, "app", "proguard-rules.pro"), common);
 
   return { projectDir };
 }

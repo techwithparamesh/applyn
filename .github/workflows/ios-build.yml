@@ -1,0 +1,192 @@
+# iOS Build Workflow
+# This workflow builds iOS apps on GitHub Actions macOS runners
+# Triggered via API call from the main server
+
+name: iOS Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_id:
+        description: 'App ID'
+        required: true
+        type: string
+      app_name:
+        description: 'App Name'
+        required: true
+        type: string
+      bundle_id:
+        description: 'Bundle Identifier'
+        required: true
+        type: string
+      website_url:
+        description: 'Website URL to wrap'
+        required: true
+        type: string
+      version_code:
+        description: 'Version code'
+        required: false
+        default: '1'
+        type: string
+      callback_url:
+        description: 'URL to POST results to'
+        required: true
+        type: string
+
+jobs:
+  build-ios:
+    runs-on: macos-14  # Apple Silicon runner
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.0'
+
+      - name: Copy iOS template
+        run: |
+          mkdir -p build-workspace
+          cp -r ios-template/* build-workspace/
+
+      - name: Configure project
+        env:
+          APP_NAME: ${{ inputs.app_name }}
+          BUNDLE_ID: ${{ inputs.bundle_id }}
+          WEBSITE_URL: ${{ inputs.website_url }}
+          VERSION_CODE: ${{ inputs.version_code }}
+        run: |
+          cd build-workspace
+          
+          # Use perl for reliable replacement (handles special chars in URLs)
+          find . -type f \( -name "*.swift" -o -name "*.plist" -o -name "*.storyboard" -o -name "*.pbxproj" -o -name "*.json" -o -name "*.xcscheme" \) | while read file; do
+            perl -i -pe "s|__APP_NAME__|$APP_NAME|g" "$file"
+            perl -i -pe "s|__BUNDLE_ID__|$BUNDLE_ID|g" "$file"
+            perl -i -pe "s|__WEBSITE_URL__|$WEBSITE_URL|g" "$file"
+            perl -i -pe "s|__VERSION_CODE__|$VERSION_CODE|g" "$file"
+          done
+
+      - name: Build iOS App (Unsigned for Devices)
+        run: |
+          cd build-workspace
+          
+          # First, build for iOS device (unsigned - can be signed later)
+          echo "Building for iOS devices (unsigned)..."
+          xcodebuild build \
+            -project WebViewApp.xcodeproj \
+            -scheme WebViewApp \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ./DerivedData \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO \
+            2>&1 | tee build.log || true
+          
+          # Check if build succeeded
+          if grep -q "BUILD SUCCEEDED" build.log; then
+            echo "✅ Build succeeded!"
+          else
+            echo "⚠️ Build may have issues, checking for .app..."
+          fi
+          
+          # Find and package the .app
+          APP_PATH=$(find ./DerivedData -name "*.app" -type d | head -1)
+          if [ -n "$APP_PATH" ]; then
+            echo "Found app at: $APP_PATH"
+            
+            # Create IPA-like structure (Payload folder)
+            mkdir -p Payload
+            cp -r "$APP_PATH" Payload/
+            zip -r "../${{ inputs.app_id }}.ipa" Payload
+            
+            # Also create .app zip for sideloading tools
+            zip -r "../${{ inputs.app_id }}-app.zip" "$APP_PATH"
+            
+            echo "✅ Package created successfully"
+          else
+            echo "❌ No .app found in DerivedData"
+            cat build.log
+            exit 1
+          fi
+
+      - name: Build iOS Archive (For App Store - Requires Signing)
+        if: ${{ vars.APPLE_SIGNING_ENABLED == 'true' }}
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          cd build-workspace
+          
+          # Import certificate
+          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+          security create-keychain -p "" build.keychain
+          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          
+          # Import provisioning profile
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "$APPLE_PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+          
+          # Build signed archive
+          xcodebuild archive \
+            -project WebViewApp.xcodeproj \
+            -scheme WebViewApp \
+            -archivePath ./build/WebViewApp.xcarchive \
+            -configuration Release
+          
+          # Export signed IPA
+          cat > ExportOptions.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>ad-hoc</string>
+              <key>compileBitcode</key>
+              <false/>
+          </dict>
+          </plist>
+          EOF
+          
+          xcodebuild -exportArchive \
+            -archivePath ./build/WebViewApp.xcarchive \
+            -exportPath ./build \
+            -exportOptionsPlist ExportOptions.plist
+          
+          # Copy signed IPA
+          cp ./build/*.ipa "../${{ inputs.app_id }}-signed.ipa"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-app-${{ inputs.app_id }}
+          path: |
+            *.ipa
+            *-app.zip
+          retention-days: 7
+
+      - name: Notify callback
+        if: always()
+        env:
+          IOS_CALLBACK_SECRET: ${{ secrets.IOS_CALLBACK_SECRET }}
+        run: |
+          STATUS="${{ job.status }}"
+          ARTIFACT_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          
+          curl -X POST "${{ inputs.callback_url }}" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $IOS_CALLBACK_SECRET" \
+            -d "{
+              \"appId\": \"${{ inputs.app_id }}\",
+              \"status\": \"$STATUS\",
+              \"artifactUrl\": \"$ARTIFACT_URL\",
+              \"runId\": \"${{ github.run_id }}\"
+            }" || true

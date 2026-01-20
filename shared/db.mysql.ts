@@ -1,4 +1,4 @@
-import { mysqlTable, int, text, timestamp, varchar, boolean } from "drizzle-orm/mysql-core";
+import { mysqlTable, int, text, timestamp, varchar, boolean, index } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: varchar("id", { length: 36 }).primaryKey(),
@@ -13,7 +13,9 @@ export const users = mysqlTable("users", {
   resetTokenExpiresAt: timestamp("reset_token_expires_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
-});
+}, (table) => ({
+  resetTokenIdx: index("users_reset_token_idx").on(table.resetToken),
+}));
 
 export const apps = mysqlTable("apps", {
   id: varchar("id", { length: 36 }).primaryKey(),
@@ -34,9 +36,13 @@ export const apps = mysqlTable("apps", {
   buildLogs: text("build_logs"),
   buildError: text("build_error"),
   lastBuildAt: timestamp("last_build_at", { mode: "date" }),
+  apiSecret: varchar("api_secret", { length: 64 }), // For push notification token registration auth
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
-});
+}, (table) => ({
+  ownerIdIdx: index("apps_owner_id_idx").on(table.ownerId),
+  statusIdx: index("apps_status_idx").on(table.status),
+}));
 
 export const buildJobs = mysqlTable("build_jobs", {
   id: varchar("id", { length: 36 }).primaryKey(),
@@ -49,7 +55,11 @@ export const buildJobs = mysqlTable("build_jobs", {
   error: text("error"),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
-});
+}, (table) => ({
+  appIdIdx: index("build_jobs_app_id_idx").on(table.appId),
+  statusIdx: index("build_jobs_status_idx").on(table.status),
+  ownerIdIdx: index("build_jobs_owner_id_idx").on(table.ownerId),
+}));
 
 export const supportTickets = mysqlTable("support_tickets", {
   id: varchar("id", { length: 36 }).primaryKey(),
@@ -60,7 +70,10 @@ export const supportTickets = mysqlTable("support_tickets", {
   status: varchar("status", { length: 16 }).notNull().default("open"),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
-});
+}, (table) => ({
+  requesterIdIdx: index("support_tickets_requester_id_idx").on(table.requesterId),
+  statusIdx: index("support_tickets_status_idx").on(table.status),
+}));
 
 export const payments = mysqlTable("payments", {
   id: varchar("id", { length: 36 }).primaryKey(),
@@ -74,7 +87,11 @@ export const payments = mysqlTable("payments", {
   status: varchar("status", { length: 16 }).notNull().default("pending"),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
-});
+}, (table) => ({
+  userIdIdx: index("payments_user_id_idx").on(table.userId),
+  appIdIdx: index("payments_app_id_idx").on(table.appId),
+  statusIdx: index("payments_status_idx").on(table.status),
+}));
 
 // Push notification device tokens
 export const pushTokens = mysqlTable("push_tokens", {
@@ -85,7 +102,10 @@ export const pushTokens = mysqlTable("push_tokens", {
   deviceInfo: text("device_info"), // JSON with device details
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
-});
+}, (table) => ({
+  appIdIdx: index("push_tokens_app_id_idx").on(table.appId),
+  tokenIdx: index("push_tokens_token_idx").on(table.token),
+}));
 
 // Push notifications queue/history
 export const pushNotifications = mysqlTable("push_notifications", {
@@ -102,6 +122,9 @@ export const pushNotifications = mysqlTable("push_notifications", {
   sentAt: timestamp("sent_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
-});
+}, (table) => ({
+  appIdIdx: index("push_notifications_app_id_idx").on(table.appId),
+  statusIdx: index("push_notifications_status_idx").on(table.status),
+}));
 
 export { contactSubmissions } from "./db.contact.mysql";

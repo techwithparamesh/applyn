@@ -449,10 +449,10 @@ export class MysqlStorage {
         sinceDate
           ? and(
               eq(buildJobs.appId, appId),
-              eq(buildJobs.status, "completed"),
+              eq(buildJobs.status, "succeeded"),
               sql`${buildJobs.createdAt} >= ${sinceDate}`
             )
-          : and(eq(buildJobs.appId, appId), eq(buildJobs.status, "completed"))
+          : and(eq(buildJobs.appId, appId), eq(buildJobs.status, "succeeded"))
       );
     const rows = await query;
     return Number(rows[0]?.count ?? 0);

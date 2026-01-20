@@ -3,6 +3,8 @@ plugins {
   id "org.jetbrains.kotlin.android"
 }
 
+def keystoreFile = file(System.getenv("KEYSTORE_PATH") ?: "release.keystore")
+
 android {
   namespace "__PACKAGE_NAME__"
   compileSdk 34
@@ -13,12 +15,40 @@ android {
     targetSdk 34
     versionCode __VERSION_CODE__
     versionName "1.0"
+    
+    // OneSignal App ID for push notifications (injected at build time)
+    buildConfigField "String", "ONESIGNAL_APP_ID", "\"__ONESIGNAL_APP_ID__\""
+  }
+
+  signingConfigs {
+    release {
+      if (keystoreFile.exists()) {
+        storeFile keystoreFile
+        storePassword System.getenv("KEYSTORE_PASSWORD") ?: "applyn123"
+        keyAlias System.getenv("KEY_ALIAS") ?: "applyn"
+        keyPassword System.getenv("KEY_PASSWORD") ?: "applyn123"
+      }
+    }
   }
 
   buildTypes {
     debug {
       debuggable true
     }
+    release {
+      debuggable false
+      minifyEnabled false
+      if (keystoreFile.exists()) {
+        signingConfig signingConfigs.release
+      } else {
+        // Fall back to debug signing if no keystore
+        signingConfig signingConfigs.debug
+      }
+    }
+  }
+
+  buildFeatures {
+    buildConfig true
   }
 
   compileOptions {
@@ -34,4 +64,8 @@ android {
 dependencies {
   implementation "androidx.core:core-ktx:1.13.1"
   implementation "androidx.appcompat:appcompat:1.7.0"
+  implementation "androidx.core:core-splashscreen:1.0.1"
+  
+  // OneSignal Push Notifications
+  implementation "com.onesignal:OneSignal:[5.0.0, 5.99.99]"
 }

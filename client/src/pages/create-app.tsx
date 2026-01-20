@@ -29,21 +29,21 @@ const PLANS = [
     id: "starter",
     name: "Starter Build",
     price: 499,
-    features: ["Android .apk (debug)", "Basic WebView wrapper", "Default Splash", "Community Support", "Single Build"],
+    features: ["Android .apk (signed)", "WebView wrapper", "Branded Splash", "Community Support", "Single Build"],
     recommended: false,
   },
   {
     id: "standard",
     name: "Standard Build",
     price: 999,
-    features: ["Android .apk & .aab (release)", "Custom Icon & Splash", "Push Ready", "Email Support", "1 Free Rebuild (30 days)"],
+    features: ["Android .apk & .aab", "Branded Splash", "Push Ready", "Email Support", "1 Rebuild (30 days)"],
     recommended: false,
   },
   {
     id: "pro",
     name: "Pro Build",
     price: 2499,
-    features: ["Android .apk & .aab (signed)", "Push Notifications", "White-Label Branding", "Offline Caching", "Priority Support", "3 Rebuilds (90 days)"],
+    features: ["Android .apk & .aab", "Push Notifications", "White-Label", "Priority Support", "3 Rebuilds (90 days)"],
     recommended: true,
   },
 ];
@@ -358,6 +358,31 @@ export default function CreateApp() {
                           className="h-10 w-10 p-1 rounded-full cursor-pointer"
                         />
                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Target Platform</Label>
+                      <div className="grid grid-cols-3 gap-3">
+                        {[
+                          { id: "android", label: "Android", desc: "APK & AAB" },
+                          { id: "ios", label: "iOS", desc: "IPA File" },
+                          { id: "both", label: "Both", desc: "Save 20%" },
+                        ].map((platform) => (
+                          <div
+                            key={platform.id}
+                            onClick={() => setFormData({ ...formData, platform: platform.id })}
+                            className={`border-2 rounded-lg p-3 text-center cursor-pointer transition-all ${
+                              formData.platform === platform.id
+                                ? "border-primary bg-primary/5"
+                                : "border-slate-200 hover:border-slate-400"
+                            }`}
+                          >
+                            <div className="font-medium">{platform.label}</div>
+                            <div className="text-xs text-muted-foreground">{platform.desc}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">iOS builds take 5-10 minutes via cloud build.</p>
                     </div>
                   </div>
                 </div>
