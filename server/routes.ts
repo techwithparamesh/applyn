@@ -504,6 +504,41 @@ export async function registerRoutes(
     }
   });
 
+  // Get build status and logs for an app (staff only for detailed logs)
+  app.get("/api/apps/:id/build-status", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const appItem = await storage.getApp(req.params.id);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+
+      // Get the latest build job for this app
+      const jobs = await storage.listBuildJobsForApp(appItem.id);
+      const latestJob = jobs.sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )[0];
+
+      return res.json({
+        appStatus: appItem.status,
+        buildLogs: isStaff(user) ? appItem.buildLogs : null,
+        buildError: appItem.buildError,
+        lastBuildAt: appItem.lastBuildAt,
+        job: latestJob ? {
+          id: latestJob.id,
+          status: latestJob.status,
+          attempts: latestJob.attempts,
+          error: isStaff(user) ? latestJob.error : null,
+          createdAt: latestJob.createdAt,
+        } : null,
+      });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
   app.get("/api/apps/:id/download", requireAuth, async (req, res, next) => {
     try {
       const user = getAuthedUser(req);

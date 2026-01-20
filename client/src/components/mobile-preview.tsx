@@ -23,9 +23,9 @@ export function MobilePreview({
   const domain = url.replace(/^https?:\/\//, "").replace(/\/$/, "").split('/')[0];
   const normalizedUrl = url.startsWith("http") ? url : `https://${url}`;
   
-  // Use thum.io for free website screenshots (no API key needed)
-  // Format: https://image.thum.io/get/width/600/https://example.com
-  const screenshotUrl = `https://image.thum.io/get/width/600/crop/800/noanimate/${normalizedUrl}?${retryCount}`;
+  // Use thum.io for free website screenshots with mobile viewport
+  // viewportWidth=375 simulates iPhone screen width for proper mobile rendering
+  const screenshotUrl = `https://image.thum.io/get/viewportWidth/375/width/375/crop/700/noanimate/${normalizedUrl}?v=${retryCount}`;
   
   const handleRetry = () => {
     setImageError(false);
@@ -34,7 +34,7 @@ export function MobilePreview({
   };
   
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center gap-3">
       <div className="relative mx-auto border-gray-800 dark:border-gray-800 bg-gray-800 border-[14px] rounded-[2.5rem] h-[600px] w-[300px] shadow-xl">
         <div className="w-[148px] h-[18px] bg-gray-800 top-0 rounded-b-[1rem] left-1/2 -translate-x-1/2 absolute z-10"></div>
         <div className="h-[32px] w-[3px] bg-gray-800 absolute -left-[17px] top-[72px] rounded-l-lg"></div>
@@ -77,8 +77,8 @@ export function MobilePreview({
             {!imageLoaded && !imageError && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10">
                 <Loader2 className="w-8 h-8 animate-spin text-gray-400 mb-3" />
-                <p className="text-xs text-gray-500 font-medium">Loading website preview...</p>
-                <p className="text-[10px] text-gray-400 mt-1">This may take a few seconds</p>
+                <p className="text-xs text-gray-500 font-medium">Loading preview...</p>
+                <p className="text-[10px] text-gray-400 mt-1">Capturing mobile view</p>
               </div>
             )}
             
@@ -98,11 +98,12 @@ export function MobilePreview({
               </div>
             )}
             
-            {/* Actual Screenshot */}
+            {/* Actual Screenshot - scaled to fit properly */}
             <motion.img
               src={screenshotUrl}
               alt={`Preview of ${domain}`}
-              className={`w-full h-full object-cover object-top transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+              className={`w-full object-cover object-top transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+              style={{ minHeight: '100%' }}
               onLoad={() => setImageLoaded(true)}
               onError={() => setImageError(true)}
             />
@@ -124,15 +125,10 @@ export function MobilePreview({
         </div>
       </div>
       
-      {/* Preview Label */}
-      <div className="text-center">
-        <p className="text-sm text-muted-foreground">
-          Live Preview: <span className="text-white font-medium">{appName}</span>
-        </p>
-        <p className="text-[10px] text-muted-foreground/60 mt-1">
-          Showing actual website content from {domain}
-        </p>
-      </div>
+      {/* Simple Label - just app name */}
+      <p className="text-sm text-muted-foreground text-center">
+        <span className="text-white font-medium">{appName}</span>
+      </p>
     </div>
   );
 }

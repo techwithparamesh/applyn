@@ -399,6 +399,15 @@ export class MysqlStorage {
     return rows[0] as unknown as BuildJob;
   }
 
+  async listBuildJobsForApp(appId: string): Promise<BuildJob[]> {
+    const rows = await getMysqlDb()
+      .select()
+      .from(buildJobs)
+      .where(eq(buildJobs.appId, appId))
+      .orderBy(desc(buildJobs.createdAt));
+    return rows as unknown as BuildJob[];
+  }
+
   // --- Payment methods ---
   async createPayment(userId: string, payment: InsertPayment): Promise<Payment> {
     const id = randomUUID();

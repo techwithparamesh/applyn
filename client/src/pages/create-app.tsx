@@ -901,7 +901,6 @@ export default function CreateApp() {
               primaryColor={formData.primaryColor}
               icon={formData.icon}
             />
-            <p className="text-center text-sm text-muted-foreground mt-4">Live Preview: <span className="text-white">{formData.appName}</span></p>
           </div>
         </div>
       </main>

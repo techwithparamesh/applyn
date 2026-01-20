@@ -84,6 +84,7 @@ export interface IStorage {
   enqueueBuildJob(ownerId: string, appId: string): Promise<BuildJob>;
   claimNextBuildJob(workerId: string): Promise<BuildJob | null>;
   completeBuildJob(jobId: string, status: Exclude<BuildJobStatus, "queued" | "running">, error?: string | null): Promise<BuildJob | undefined>;
+  listBuildJobsForApp(appId: string): Promise<BuildJob[]>;
   updateAppBuild(id: string, patch: AppBuildPatch): Promise<App | undefined>;
 
   createContactSubmission(payload: InsertContactSubmission): Promise<ContactSubmission>;
@@ -416,6 +417,10 @@ export class MemStorage implements IStorage {
     };
     this.buildJobs.set(jobId, updated);
     return updated;
+  }
+
+  async listBuildJobsForApp(appId: string): Promise<BuildJob[]> {
+    return Array.from(this.buildJobs.values()).filter((j) => j.appId === appId);
   }
 
   // --- Payment methods ---

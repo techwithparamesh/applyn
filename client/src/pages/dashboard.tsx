@@ -93,6 +93,9 @@ export default function Dashboard() {
   const [logsOpen, setLogsOpen] = useState(false);
   const [logsTitle, setLogsTitle] = useState<string>("Build logs");
   const [logsText, setLogsText] = useState<string | null>(null);
+  
+  // Filter state for apps
+  const [statusFilter, setStatusFilter] = useState<"all" | "live" | "processing" | "failed" | "draft">("all");
 
   const { data: apps, isLoading: appsLoading } = useQuery<AppItem[]>({
     queryKey: ["/api/apps"],
@@ -122,6 +125,12 @@ export default function Dashboard() {
     };
   }, [apps, tickets]);
 
+  // Filtered apps based on status filter
+  const filteredApps = useMemo(() => {
+    if (statusFilter === "all") return apps || [];
+    return (apps || []).filter((a) => a.status === statusFilter);
+  }, [apps, statusFilter]);
+
   useEffect(() => {
     if (!isLoading && !me) {
       setLocation(`/login?returnTo=${encodeURIComponent("/dashboard")}`);
@@ -150,6 +159,47 @@ export default function Dashboard() {
     } catch (err: any) {
       toast({
         title: "Build failed",
+        description: err?.message || "Please try again",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleViewBuildStatus = async (app: AppItem) => {
+    try {
+      const res = await apiRequest("GET", `/api/apps/${app.id}/build-status`);
+      const data = await res.json();
+      
+      let logsContent = "";
+      
+      if (data.job) {
+        logsContent += `=== Build Job ===\n`;
+        logsContent += `Status: ${data.job.status}\n`;
+        logsContent += `Attempts: ${data.job.attempts}\n`;
+        logsContent += `Created: ${new Date(data.job.createdAt).toLocaleString()}\n`;
+        if (data.job.error) {
+          logsContent += `\n=== Error ===\n${data.job.error}\n`;
+        }
+      }
+      
+      if (data.buildError) {
+        logsContent += `\n=== Build Error ===\n${data.buildError}\n`;
+      }
+      
+      if (data.buildLogs) {
+        logsContent += `\n=== Build Logs ===\n${data.buildLogs}`;
+      }
+      
+      if (!logsContent) {
+        logsContent = "Build is in progress. No logs available yet.\n\nThe build worker processes jobs periodically. Please check back in a minute.";
+      }
+      
+      setLogsTitle(`${app.name} • Build Status`);
+      setLogsText(logsContent);
+      setLogsOpen(true);
+    } catch (err: any) {
+      toast({
+        title: "Failed to fetch build status",
         description: err?.message || "Please try again",
         variant: "destructive",
       });
@@ -275,7 +325,10 @@ export default function Dashboard() {
 
           {/* Stats Grid */}
           <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="glass glass-hover border stat-gradient-1">
+            <Card 
+              className={`glass glass-hover border stat-gradient-1 cursor-pointer transition-all ${statusFilter === "all" ? "ring-2 ring-cyan-500" : ""}`}
+              onClick={() => setStatusFilter("all")}
+            >
               <CardContent className="p-5">
                 <div className="flex items-center justify-between">
                   <div>
@@ -289,7 +342,10 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="glass glass-hover border stat-gradient-3">
+            <Card 
+              className={`glass glass-hover border stat-gradient-3 cursor-pointer transition-all ${statusFilter === "live" ? "ring-2 ring-green-500" : ""}`}
+              onClick={() => setStatusFilter("live")}
+            >
               <CardContent className="p-5">
                 <div className="flex items-center justify-between">
                   <div>
@@ -303,7 +359,10 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="glass glass-hover border stat-gradient-2">
+            <Card 
+              className={`glass glass-hover border stat-gradient-2 cursor-pointer transition-all ${statusFilter === "processing" ? "ring-2 ring-purple-500" : ""}`}
+              onClick={() => setStatusFilter("processing")}
+            >
               <CardContent className="p-5">
                 <div className="flex items-center justify-between">
                   <div>
@@ -317,7 +376,10 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="glass glass-hover border stat-gradient-4">
+            <Card 
+              className="glass glass-hover border stat-gradient-4 cursor-pointer transition-all"
+              onClick={() => setLocation("/tickets")}
+            >
               <CardContent className="p-5">
                 <div className="flex items-center justify-between">
                   <div>
@@ -397,11 +459,24 @@ export default function Dashboard() {
           {/* Apps Section */}
           <motion.div variants={itemVariants}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white">My Apps</h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-semibold text-white">My Apps</h2>
+                {statusFilter !== "all" && (
+                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-white/10 text-white capitalize flex items-center gap-1">
+                    {statusFilter}
+                    <button 
+                      onClick={() => setStatusFilter("all")}
+                      className="ml-1 hover:text-cyan-400 transition-colors"
+                    >
+                      ×
+                    </button>
+                  </span>
+                )}
+              </div>
               {(apps || []).length > 0 && (
                 <Link href="/create">
                   <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground hover:text-white">
-                    View all <ArrowRight className="h-4 w-4" />
+                    Create new <Plus className="h-4 w-4" />
                   </Button>
                 </Link>
               )}
@@ -417,7 +492,32 @@ export default function Dashboard() {
                 </Card>
               )}
 
-              {(apps || []).map((app) => (
+              {!appsLoading && filteredApps.length === 0 && (
+                <Card className="md:col-span-2 lg:col-span-3 glass">
+                  <CardContent className="p-8 text-center">
+                    <div className="h-12 w-12 rounded-xl bg-white/5 flex items-center justify-center mx-auto mb-3">
+                      <Package className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <p className="text-muted-foreground">
+                      {statusFilter === "all" 
+                        ? "No apps yet. Create your first app!" 
+                        : `No ${statusFilter} apps found.`}
+                    </p>
+                    {statusFilter !== "all" && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="mt-2 text-cyan-400"
+                        onClick={() => setStatusFilter("all")}
+                      >
+                        Show all apps
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {filteredApps.map((app) => (
                 <Card key={app.id} className="glass glass-hover overflow-hidden group">
                   <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
                     <div className="flex items-center gap-3">
@@ -452,14 +552,9 @@ export default function Dashboard() {
                             <Download className="mr-2 h-4 w-4" /> Download iOS
                           </DropdownMenuItem>
                         )}
-                        {isStaff && (
+                        {isStaff && (app.status === "live" || app.status === "failed") && (
                           <DropdownMenuItem
-                            onClick={() => {
-                              setLogsTitle(`${app.name} • Build logs`);
-                              setLogsText(app.buildLogs || "");
-                              setLogsOpen(true);
-                            }}
-                            disabled={!app.buildLogs}
+                            onClick={() => handleViewBuildStatus(app)}
                           >
                             View build logs
                           </DropdownMenuItem>
@@ -474,7 +569,14 @@ export default function Dashboard() {
                             <RefreshCw className="mr-2 h-4 w-4" /> Rebuild App
                           </DropdownMenuItem>
                         )}
-                        {app.status === "processing" && (
+                        {app.status === "processing" && isStaff && (
+                          <DropdownMenuItem
+                            onClick={() => handleViewBuildStatus(app)}
+                          >
+                            <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> View Build Status
+                          </DropdownMenuItem>
+                        )}
+                        {app.status === "processing" && !isStaff && (
                           <DropdownMenuItem disabled>
                             <Clock className="mr-2 h-4 w-4" /> Building...
                           </DropdownMenuItem>
