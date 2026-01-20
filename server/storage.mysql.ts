@@ -337,6 +337,8 @@ export class MysqlStorage {
     const maxAttempts = maxBuildAttempts();
     const staleBefore = new Date(Date.now() - jobLockTtlMs());
 
+    console.log(`[Storage] Looking for jobs: maxAttempts=${maxAttempts}, staleBefore=${staleBefore.toISOString()}`);
+
     // Prefer queued jobs; reclaim stale running jobs if a worker died mid-build.
     const rows = await getMysqlDb()
       .select()
@@ -350,8 +352,12 @@ export class MysqlStorage {
       .orderBy(buildJobs.createdAt)
       .limit(1);
 
+    console.log(`[Storage] Found ${rows.length} candidate jobs`);
+
     const candidate = rows[0] as unknown as BuildJob | undefined;
     if (!candidate) return null;
+
+    console.log(`[Storage] Candidate job: ${candidate.id}, status=${candidate.status}, attempts=${candidate.attempts}`);
 
     const lockToken = `${workerId}:${randomUUID()}`;
     const now = new Date();
