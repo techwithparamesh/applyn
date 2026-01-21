@@ -1,6 +1,19 @@
 import path from "path";
 import fs from "fs/promises";
-import sharp from "sharp";
+
+// Lazy load sharp to avoid crash if not installed
+let sharp: typeof import("sharp") | null = null;
+async function getSharp() {
+  if (!sharp) {
+    try {
+      sharp = (await import("sharp")).default;
+    } catch {
+      console.warn("[Icon] sharp not installed - custom icons disabled. Run: npm install sharp");
+      return null;
+    }
+  }
+  return sharp;
+}
 
 // Android icon sizes for different densities
 const ANDROID_ICON_SIZES = [
@@ -79,6 +92,12 @@ async function generateAppIcons(
   iconUrl: string,
   primaryColor: string
 ): Promise<void> {
+  const sharpLib = await getSharp();
+  if (!sharpLib) {
+    console.log("[Icon] Skipping custom icon - sharp not available");
+    return;
+  }
+
   try {
     // Get image buffer from base64 or URL
     let imageBuffer: Buffer;
@@ -104,7 +123,7 @@ async function generateAppIcons(
       await fs.mkdir(outputDir, { recursive: true });
       
       // ic_launcher.png - square icon with rounded corners
-      await sharp(imageBuffer)
+      await sharpLib(imageBuffer)
         .resize(size, size, { fit: "cover" })
         .png()
         .toFile(path.join(outputDir, "ic_launcher.png"));
@@ -116,7 +135,7 @@ async function generateAppIcons(
         </svg>`
       );
       
-      await sharp(imageBuffer)
+      await sharpLib(imageBuffer)
         .resize(size, size, { fit: "cover" })
         .composite([{ input: roundMask, blend: "dest-in" }])
         .png()
@@ -129,7 +148,7 @@ async function generateAppIcons(
     const iconSize = 288; // 72dp * 4 (safe zone)
     const offset = (foregroundSize - iconSize) / 2;
     
-    const foreground = await sharp(imageBuffer)
+    const foreground = await sharpLib(imageBuffer)
       .resize(iconSize, iconSize, { fit: "cover" })
       .extend({
         top: offset,
@@ -155,7 +174,7 @@ async function generateAppIcons(
       const outputDir = path.join(resDir, folder);
       await fs.mkdir(outputDir, { recursive: true });
       
-      await sharp(foreground)
+      await sharpLib(foreground)
         .resize(scaledSize, scaledSize)
         .png()
         .toFile(path.join(outputDir, "ic_launcher_foreground.png"));
