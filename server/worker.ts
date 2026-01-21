@@ -62,7 +62,15 @@ function mockAndroidFailOnce() {
 }
 
 function safePackageName(appId: string) {
-  const suffix = appId.replace(/[^a-z0-9]/gi, "").slice(0, 8).toLowerCase() || "app";
+  // Java package names cannot start with a number
+  // Remove non-alphanumeric, take first 8 chars, ensure starts with letter
+  let suffix = appId.replace(/[^a-z0-9]/gi, "").slice(0, 8).toLowerCase() || "app";
+  
+  // If it starts with a number, prefix with 'a'
+  if (/^[0-9]/.test(suffix)) {
+    suffix = "a" + suffix.slice(0, 7);
+  }
+  
   return `com.applyn.${suffix}`;
 }
 
