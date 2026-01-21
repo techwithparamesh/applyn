@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Plus, LogOut, Menu, LifeBuoy, Sparkles } from "lucide-react";
+import { LayoutDashboard, LogOut, Menu, LifeBuoy, Sparkles } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Sheet, SheetClose, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -132,14 +132,6 @@ export function Navbar() {
                   Tickets
                 </Button>
               </Link>
-              <Link href="/create">
-                <Button 
-                  className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold h-10 px-5"
-                >
-                  <Plus className="h-4 w-4" />
-                  New App
-                </Button>
-              </Link>
               <div className="h-5 w-px bg-white/10 mx-3" />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -230,7 +222,6 @@ export function Navbar() {
                   <>
                     <MobileLink label="Dashboard" onClick={() => setLocation("/dashboard")} />
                     <MobileLink label="My Tickets" onClick={() => setLocation("/tickets")} />
-                    <MobileLink label="Create App" onClick={() => setLocation("/create")} />
                     <MobileLink label="Profile" onClick={() => setLocation("/profile")} />
                     <MobileLink label="Billing" onClick={() => setLocation("/billing")} />
                     <div className="pt-4">
