@@ -1,4 +1,4 @@
-import { mysqlTable, int, text, timestamp, varchar, boolean, index } from "drizzle-orm/mysql-core";
+import { mysqlTable, int, text, timestamp, varchar, boolean, index, customType } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: varchar("id", { length: 36 }).primaryKey(),
@@ -25,7 +25,11 @@ export const apps = mysqlTable("apps", {
   // MySQL does not allow DEFAULT values for TEXT/BLOB on many versions.
   // Keep these as VARCHAR to match the manual VPS schema.
   icon: varchar("icon", { length: 32 }).notNull().default("🚀"),
-  iconUrl: text("icon_url"), // Custom logo as base64 or URL
+  iconUrl: customType<{ data: string; driverData: string }>({
+    dataType() { return "mediumtext"; },
+    toDriver(value) { return value; },
+    fromDriver(value) { return value as string; },
+  })("icon_url"), // Custom logo as base64 - needs MEDIUMTEXT for large images
   primaryColor: varchar("primary_color", { length: 16 }).notNull().default("#2563EB"),
   platform: varchar("platform", { length: 16 }).notNull().default("android"),
   status: varchar("status", { length: 16 }).notNull().default("draft"),
