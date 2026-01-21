@@ -1214,16 +1214,48 @@ export async function registerRoutes(
         if (payload.runId) {
           try {
             const root = safeArtifactsRoot();
-            const fileName = `${appItem.id}-ios.zip`; // GitHub artifacts come as zip
-            const destPath = path.join(root, fileName);
+            const zipFileName = `${appItem.id}-ios-artifact.zip`; // GitHub artifacts come as zip
+            const zipPath = path.join(root, zipFileName);
             
             console.log(`[iOS Callback] Downloading artifact from run ${payload.runId}...`);
-            const downloaded = await downloadIOSArtifact(payload.runId, destPath);
+            const downloaded = await downloadIOSArtifact(payload.runId, zipPath);
             
-            if (downloaded && fs.existsSync(destPath)) {
-              localArtifactPath = fileName;
-              artifactSize = fs.statSync(destPath).size;
-              console.log(`[iOS Callback] Artifact downloaded: ${destPath} (${artifactSize} bytes)`);
+            if (downloaded && fs.existsSync(zipPath)) {
+              // Extract IPA from the zip file
+              try {
+                const AdmZip = (await import('adm-zip')).default;
+                const zip = new AdmZip(zipPath);
+                const zipEntries = zip.getEntries();
+                
+                // Find the IPA file inside the zip
+                const ipaEntry = zipEntries.find(e => e.entryName.endsWith('.ipa'));
+                if (ipaEntry) {
+                  const ipaFileName = `${appItem.id}-ios.ipa`;
+                  const ipaPath = path.join(root, ipaFileName);
+                  zip.extractEntryTo(ipaEntry, root, false, true, false, ipaFileName);
+                  
+                  if (fs.existsSync(ipaPath)) {
+                    localArtifactPath = ipaFileName;
+                    artifactSize = fs.statSync(ipaPath).size;
+                    console.log(`[iOS Callback] IPA extracted: ${ipaPath} (${artifactSize} bytes)`);
+                    // Clean up the zip file
+                    fs.unlinkSync(zipPath);
+                  } else {
+                    console.log(`[iOS Callback] IPA extraction failed, keeping zip`);
+                    localArtifactPath = zipFileName;
+                    artifactSize = fs.statSync(zipPath).size;
+                  }
+                } else {
+                  // No IPA found, keep the zip
+                  console.log(`[iOS Callback] No IPA in artifact, keeping zip`);
+                  localArtifactPath = zipFileName;
+                  artifactSize = fs.statSync(zipPath).size;
+                }
+              } catch (extractErr) {
+                console.error(`[iOS Callback] Error extracting IPA:`, extractErr);
+                localArtifactPath = zipFileName;
+                artifactSize = fs.statSync(zipPath).size;
+              }
             } else {
               console.log(`[iOS Callback] Failed to download artifact, storing URL instead`);
               localArtifactPath = payload.artifactUrl || null;
@@ -1240,7 +1272,7 @@ export async function registerRoutes(
           buildLogs: `iOS build completed successfully.\nRun ID: ${payload.runId || 'N/A'}`,
           lastBuildAt: new Date(),
           artifactPath: localArtifactPath,
-          artifactMime: "application/zip", // IPA in zip
+          artifactMime: localArtifactPath?.endsWith('.ipa') ? "application/octet-stream" : "application/zip",
           artifactSize,
         });
         
@@ -1303,8 +1335,9 @@ export async function registerRoutes(
       }
 
       const safeName = (appItem.name || "app").replace(/[^a-z0-9\-_. ]/gi, "").trim() || "app";
-      res.setHeader("Content-Type", "application/zip");
-      res.setHeader("Content-Disposition", `attachment; filename="${safeName}-ios.zip"`);
+      const isIPA = artifactPath.endsWith('.ipa');
+      res.setHeader("Content-Type", isIPA ? "application/octet-stream" : "application/zip");
+      res.setHeader("Content-Disposition", `attachment; filename="${safeName}${isIPA ? '.ipa' : '-ios.zip'}"`);
       return fs.createReadStream(abs).pipe(res);
     } catch (err) {
       return next(err);
