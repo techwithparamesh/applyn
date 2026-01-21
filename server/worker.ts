@@ -290,10 +290,13 @@ async function handleAndroidBuild(job: any, app: any, pkg: string, versionCode: 
     workDir = path.join(os.tmpdir(), `applyn-build-${job.id}-${randomUUID()}`);
     await ensureDir(workDir);
 
+    const hasCustomIcon = !!(app as any).iconUrl;
+
     // Write initial build log so admin can see progress
     logs = `[${new Date().toISOString()}] Starting Android build for ${app.name}\n`;
     logs += `[${new Date().toISOString()}] Package: ${pkg}\n`;
     logs += `[${new Date().toISOString()}] Version Code: ${versionCode}\n`;
+    logs += `[${new Date().toISOString()}] Custom Icon: ${hasCustomIcon ? 'Yes' : 'No (using default)'}\n`;
     logs += `[${new Date().toISOString()}] Generating Android project...\n`;
     
     await storage.updateAppBuild(app.id, {
@@ -309,6 +312,7 @@ async function handleAndroidBuild(job: any, app: any, pkg: string, versionCode: 
         primaryColor: app.primaryColor,
         packageName: pkg,
         versionCode,
+        iconUrl: (app as any).iconUrl || null,
       },
       workDir,
     );
