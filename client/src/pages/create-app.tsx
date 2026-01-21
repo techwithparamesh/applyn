@@ -599,9 +599,16 @@ export default function CreateApp() {
                             {["#00E5FF", "#A855F7", "#10B981", "#F59E0B", "#EF4444", "#3B82F6"].map((color) => (
                               <div
                                 key={color}
-                                onClick={() => setFormData({ ...formData, primaryColor: color })}
+                                onClick={() => {
+                                  // Toggle: if already selected, reset to default
+                                  if (formData.primaryColor === color) {
+                                    setFormData({ ...formData, primaryColor: "#00E5FF" });
+                                  } else {
+                                    setFormData({ ...formData, primaryColor: color });
+                                  }
+                                }}
                                 className={`h-8 w-8 rounded-full cursor-pointer border-2 transition-all ${
-                                  formData.primaryColor === color ? "border-white scale-110 shadow-lg" : "border-transparent hover:scale-105"
+                                  formData.primaryColor === color ? "border-white scale-110 shadow-lg ring-2 ring-cyan-500/50" : "border-transparent hover:scale-105"
                                 }`}
                                 style={{ backgroundColor: color }}
                               />
@@ -621,9 +628,16 @@ export default function CreateApp() {
                             {["#A855F7", "#00E5FF", "#F97316", "#22C55E", "#6366F1", "#14B8A6"].map((color) => (
                               <div
                                 key={color}
-                                onClick={() => setFormData({ ...formData, secondaryColor: color })}
+                                onClick={() => {
+                                  // Toggle: if already selected, reset to default
+                                  if (formData.secondaryColor === color) {
+                                    setFormData({ ...formData, secondaryColor: "#A855F7" });
+                                  } else {
+                                    setFormData({ ...formData, secondaryColor: color });
+                                  }
+                                }}
                                 className={`h-8 w-8 rounded-full cursor-pointer border-2 transition-all ${
-                                  formData.secondaryColor === color ? "border-white scale-110 shadow-lg" : "border-transparent hover:scale-105"
+                                  formData.secondaryColor === color ? "border-white scale-110 shadow-lg ring-2 ring-purple-500/50" : "border-transparent hover:scale-105"
                                 }`}
                                 style={{ backgroundColor: color }}
                               />

@@ -292,9 +292,16 @@ export default function EditApp() {
                         (color) => (
                           <div
                             key={color}
-                            onClick={() => setFormData({ ...formData, primaryColor: color })}
+                            onClick={() => {
+                              // Toggle: if already selected, reset to default
+                              if (formData.primaryColor === color) {
+                                setFormData({ ...formData, primaryColor: "#2563EB" });
+                              } else {
+                                setFormData({ ...formData, primaryColor: color });
+                              }
+                            }}
                             className={`h-10 w-10 rounded-full cursor-pointer border-2 transition-all ${
-                              formData.primaryColor === color ? "border-slate-900 scale-110" : "border-transparent"
+                              formData.primaryColor === color ? "border-slate-900 scale-110 ring-2 ring-primary/50" : "border-transparent hover:scale-105"
                             }`}
                             style={{ backgroundColor: color }}
                           />
