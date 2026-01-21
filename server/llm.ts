@@ -1,12 +1,108 @@
 import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 
-// Initialize OpenAI client - uses OPENAI_API_KEY env variable
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// =====================
+// Provider Configuration
+// =====================
+// Set LLM_PROVIDER env to "openai" or "claude" (default: claude)
+// Required env vars:
+// - For OpenAI: OPENAI_API_KEY
+// - For Claude: ANTHROPIC_API_KEY
+
+type LLMProvider = "openai" | "claude";
+
+function getProvider(): LLMProvider {
+  const provider = (process.env.LLM_PROVIDER || "claude").toLowerCase();
+  if (provider === "openai") return "openai";
+  return "claude";
+}
+
+// Initialize clients lazily
+let openaiClient: OpenAI | null = null;
+let anthropicClient: Anthropic | null = null;
+
+function getOpenAI(): OpenAI {
+  if (!openaiClient) {
+    openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return openaiClient;
+}
+
+function getAnthropic(): Anthropic {
+  if (!anthropicClient) {
+    anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  }
+  return anthropicClient;
+}
 
 export function isLLMConfigured(): boolean {
-  return !!process.env.OPENAI_API_KEY;
+  const provider = getProvider();
+  if (provider === "openai") {
+    return !!process.env.OPENAI_API_KEY;
+  }
+  return !!process.env.ANTHROPIC_API_KEY;
+}
+
+export function getLLMProvider(): string {
+  return getProvider();
+}
+
+// =====================
+// Unified Chat Completion
+// =====================
+interface ChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+interface CompletionOptions {
+  messages: ChatMessage[];
+  maxTokens?: number;
+  jsonMode?: boolean;
+}
+
+async function complete(options: CompletionOptions): Promise<string> {
+  const { messages, maxTokens = 1000, jsonMode = true } = options;
+  const provider = getProvider();
+
+  if (provider === "openai") {
+    const openai = getOpenAI();
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages,
+      max_tokens: maxTokens,
+      ...(jsonMode && { response_format: { type: "json_object" } }),
+    });
+    return response.choices[0]?.message?.content || "";
+  } else {
+    // Claude
+    const anthropic = getAnthropic();
+    
+    // Extract system message for Claude (it uses a separate system parameter)
+    const systemMessage = messages.find(m => m.role === "system")?.content || "";
+    const chatMessages = messages
+      .filter(m => m.role !== "system")
+      .map(m => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }));
+
+    // For JSON mode with Claude, we add instruction to the system prompt
+    const systemWithJson = jsonMode 
+      ? `${systemMessage}\n\nIMPORTANT: You must respond with valid JSON only. No markdown, no code blocks, just raw JSON.`
+      : systemMessage;
+
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: maxTokens,
+      system: systemWithJson,
+      messages: chatMessages,
+    });
+
+    // Extract text content from Claude response
+    const textBlock = response.content.find(block => block.type === "text");
+    return textBlock?.type === "text" ? textBlock.text : "";
+  }
 }
 
 // =====================
@@ -22,8 +118,7 @@ export interface WebsiteAnalysis {
 }
 
 export async function analyzeWebsite(url: string, htmlContent: string): Promise<WebsiteAnalysis> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  const content = await complete({
     messages: [
       {
         role: "system",
@@ -48,14 +143,8 @@ HTML Content (truncated):
 ${htmlContent.substring(0, 15000)}`
       }
     ],
-    response_format: { type: "json_object" },
-    max_tokens: 1000,
+    maxTokens: 1000,
   });
-
-  const content = response.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error("No response from AI");
-  }
 
   return JSON.parse(content) as WebsiteAnalysis;
 }
@@ -71,8 +160,7 @@ export interface AppNameSuggestions {
 }
 
 export async function generateAppNames(websiteUrl: string, description: string): Promise<AppNameSuggestions> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  const content = await complete({
     messages: [
       {
         role: "system",
@@ -90,14 +178,8 @@ Website: ${websiteUrl}
 Description: ${description || "A mobile app version of the website"}`
       }
     ],
-    response_format: { type: "json_object" },
-    max_tokens: 500,
+    maxTokens: 500,
   });
-
-  const content = response.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error("No response from AI");
-  }
 
   return JSON.parse(content) as AppNameSuggestions;
 }
@@ -111,8 +193,7 @@ export interface EnhancedDescription {
 }
 
 export async function enhanceAppDescription(originalDescription: string, appName: string): Promise<EnhancedDescription> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  const content = await complete({
     messages: [
       {
         role: "system",
@@ -129,14 +210,8 @@ App Name: ${appName}
 Original Description: ${originalDescription}`
       }
     ],
-    response_format: { type: "json_object" },
-    max_tokens: 400,
+    maxTokens: 400,
   });
-
-  const content = response.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error("No response from AI");
-  }
 
   return JSON.parse(content) as EnhancedDescription;
 }
@@ -153,8 +228,7 @@ export interface NotificationSuggestions {
 }
 
 export async function generatePushNotifications(appName: string, appDescription: string, context?: string): Promise<NotificationSuggestions> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  const content = await complete({
     messages: [
       {
         role: "system",
@@ -174,14 +248,8 @@ App Description: ${appDescription}
 ${context ? `Additional Context: ${context}` : ""}`
       }
     ],
-    response_format: { type: "json_object" },
-    max_tokens: 600,
+    maxTokens: 600,
   });
-
-  const content = response.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error("No response from AI");
-  }
 
   return JSON.parse(content) as NotificationSuggestions;
 }
@@ -198,8 +266,7 @@ export interface BuildErrorAnalysis {
 }
 
 export async function analyzeBuildError(errorLogs: string, appInfo: { name: string; websiteUrl: string }): Promise<BuildErrorAnalysis> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  const content = await complete({
     messages: [
       {
         role: "system",
@@ -222,14 +289,8 @@ Build Logs (last 5000 chars):
 ${errorLogs.slice(-5000)}`
       }
     ],
-    response_format: { type: "json_object" },
-    max_tokens: 500,
+    maxTokens: 500,
   });
-
-  const content = response.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error("No response from AI");
-  }
 
   return JSON.parse(content) as BuildErrorAnalysis;
 }
@@ -261,26 +322,25 @@ Common issues and solutions:
 - Can't download: Build might still be in progress, check status
 - Payment issues: Contact support with order ID
 
-Be helpful, concise, and friendly. If you're unsure or the issue needs human attention, set needsHuman to true.`;
+Be helpful, concise, and friendly. If you're unsure or the issue needs human attention, set needsHuman to true.
+
+Return a JSON object with:
+- message: Your response to the user
+- suggestedActions: Array of 1-3 suggested follow-up questions or actions
+- needsHuman: Boolean - true if this needs human support
+- category: Optional category (billing, technical, feature_request, general)`;
 
 export async function supportChat(userMessage: string, conversationHistory: Array<{ role: "user" | "assistant"; content: string }>): Promise<ChatResponse> {
-  const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+  const messages: ChatMessage[] = [
     { role: "system", content: SUPPORT_CONTEXT },
-    ...conversationHistory.slice(-10), // Keep last 10 messages for context
+    ...conversationHistory.slice(-10).map(m => ({ ...m, role: m.role as "user" | "assistant" })),
     { role: "user", content: userMessage }
   ];
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  const content = await complete({
     messages,
-    response_format: { type: "json_object" },
-    max_tokens: 500,
+    maxTokens: 500,
   });
-
-  const content = response.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error("No response from AI");
-  }
 
   // Parse with fallback
   try {
@@ -311,8 +371,7 @@ export interface TicketCategorization {
 }
 
 export async function categorizeTicket(subject: string, message: string): Promise<TicketCategorization> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  const content = await complete({
     messages: [
       {
         role: "system",
@@ -335,14 +394,8 @@ Subject: ${subject}
 Message: ${message}`
       }
     ],
-    response_format: { type: "json_object" },
-    max_tokens: 400,
+    maxTokens: 400,
   });
-
-  const content = response.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error("No response from AI");
-  }
 
   return JSON.parse(content) as TicketCategorization;
 }

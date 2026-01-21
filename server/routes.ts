@@ -23,6 +23,7 @@ import { sendPasswordResetEmail, isEmailConfigured } from "./email";
 import crypto from "crypto";
 import {
   isLLMConfigured,
+  getLLMProvider,
   analyzeWebsite,
   generateAppNames,
   enhanceAppDescription,
@@ -1365,9 +1366,12 @@ export async function registerRoutes(
     message: { message: "Too many AI requests, please slow down" },
   });
 
-  // Check if LLM is configured
+  // Check if LLM is configured and which provider
   app.get("/api/ai/status", (req, res) => {
-    res.json({ available: isLLMConfigured() });
+    res.json({ 
+      available: isLLMConfigured(),
+      provider: getLLMProvider(), // "openai" or "claude"
+    });
   });
 
   // 1. Website Analyzer - Analyze a website for app conversion
