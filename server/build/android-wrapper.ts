@@ -33,7 +33,6 @@ export type AndroidWrapperConfig = {
   appName: string;
   startUrl: string;
   primaryColor: string;
-  iconColor?: string | null; // Icon background color (defaults to primaryColor)
   packageName: string;
   versionCode: number;
   iconUrl?: string | null; // Custom icon as base64 data URL or http URL
@@ -87,11 +86,11 @@ async function replaceInFileIfExists(filePath: string, replacements: Record<stri
 
 /**
  * Generates Android app icons from a base64 image or URL
+ * The user's logo is used directly as the app icon without any background color overlay
  */
 async function generateAppIcons(
   projectDir: string, 
-  iconUrl: string,
-  primaryColor: string
+  iconUrl: string
 ): Promise<void> {
   const sharpLib = await getSharp();
   if (!sharpLib) {
@@ -119,17 +118,18 @@ async function generateAppIcons(
     const resDir = path.join(projectDir, "app", "src", "main", "res");
 
     // Generate standard launcher icons for each density
+    // The user's logo is used directly - resized to fit each density
     for (const { folder, size } of ANDROID_ICON_SIZES) {
       const outputDir = path.join(resDir, folder);
       await fs.mkdir(outputDir, { recursive: true });
       
-      // ic_launcher.png - square icon with rounded corners
+      // ic_launcher.png - use the logo directly, resized to fit
       await sharpLib(imageBuffer)
-        .resize(size, size, { fit: "cover" })
+        .resize(size, size, { fit: "contain", background: { r: 255, g: 255, b: 255, alpha: 0 } })
         .png()
         .toFile(path.join(outputDir, "ic_launcher.png"));
       
-      // ic_launcher_round.png - circular icon
+      // ic_launcher_round.png - circular icon with the logo
       const roundMask = Buffer.from(
         `<svg width="${size}" height="${size}">
           <circle cx="${size/2}" cy="${size/2}" r="${size/2}" fill="white"/>
@@ -137,7 +137,7 @@ async function generateAppIcons(
       );
       
       await sharpLib(imageBuffer)
-        .resize(size, size, { fit: "cover" })
+        .resize(size, size, { fit: "contain", background: { r: 255, g: 255, b: 255, alpha: 0 } })
         .composite([{ input: roundMask, blend: "dest-in" }])
         .png()
         .toFile(path.join(outputDir, "ic_launcher_round.png"));
@@ -150,7 +150,7 @@ async function generateAppIcons(
     const offset = (foregroundSize - iconSize) / 2;
     
     const foreground = await sharpLib(imageBuffer)
-      .resize(iconSize, iconSize, { fit: "cover" })
+      .resize(iconSize, iconSize, { fit: "contain", background: { r: 255, g: 255, b: 255, alpha: 0 } })
       .extend({
         top: offset,
         bottom: offset,
@@ -188,7 +188,7 @@ async function generateAppIcons(
       // May not exist
     }
 
-    // Update the adaptive icon XML to use PNG foreground
+    // Update the adaptive icon XML - use transparent background so the logo shows as-is
     const adaptiveIconXml = `<?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/ic_launcher_background"/>
@@ -201,13 +201,14 @@ async function generateAppIcons(
     await fs.writeFile(path.join(adaptiveIconDir, "ic_launcher.xml"), adaptiveIconXml);
     await fs.writeFile(path.join(adaptiveIconDir, "ic_launcher_round.xml"), adaptiveIconXml);
 
-    // Add ic_launcher_background color resource
+    // Add ic_launcher_background as white (most logos look good on white)
+    // The logo itself will be the foreground, so the background is just for adaptive icons
     const colorsPath = path.join(resDir, "values", "colors.xml");
     const colorsContent = await fs.readFile(colorsPath, "utf-8");
     if (!colorsContent.includes("ic_launcher_background")) {
       const newColorsContent = colorsContent.replace(
         "</resources>",
-        `    <color name="ic_launcher_background">${primaryColor}</color>\n</resources>`
+        `    <color name="ic_launcher_background">#FFFFFF</color>\n</resources>`
       );
       await fs.writeFile(colorsPath, newColorsContent);
     }
@@ -284,10 +285,10 @@ export async function generateAndroidWrapperProject(
   await replaceInFileIfExists(path.join(projectDir, "app", "proguard-rules.pro"), common);
 
   // Generate custom app icons if iconUrl is provided
+  // The user's logo is used directly as the app icon
   if (config.iconUrl) {
-    console.log("[Build] Generating custom app icons...");
-    const iconBgColor = sanitizeHexColor(config.iconColor || config.primaryColor);
-    await generateAppIcons(projectDir, config.iconUrl, iconBgColor);
+    console.log("[Build] Generating custom app icons from user's logo...");
+    await generateAppIcons(projectDir, config.iconUrl);
   }
 
   return { projectDir };
