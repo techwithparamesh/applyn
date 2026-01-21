@@ -106,10 +106,10 @@ export default function EditApp() {
 
   if (meLoading || appLoading) {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-background bg-mesh-subtle">
         <Navbar />
         <main className="container mx-auto px-4 py-8">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 text-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
             Loading...
           </div>
@@ -120,11 +120,11 @@ export default function EditApp() {
 
   if (!app) {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-background bg-mesh-subtle">
         <Navbar />
         <main className="container mx-auto px-4 py-8">
           <div className="text-center py-12">
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">App not found</h2>
+            <h2 className="text-2xl font-bold text-foreground mb-2">App not found</h2>
             <p className="text-muted-foreground mb-4">This app doesn't exist or you don't have access to it.</p>
             <Button onClick={() => setLocation("/dashboard")}>
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
@@ -136,7 +136,7 @@ export default function EditApp() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-background bg-mesh-subtle">
       <Navbar />
       <main className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="flex items-center gap-4 mb-8">
@@ -144,7 +144,7 @@ export default function EditApp() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Edit App</h1>
+            <h1 className="text-3xl font-bold text-foreground">Edit App</h1>
             <p className="text-muted-foreground">Update your app settings</p>
           </div>
         </div>
