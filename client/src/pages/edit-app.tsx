@@ -259,7 +259,14 @@ export default function EditApp() {
                           <button
                             key={emoji}
                             type="button"
-                            onClick={() => setFormData({ ...formData, icon: emoji, customLogo: null })}
+                            onClick={() => {
+                              // Toggle: if already selected, unselect it
+                              if (formData.icon === emoji && !formData.customLogo) {
+                                setFormData({ ...formData, icon: "" });
+                              } else {
+                                setFormData({ ...formData, icon: emoji, customLogo: null });
+                              }
+                            }}
                             className={`w-10 h-10 text-xl rounded-lg border-2 transition-all ${
                               formData.icon === emoji && !formData.customLogo
                                 ? "border-primary bg-primary/10"
