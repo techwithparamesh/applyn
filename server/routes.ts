@@ -21,6 +21,16 @@ import { storage } from "./storage";
 import { hashPassword, sanitizeUser, verifyPassword } from "./auth";
 import { sendPasswordResetEmail, isEmailConfigured } from "./email";
 import crypto from "crypto";
+import {
+  isLLMConfigured,
+  analyzeWebsite,
+  generateAppNames,
+  enhanceAppDescription,
+  generatePushNotifications,
+  analyzeBuildError,
+  supportChat,
+  categorizeTicket,
+} from "./llm";
 
 function isGoogleConfigured() {
   return !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
@@ -1339,6 +1349,221 @@ export async function registerRoutes(
       res.setHeader("Content-Type", isIPA ? "application/octet-stream" : "application/zip");
       res.setHeader("Content-Disposition", `attachment; filename="${safeName}${isIPA ? '.ipa' : '-ios.zip'}"`);
       return fs.createReadStream(abs).pipe(res);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // ==========================================
+  // LLM-Powered Features
+  // ==========================================
+
+  // Rate limiter for AI endpoints (more restrictive)
+  const aiRateLimit = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 10, // 10 requests per minute
+    message: { message: "Too many AI requests, please slow down" },
+  });
+
+  // Check if LLM is configured
+  app.get("/api/ai/status", (req, res) => {
+    res.json({ available: isLLMConfigured() });
+  });
+
+  // 1. Website Analyzer - Analyze a website for app conversion
+  app.post("/api/ai/analyze-website", aiRateLimit, async (req, res, next) => {
+    try {
+      if (!isLLMConfigured()) {
+        return res.status(503).json({ message: "AI features not available" });
+      }
+
+      const schema = z.object({
+        url: z.string().url(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid URL" });
+      }
+
+      const { url } = parsed.data;
+
+      // Fetch the website HTML
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      try {
+        const response = await fetch(url, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; Applyn/1.0; +https://applyn.io)',
+          },
+        });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          return res.status(400).json({ message: `Could not fetch website: ${response.status}` });
+        }
+
+        const html = await response.text();
+        const analysis = await analyzeWebsite(url, html);
+        return res.json(analysis);
+      } catch (fetchErr: any) {
+        if (fetchErr.name === 'AbortError') {
+          return res.status(408).json({ message: "Website took too long to respond" });
+        }
+        return res.status(400).json({ message: "Could not access website" });
+      }
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // 2. App Name Generator
+  app.post("/api/ai/generate-names", aiRateLimit, async (req, res, next) => {
+    try {
+      if (!isLLMConfigured()) {
+        return res.status(503).json({ message: "AI features not available" });
+      }
+
+      const schema = z.object({
+        websiteUrl: z.string(),
+        description: z.string().optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid input" });
+      }
+
+      const suggestions = await generateAppNames(parsed.data.websiteUrl, parsed.data.description || "");
+      return res.json(suggestions);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // 3. App Description Enhancer
+  app.post("/api/ai/enhance-description", aiRateLimit, async (req, res, next) => {
+    try {
+      if (!isLLMConfigured()) {
+        return res.status(503).json({ message: "AI features not available" });
+      }
+
+      const schema = z.object({
+        description: z.string().min(1).max(500),
+        appName: z.string().min(1).max(50),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid input" });
+      }
+
+      const enhanced = await enhanceAppDescription(parsed.data.description, parsed.data.appName);
+      return res.json(enhanced);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // 4. Push Notification Generator (requires auth)
+  app.post("/api/ai/generate-notifications", requireAuth, aiRateLimit, async (req, res, next) => {
+    try {
+      if (!isLLMConfigured()) {
+        return res.status(503).json({ message: "AI features not available" });
+      }
+
+      const schema = z.object({
+        appName: z.string().min(1),
+        appDescription: z.string().optional(),
+        context: z.string().optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid input" });
+      }
+
+      const suggestions = await generatePushNotifications(
+        parsed.data.appName,
+        parsed.data.appDescription || "",
+        parsed.data.context
+      );
+      return res.json(suggestions);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // 5. Build Error Analyzer (for apps with failed builds)
+  app.get("/api/ai/analyze-error/:appId", requireAuth, async (req, res, next) => {
+    try {
+      if (!isLLMConfigured()) {
+        return res.status(503).json({ message: "AI features not available" });
+      }
+
+      const user = getAuthedUser(req);
+      const appItem = await storage.getApp(req.params.appId);
+      
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user?.id)) {
+        return res.status(404).json({ message: "App not found" });
+      }
+
+      if (appItem.status !== "failed" || !appItem.buildError) {
+        return res.status(400).json({ message: "No build error to analyze" });
+      }
+
+      const analysis = await analyzeBuildError(
+        appItem.buildLogs || appItem.buildError || "Unknown error",
+        { name: appItem.name, websiteUrl: appItem.url }
+      );
+      return res.json(analysis);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // 6. Support Chatbot
+  app.post("/api/ai/chat", aiRateLimit, async (req, res, next) => {
+    try {
+      if (!isLLMConfigured()) {
+        return res.status(503).json({ message: "AI features not available" });
+      }
+
+      const schema = z.object({
+        message: z.string().min(1).max(1000),
+        history: z.array(z.object({
+          role: z.enum(["user", "assistant"]),
+          content: z.string(),
+        })).optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid input" });
+      }
+
+      const response = await supportChat(parsed.data.message, parsed.data.history || []);
+      return res.json(response);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // 7. Ticket Categorization (for staff when viewing tickets)
+  app.post("/api/ai/categorize-ticket", requireRole(["admin", "support"]), async (req, res, next) => {
+    try {
+      if (!isLLMConfigured()) {
+        return res.status(503).json({ message: "AI features not available" });
+      }
+
+      const schema = z.object({
+        subject: z.string(),
+        message: z.string(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid input" });
+      }
+
+      const categorization = await categorizeTicket(parsed.data.subject, parsed.data.message);
+      return res.json(categorization);
     } catch (err) {
       return next(err);
     }

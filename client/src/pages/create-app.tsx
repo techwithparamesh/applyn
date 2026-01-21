@@ -6,13 +6,14 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { MobilePreview } from "@/components/mobile-preview";
-import { ArrowRight, ArrowLeft, Loader2, Smartphone, Check, Palette, Globe, CreditCard, Upload, Image, Trash2, Sun, Moon, Sparkles, Lock, Crown, Zap, Download, X } from "lucide-react";
+import { ArrowRight, ArrowLeft, Loader2, Smartphone, Check, Palette, Globe, CreditCard, Upload, Image, Trash2, Sun, Moon, Sparkles, Lock, Crown, Zap, Download, X, Wand2 } from "lucide-react";
 import { useLocation, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { WebsiteAnalyzer, AppNameGenerator } from "@/components/ai-features";
 
 declare global {
   interface Window {
@@ -473,6 +474,23 @@ export default function CreateApp() {
                         placeholder="https://yourwebsite.com"
                         className="h-12 text-lg bg-white/5 border-white/10 focus:border-cyan-500/50 text-white rounded-lg"
                       />
+                      {/* AI Website Analyzer */}
+                      <WebsiteAnalyzer 
+                        url={formData.url}
+                        onAnalysisComplete={(analysis) => {
+                          setFormData(prev => ({
+                            ...prev,
+                            appName: analysis.appName || prev.appName,
+                            primaryColor: analysis.primaryColor || prev.primaryColor,
+                          }));
+                          toast({
+                            title: "Website Analyzed!",
+                            description: analysis.isAppReady 
+                              ? "Your website is ready for conversion." 
+                              : `Found ${analysis.issues.length} potential issues.`,
+                          });
+                        }}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="appName" className="text-muted-foreground">App Name</Label>
@@ -482,6 +500,14 @@ export default function CreateApp() {
                         onChange={(e) => setFormData({ ...formData, appName: e.target.value })}
                         placeholder="e.g. My Shop"
                         className="h-12 bg-white/5 border-white/10 focus:border-cyan-500/50 text-white rounded-lg"
+                      />
+                      {/* AI App Name Generator */}
+                      <AppNameGenerator 
+                        websiteUrl={formData.url}
+                        description=""
+                        onSelect={(name) => {
+                          setFormData(prev => ({ ...prev, appName: name }));
+                        }}
                       />
                     </div>
                   </div>

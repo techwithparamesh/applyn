@@ -22,7 +22,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
@@ -38,6 +38,9 @@ import {
   ArrowRight,
   Sparkles,
   Send,
+  Loader2,
+  Wand2,
+  AlertTriangle,
 } from "lucide-react";
 
 type Role = "admin" | "support" | "user" | string;
@@ -90,6 +93,34 @@ export default function Tickets() {
 
   const [viewOpen, setViewOpen] = useState(false);
   const [activeTicket, setActiveTicket] = useState<SupportTicket | null>(null);
+  const [ticketAnalysis, setTicketAnalysis] = useState<{
+    category: string;
+    priority: string;
+    summary: string;
+    suggestedResponse?: string;
+  } | null>(null);
+
+  // AI Ticket Categorization for staff
+  const categorizeMutation = useMutation({
+    mutationFn: async (ticket: SupportTicket) => {
+      const res = await apiRequest("POST", "/api/ai/categorize-ticket", {
+        subject: ticket.subject,
+        message: ticket.message,
+      });
+      if (!res.ok) throw new Error("AI analysis failed");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setTicketAnalysis(data);
+    },
+    onError: () => {
+      toast({
+        title: "AI analysis unavailable",
+        description: "Could not analyze the ticket",
+        variant: "destructive",
+      });
+    },
+  });
 
   const [newOpen, setNewOpen] = useState(false);
   const [newAppId, setNewAppId] = useState<string>("");
@@ -138,6 +169,7 @@ export default function Tickets() {
 
   const handleView = (t: SupportTicket) => {
     setActiveTicket(t);
+    setTicketAnalysis(null); // Reset analysis when viewing new ticket
     setViewOpen(true);
   };
 
@@ -478,7 +510,63 @@ export default function Tickets() {
                 </div>
               )}
 
-              <ScrollArea className="h-[300px] rounded-lg border border-white/10 bg-white/[0.02] p-4">
+              {/* AI Analysis for Staff */}
+              {isStaff && (
+                <div className="p-3 rounded-lg bg-gradient-to-r from-purple-500/10 to-cyan-500/10 border border-purple-500/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Wand2 className="h-4 w-4 text-purple-400" />
+                      <span className="text-sm font-medium text-white">AI Analysis</span>
+                    </div>
+                    {!ticketAnalysis && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => categorizeMutation.mutate(activeTicket)}
+                        disabled={categorizeMutation.isPending}
+                        className="h-7 text-xs gap-1 text-purple-400 hover:text-purple-300"
+                      >
+                        {categorizeMutation.isPending ? (
+                          <><Loader2 className="h-3 w-3 animate-spin" /> Analyzing...</>
+                        ) : (
+                          <><Sparkles className="h-3 w-3" /> Analyze</>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {ticketAnalysis && (
+                    <div className="space-y-2 text-sm">
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline" className="text-xs">
+                          Category: {ticketAnalysis.category.replace('_', ' ')}
+                        </Badge>
+                        <Badge 
+                          variant="outline" 
+                          className={`text-xs ${
+                            ticketAnalysis.priority === 'urgent' ? 'border-red-500/50 text-red-400' :
+                            ticketAnalysis.priority === 'high' ? 'border-orange-500/50 text-orange-400' :
+                            ticketAnalysis.priority === 'medium' ? 'border-yellow-500/50 text-yellow-400' :
+                            'border-green-500/50 text-green-400'
+                          }`}
+                        >
+                          {ticketAnalysis.priority === 'urgent' && <AlertTriangle className="h-3 w-3 mr-1" />}
+                          Priority: {ticketAnalysis.priority}
+                        </Badge>
+                      </div>
+                      <p className="text-muted-foreground">{ticketAnalysis.summary}</p>
+                      {ticketAnalysis.suggestedResponse && (
+                        <div className="mt-2 p-2 rounded bg-white/5 border border-white/10">
+                          <p className="text-xs text-muted-foreground mb-1">Suggested Response:</p>
+                          <p className="text-white/80 text-xs">{ticketAnalysis.suggestedResponse}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <ScrollArea className="h-[250px] rounded-lg border border-white/10 bg-white/[0.02] p-4">
                 <pre className="whitespace-pre-wrap text-sm text-white/90 font-sans">
                   {activeTicket.message}
                 </pre>

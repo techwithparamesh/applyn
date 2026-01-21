@@ -11,8 +11,9 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
 import { useLocation, useParams } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Bell, Send, Loader2, Users, CheckCircle, XCircle, Clock, Image, Link as LinkIcon } from "lucide-react";
+import { ArrowLeft, Bell, Send, Loader2, Users, CheckCircle, XCircle, Clock, Image, Link as LinkIcon, Sparkles } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { NotificationGenerator } from "@/components/ai-features";
 
 type PushNotification = {
   id: string;
@@ -225,6 +226,23 @@ export default function PushNotifications() {
               <CardDescription>Compose and send a push notification to all registered devices</CardDescription>
             </CardHeader>
             <CardContent>
+              {/* AI Notification Generator */}
+              <div className="mb-6 p-4 rounded-lg bg-gradient-to-r from-purple-500/10 to-cyan-500/10 border border-purple-500/20">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="h-4 w-4 text-purple-500" />
+                  <span className="text-sm font-medium">AI Content Generator</span>
+                </div>
+                <NotificationGenerator
+                  appName={app?.name || ""}
+                  appDescription=""
+                  onSelect={(title, body) => {
+                    setFormData(prev => ({ ...prev, title, body }));
+                  }}
+                />
+              </div>
+
+              <Separator className="my-4" />
+
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="title">Title *</Label>

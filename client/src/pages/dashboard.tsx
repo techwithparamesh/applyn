@@ -26,6 +26,7 @@ import {
   Sparkles,
   LifeBuoy,
   CreditCard,
+  Wand2,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -42,6 +43,7 @@ import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { BuildLogsDialog } from "@/components/build-logs-dialog";
 import { motion } from "framer-motion";
+import { BuildErrorAnalyzer } from "@/components/ai-features";
 
 type AppItem = {
   id: string;
@@ -718,6 +720,12 @@ export default function Dashboard() {
                             {app.buildError}
                           </div>
                         )}
+                        
+                        {/* AI Error Analysis */}
+                        <div className="mt-3 pt-3 border-t border-red-500/10">
+                          <BuildErrorAnalyzer appId={app.id} />
+                        </div>
+
                         {!isStaff && (
                           <Button
                             variant="ghost"
