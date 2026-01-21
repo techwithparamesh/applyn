@@ -17,6 +17,7 @@ type AppItem = {
   url: string;
   icon: string;
   iconUrl?: string | null;
+  iconColor?: string | null;
   primaryColor: string;
   platform: string;
   status: string;
@@ -47,6 +48,7 @@ export default function EditApp() {
     url: "",
     icon: "🚀",
     customLogo: null as string | null,
+    iconColor: "#2563EB",
     primaryColor: "#2563EB",
   });
 
@@ -63,6 +65,7 @@ export default function EditApp() {
         url: app.url,
         icon: app.icon,
         customLogo: app.iconUrl || null,
+        iconColor: app.iconColor || app.primaryColor || "#2563EB",
         primaryColor: app.primaryColor,
       });
     }
@@ -99,6 +102,7 @@ export default function EditApp() {
       url: formData.url,
       icon: formData.icon || "🚀",
       iconUrl: formData.customLogo,
+      iconColor: formData.iconColor,
       primaryColor: formData.primaryColor,
     };
     updateApp.mutate(apiData);
@@ -281,7 +285,33 @@ export default function EditApp() {
                   </div>
 
                   <div className="space-y-2">
+                    <Label>Icon Background Color</Label>
+                    <p className="text-xs text-muted-foreground mb-2">This color appears behind your logo/emoji on the app icon</p>
+                    <div className="flex gap-2 flex-wrap">
+                      {["#2563EB", "#16A34A", "#DC2626", "#9333EA", "#EA580C", "#0891B2", "#CA8A04", "#000000", "#FFFFFF", "#1F2937"].map(
+                        (color) => (
+                          <div
+                            key={color}
+                            onClick={() => setFormData({ ...formData, iconColor: color })}
+                            className={`h-10 w-10 rounded-lg cursor-pointer border-2 transition-all ${
+                              formData.iconColor === color ? "border-primary scale-110 ring-2 ring-primary/50" : "border-slate-300"
+                            }`}
+                            style={{ backgroundColor: color }}
+                          />
+                        )
+                      )}
+                      <Input
+                        type="color"
+                        value={formData.iconColor}
+                        onChange={(e) => setFormData({ ...formData, iconColor: e.target.value })}
+                        className="h-10 w-10 p-1 rounded-lg cursor-pointer"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
                     <Label>Primary Color</Label>
+                    <p className="text-xs text-muted-foreground mb-2">Used for buttons, links, and accent elements in your app</p>
                     <div className="flex gap-2 flex-wrap">
                       {["#2563EB", "#16A34A", "#DC2626", "#9333EA", "#EA580C", "#0891B2", "#CA8A04", "#000000"].map(
                         (color) => (

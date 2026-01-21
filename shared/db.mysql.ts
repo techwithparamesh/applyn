@@ -30,6 +30,7 @@ export const apps = mysqlTable("apps", {
     toDriver(value) { return value; },
     fromDriver(value) { return value as string; },
   })("icon_url"), // Custom logo as base64 - needs MEDIUMTEXT for large images
+  iconColor: varchar("icon_color", { length: 16 }).default("#2563EB"), // Icon background color
   primaryColor: varchar("primary_color", { length: 16 }).notNull().default("#2563EB"),
   platform: varchar("platform", { length: 16 }).notNull().default("android"),
   status: varchar("status", { length: 16 }).notNull().default("draft"),

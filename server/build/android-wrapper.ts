@@ -33,6 +33,7 @@ export type AndroidWrapperConfig = {
   appName: string;
   startUrl: string;
   primaryColor: string;
+  iconColor?: string | null; // Icon background color (defaults to primaryColor)
   packageName: string;
   versionCode: number;
   iconUrl?: string | null; // Custom icon as base64 data URL or http URL
@@ -285,7 +286,8 @@ export async function generateAndroidWrapperProject(
   // Generate custom app icons if iconUrl is provided
   if (config.iconUrl) {
     console.log("[Build] Generating custom app icons...");
-    await generateAppIcons(projectDir, config.iconUrl, sanitizeHexColor(config.primaryColor));
+    const iconBgColor = sanitizeHexColor(config.iconColor || config.primaryColor);
+    await generateAppIcons(projectDir, config.iconUrl, iconBgColor);
   }
 
   return { projectDir };

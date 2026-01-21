@@ -131,6 +131,7 @@ export default function CreateApp() {
     appName: "My Awesome App",
     icon: "🚀",
     customLogo: null as string | null,
+    iconColor: "#2563EB",
     primaryColor: "#00E5FF",
     secondaryColor: "#A855F7",
     splashBgColor: "#0a0a0a",
@@ -291,6 +292,8 @@ export default function CreateApp() {
         name: formData.appName,
         url: formData.url,
         icon: formData.icon,
+        iconUrl: formData.customLogo,
+        iconColor: formData.iconColor,
         primaryColor: formData.primaryColor,
         platform: formData.platform,
         buildNow: false, // Don't build yet, wait for payment
@@ -581,6 +584,29 @@ export default function CreateApp() {
                               {emoji}
                             </button>
                           ))}
+                        </div>
+                      </div>
+                      
+                      {/* Icon Background Color */}
+                      <div className="pt-3">
+                        <p className="text-xs text-muted-foreground mb-2">Icon background color:</p>
+                        <div className="flex gap-2 flex-wrap">
+                          {["#2563EB", "#16A34A", "#DC2626", "#9333EA", "#EA580C", "#000000", "#FFFFFF", "#1F2937"].map((color) => (
+                            <div
+                              key={color}
+                              onClick={() => setFormData({ ...formData, iconColor: color })}
+                              className={`h-8 w-8 rounded-lg cursor-pointer border-2 transition-all ${
+                                formData.iconColor === color ? "border-cyan-500 scale-110 ring-2 ring-cyan-500/50" : "border-white/20 hover:scale-105"
+                              }`}
+                              style={{ backgroundColor: color }}
+                            />
+                          ))}
+                          <Input
+                            type="color"
+                            value={formData.iconColor}
+                            onChange={(e) => setFormData({ ...formData, iconColor: e.target.value })}
+                            className="h-8 w-8 p-1 rounded-lg cursor-pointer bg-transparent border-white/20"
+                          />
                         </div>
                       </div>
                     </div>
