@@ -153,6 +153,7 @@ export class MysqlStorage {
       name: apps.name,
       url: apps.url,
       icon: apps.icon,
+      iconUrl: apps.iconUrl,
       primaryColor: apps.primaryColor,
       platform: apps.platform,
       status: apps.status,

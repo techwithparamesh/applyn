@@ -38,6 +38,7 @@ export const insertAppSchema = z.object({
   name: z.string().min(2).max(200),
   url: z.string().url().max(2000),
   icon: z.string().min(1).max(10).default("🚀"),
+  iconUrl: z.string().max(500000).nullable().optional(), // base64 or URL
   primaryColor: z.string().min(4).max(32).default("#2563EB"),
   platform: appPlatformSchema.default("android"),
   status: appStatusSchema.default("draft"),
@@ -50,6 +51,7 @@ export type App = {
   name: string;
   url: string;
   icon: string;
+  iconUrl?: string | null;
   primaryColor: string;
   platform: z.infer<typeof appPlatformSchema>;
   status: z.infer<typeof appStatusSchema>;

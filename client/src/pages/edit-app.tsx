@@ -8,7 +8,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
 import { useLocation, useParams } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, Save, Globe, Palette, Smartphone } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Globe, Palette, Smartphone, Upload, X } from "lucide-react";
 import { MobilePreview } from "@/components/mobile-preview";
 
 type AppItem = {
@@ -16,6 +16,7 @@ type AppItem = {
   name: string;
   url: string;
   icon: string;
+  iconUrl?: string | null;
   primaryColor: string;
   platform: string;
   status: string;
@@ -45,6 +46,7 @@ export default function EditApp() {
     name: "",
     url: "",
     icon: "🚀",
+    customLogo: null as string | null,
     primaryColor: "#2563EB",
   });
 
@@ -60,6 +62,7 @@ export default function EditApp() {
         name: app.name,
         url: app.url,
         icon: app.icon,
+        customLogo: app.iconUrl || null,
         primaryColor: app.primaryColor,
       });
     }
@@ -90,7 +93,15 @@ export default function EditApp() {
       toast({ title: "Name and URL are required", variant: "destructive" });
       return;
     }
-    updateApp.mutate(formData);
+    // Map customLogo to iconUrl for the API
+    const apiData = {
+      name: formData.name,
+      url: formData.url,
+      icon: formData.icon || "🚀",
+      iconUrl: formData.customLogo,
+      primaryColor: formData.primaryColor,
+    };
+    updateApp.mutate(apiData);
   };
 
   if (meLoading || appLoading) {
@@ -172,22 +183,85 @@ export default function EditApp() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>App Icon (Emoji)</Label>
+                    <Label>App Icon</Label>
+                    
+                    {/* Custom Logo Upload */}
+                    <div className="mb-4">
+                      <input
+                        type="file"
+                        id="logo-upload"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              setFormData({ ...formData, customLogo: reader.result as string, icon: "" });
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                      <label
+                        htmlFor="logo-upload"
+                        className={`flex items-center gap-3 p-3 rounded-lg border-2 border-dashed cursor-pointer transition-all ${
+                          formData.customLogo 
+                            ? "border-primary bg-primary/5" 
+                            : "border-slate-300 hover:border-primary"
+                        }`}
+                      >
+                        {formData.customLogo ? (
+                          <>
+                            <img src={formData.customLogo} alt="Logo" className="h-12 w-12 object-contain rounded-lg" />
+                            <div className="flex-1">
+                              <p className="text-sm font-medium">Custom logo uploaded</p>
+                              <p className="text-xs text-muted-foreground">Click to change</p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setFormData({ ...formData, customLogo: null, icon: "🚀" });
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <div className="h-12 w-12 rounded-lg bg-slate-100 flex items-center justify-center">
+                              <Upload className="h-5 w-5 text-slate-400" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">Upload custom logo</p>
+                              <p className="text-xs text-muted-foreground">PNG or JPG, 512x512 recommended</p>
+                            </div>
+                          </>
+                        )}
+                      </label>
+                    </div>
+
+                    {/* Emoji Selection */}
                     <div className="flex gap-4">
                       <Input
                         value={formData.icon}
-                        onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, icon: e.target.value, customLogo: null })}
                         className="w-20 text-center text-2xl h-12"
                         maxLength={2}
+                        placeholder="🚀"
                       />
                       <div className="flex gap-2 flex-wrap">
                         {["🚀", "📱", "🛍️", "🍔", "📚", "💼", "🎮", "🏠"].map((emoji) => (
                           <button
                             key={emoji}
                             type="button"
-                            onClick={() => setFormData({ ...formData, icon: emoji })}
+                            onClick={() => setFormData({ ...formData, icon: emoji, customLogo: null })}
                             className={`w-10 h-10 text-xl rounded-lg border-2 transition-all ${
-                              formData.icon === emoji
+                              formData.icon === emoji && !formData.customLogo
                                 ? "border-primary bg-primary/10"
                                 : "border-slate-200 hover:border-slate-400"
                             }`}
@@ -295,7 +369,7 @@ export default function EditApp() {
                 url={formData.url}
                 appName={formData.name}
                 primaryColor={formData.primaryColor}
-                icon={formData.icon}
+                icon={formData.customLogo || formData.icon}
               />
               <p className="text-center text-sm text-muted-foreground mt-4">Live Preview</p>
             </div>
