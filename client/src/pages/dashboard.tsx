@@ -166,6 +166,64 @@ export default function Dashboard() {
     }
   };
 
+  // Handle rebuild with plan limit check
+  const handleRebuild = async (app: AppItem) => {
+    try {
+      // First check the plan limits
+      const planRes = await apiRequest("GET", `/api/apps/${app.id}/plan`);
+      const planData = await planRes.json();
+      
+      if (!planData.rebuilds?.allowed) {
+        // Show upgrade prompt based on the reason
+        if (planData.plan === "starter") {
+          toast({
+            title: "Rebuilds not included",
+            description: "Starter plan doesn't include rebuilds. Upgrade to Standard or Pro plan for rebuild access.",
+            variant: "destructive",
+          });
+        } else if (planData.rebuilds?.remaining === 0) {
+          toast({
+            title: "Rebuild limit reached",
+            description: `You've used all ${planData.rebuilds.limit} rebuilds on your ${planData.plan} plan.`,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Rebuild not available",
+            description: "Your rebuild window has expired or no payment found.",
+            variant: "destructive",
+          });
+        }
+        return;
+      }
+
+      // Confirm with user showing remaining rebuilds
+      const remaining = planData.rebuilds.remaining - 1;
+      const confirmMessage = remaining > 0 
+        ? `This will use 1 of your ${planData.rebuilds.limit} rebuilds. You'll have ${remaining} rebuild(s) remaining.`
+        : `This is your last rebuild on the ${planData.plan} plan.`;
+      
+      if (!window.confirm(`Rebuild ${app.name}?\n\n${confirmMessage}`)) {
+        return;
+      }
+
+      // Proceed with rebuild
+      await apiRequest("POST", `/api/apps/${app.id}/build`);
+      await queryClient.invalidateQueries({ queryKey: ["/api/apps"] });
+      toast({ 
+        title: "Rebuild started", 
+        description: `Building ${app.name}. ${remaining} rebuild(s) remaining.` 
+      });
+    } catch (err: any) {
+      const errorData = err?.response ? await err.response.json().catch(() => ({})) : {};
+      toast({
+        title: "Rebuild failed",
+        description: errorData?.message || err?.message || "Please try again",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Fetch build status for an app
   const fetchBuildStatus = async (appId: string, appName: string) => {
     try {
@@ -586,7 +644,12 @@ export default function Dashboard() {
                             <Download className="mr-2 h-4 w-4" /> Download iOS
                           </DropdownMenuItem>
                         )}
-                        {isStaff && (app.status === "live" || app.status === "failed") && (
+                        {app.status === "live" && (
+                          <DropdownMenuItem onClick={() => handleRebuild(app)}>
+                            <RefreshCw className="mr-2 h-4 w-4" /> Rebuild App
+                          </DropdownMenuItem>
+                        )}
+                        {(app.status === "live" || app.status === "failed") && (
                           <DropdownMenuItem
                             onClick={() => handleViewBuildStatus(app)}
                           >
@@ -599,7 +662,7 @@ export default function Dashboard() {
                           </DropdownMenuItem>
                         )}
                         {app.status === "failed" && (
-                          <DropdownMenuItem onClick={() => handleBuild(app.id)}>
+                          <DropdownMenuItem onClick={() => handleRebuild(app)}>
                             <RefreshCw className="mr-2 h-4 w-4" /> Rebuild App
                           </DropdownMenuItem>
                         )}
