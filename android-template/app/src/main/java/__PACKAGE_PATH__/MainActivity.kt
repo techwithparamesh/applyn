@@ -71,12 +71,6 @@ class MainActivity : AppCompatActivity() {
     settings.domStorageEnabled = true
     settings.databaseEnabled = true
     settings.setGeolocationEnabled(true)
-    
-    // Enable app cache for offline support
-    @Suppress("DEPRECATION")
-    settings.setAppCacheEnabled(true)
-    @Suppress("DEPRECATION")
-    settings.setAppCachePath(cacheDir.absolutePath)
 
     webView.webViewClient = object : WebViewClient() {
       override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
