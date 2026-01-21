@@ -84,6 +84,7 @@ export interface IStorage {
   enqueueBuildJob(ownerId: string, appId: string): Promise<BuildJob>;
   claimNextBuildJob(workerId: string): Promise<BuildJob | null>;
   completeBuildJob(jobId: string, status: Exclude<BuildJobStatus, "queued" | "running">, error?: string | null): Promise<BuildJob | undefined>;
+  requeueBuildJob(jobId: string): Promise<BuildJob | undefined>;
   listBuildJobsForApp(appId: string): Promise<BuildJob[]>;
   updateAppBuild(id: string, patch: AppBuildPatch): Promise<App | undefined>;
 
@@ -413,6 +414,21 @@ export class MemStorage implements IStorage {
       ...existing,
       status,
       error: error ?? null,
+      updatedAt: new Date(),
+    };
+    this.buildJobs.set(jobId, updated);
+    return updated;
+  }
+
+  async requeueBuildJob(jobId: string): Promise<BuildJob | undefined> {
+    const job = this.buildJobs.get(jobId);
+    if (!job) return undefined;
+    const updated: BuildJob = {
+      ...job,
+      status: "queued",
+      lockToken: null,
+      lockedAt: null,
+      error: null,
       updatedAt: new Date(),
     };
     this.buildJobs.set(jobId, updated);

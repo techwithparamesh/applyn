@@ -326,7 +326,6 @@ async function handleAndroidBuild(job: any, app: any, pkg: string, versionCode: 
 
     if (!build.ok) {
       const msg = "Android build failed";
-      await storage.completeBuildJob(job.id, "failed", msg);
 
       if (job.attempts < maxBuildAttempts()) {
         await storage.updateAppBuild(app.id, {
@@ -338,10 +337,15 @@ async function handleAndroidBuild(job: any, app: any, pkg: string, versionCode: 
 
         const delay = retryBackoffMs(job.attempts);
         if (delay > 0) await new Promise((r) => setTimeout(r, delay));
-        await storage.enqueueBuildJob(app.ownerId, app.id);
+        
+        // Requeue the same job instead of creating a new one
+        await storage.requeueBuildJob(job.id);
+        console.log(`[Worker] Requeued job ${job.id} for retry (attempt ${job.attempts} of ${maxBuildAttempts()})`);
         return;
       }
 
+      // Max attempts reached - mark as failed permanently
+      await storage.completeBuildJob(job.id, "failed", msg);
       await storage.updateAppBuild(app.id, {
         status: "failed",
         buildError: msg,
@@ -390,8 +394,7 @@ async function handleAndroidBuild(job: any, app: any, pkg: string, versionCode: 
     await cleanupArtifactsForApp(app.id);
   } catch (err: any) {
     const msg = err?.message || String(err);
-
-    await storage.completeBuildJob(job.id, "failed", msg);
+    console.error(`[Worker] Build error for job ${job.id}:`, msg);
 
     if (job.attempts < maxBuildAttempts()) {
       await storage.updateAppBuild(app.id, {
@@ -403,10 +406,15 @@ async function handleAndroidBuild(job: any, app: any, pkg: string, versionCode: 
 
       const delay = retryBackoffMs(job.attempts);
       if (delay > 0) await new Promise((r) => setTimeout(r, delay));
-      await storage.enqueueBuildJob(app.ownerId, app.id);
+      
+      // Requeue the same job instead of creating a new one
+      await storage.requeueBuildJob(job.id);
+      console.log(`[Worker] Requeued job ${job.id} for retry (attempt ${job.attempts} of ${maxBuildAttempts()})`);
       return;
     }
 
+    // Max attempts reached - mark as failed permanently
+    await storage.completeBuildJob(job.id, "failed", msg);
     await storage.updateAppBuild(app.id, {
       status: "failed",
       buildError: msg,
