@@ -591,6 +591,16 @@ export default function CreateApp() {
                       <div className="pt-3">
                         <p className="text-xs text-muted-foreground mb-2">Icon background color:</p>
                         <div className="flex gap-2 flex-wrap">
+                          {/* None/Transparent option */}
+                          <div
+                            onClick={() => setFormData({ ...formData, iconColor: "" })}
+                            className={`h-8 w-8 rounded-lg cursor-pointer border-2 transition-all flex items-center justify-center bg-gradient-to-br from-gray-600 via-gray-500 to-gray-600 ${
+                              !formData.iconColor ? "border-cyan-500 scale-110 ring-2 ring-cyan-500/50" : "border-white/20 hover:scale-105"
+                            }`}
+                            title="None (transparent)"
+                          >
+                            <span className="text-[8px] text-white font-medium">None</span>
+                          </div>
                           {["#2563EB", "#16A34A", "#DC2626", "#9333EA", "#EA580C", "#000000", "#FFFFFF", "#1F2937"].map((color) => (
                             <div
                               key={color}
@@ -603,7 +613,7 @@ export default function CreateApp() {
                           ))}
                           <Input
                             type="color"
-                            value={formData.iconColor}
+                            value={formData.iconColor || "#2563EB"}
                             onChange={(e) => setFormData({ ...formData, iconColor: e.target.value })}
                             className="h-8 w-8 p-1 rounded-lg cursor-pointer bg-transparent border-white/20"
                           />

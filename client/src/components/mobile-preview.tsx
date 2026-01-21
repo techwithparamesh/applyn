@@ -68,7 +68,11 @@ export function MobilePreview({
             style={{ backgroundColor: primaryColor }}
           >
             <div className="text-white font-bold flex items-center gap-2 text-sm">
-              {icon && !icon.startsWith("http") && <span className="text-base">{icon}</span>}
+              {icon && (icon.startsWith("data:") || icon.startsWith("http")) ? (
+                <img src={icon} alt="App icon" className="w-6 h-6 rounded object-contain" />
+              ) : icon ? (
+                <span className="text-base">{icon}</span>
+              ) : null}
               <span className="truncate max-w-[180px]">{appName}</span>
             </div>
             <Menu className="w-5 h-5 text-white/80" />

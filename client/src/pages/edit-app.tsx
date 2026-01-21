@@ -288,6 +288,16 @@ export default function EditApp() {
                     <Label>Icon Background Color</Label>
                     <p className="text-xs text-muted-foreground mb-2">This color appears behind your logo/emoji on the app icon</p>
                     <div className="flex gap-2 flex-wrap">
+                      {/* None/Transparent option */}
+                      <div
+                        onClick={() => setFormData({ ...formData, iconColor: "" })}
+                        className={`h-10 w-10 rounded-lg cursor-pointer border-2 transition-all flex items-center justify-center bg-gradient-to-br from-gray-100 via-white to-gray-100 ${
+                          !formData.iconColor ? "border-primary scale-110 ring-2 ring-primary/50" : "border-slate-300"
+                        }`}
+                        title="None (transparent)"
+                      >
+                        <span className="text-xs text-gray-400 font-medium">None</span>
+                      </div>
                       {["#2563EB", "#16A34A", "#DC2626", "#9333EA", "#EA580C", "#0891B2", "#CA8A04", "#000000", "#FFFFFF", "#1F2937"].map(
                         (color) => (
                           <div
@@ -302,7 +312,7 @@ export default function EditApp() {
                       )}
                       <Input
                         type="color"
-                        value={formData.iconColor}
+                        value={formData.iconColor || "#2563EB"}
                         onChange={(e) => setFormData({ ...formData, iconColor: e.target.value })}
                         className="h-10 w-10 p-1 rounded-lg cursor-pointer"
                       />
