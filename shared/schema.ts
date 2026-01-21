@@ -37,7 +37,7 @@ export const appPlatformSchema = z.enum(["android", "ios", "both"]);
 export const insertAppSchema = z.object({
   name: z.string().min(2).max(200),
   url: z.string().url().max(2000),
-  icon: z.string().min(1).max(10).default("🚀"),
+  icon: z.string().max(10).default("🚀"), // Can be empty if user has custom logo
   iconUrl: z.string().max(500000).nullable().optional(), // base64 or URL
   iconColor: z.string().min(4).max(32).default("#2563EB").optional(), // Icon background color
   primaryColor: z.string().min(4).max(32).default("#2563EB"),
