@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { Navbar } from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,14 +6,15 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { MobilePreview } from "@/components/mobile-preview";
-import { ArrowRight, ArrowLeft, Loader2, Smartphone, Check, Palette, Globe, CreditCard, Upload, Image, Trash2, Sun, Moon, Sparkles, Lock, Crown, Zap, Download, X, Wand2 } from "lucide-react";
+import { DevicePreview } from "@/components/device-preview";
+import { ArrowRight, ArrowLeft, Loader2, Smartphone, Check, Palette, Globe, CreditCard, Upload, Image, Trash2, Sun, Moon, Sparkles, Lock, Crown, Zap, Download, X, Wand2, CheckCircle2, AlertCircle } from "lucide-react";
 import { useLocation, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { WebsiteAnalyzer, AppNameGenerator } from "@/components/ai-features";
+import { AppNameGenerator, useAIStatus } from "@/components/ai-features";
 
 declare global {
   interface Window {
@@ -178,6 +179,68 @@ export default function CreateApp() {
   
   // State for plan selection modal
   const [showPlanModal, setShowPlanModal] = useState(false);
+
+  // AI Status check
+  const { data: aiStatus } = useAIStatus();
+
+  // Auto-analysis state
+  const [websiteAnalysis, setWebsiteAnalysis] = useState<{
+    appName: string;
+    primaryColor: string;
+    isAppReady: boolean;
+    issues: string[];
+  } | null>(null);
+  const [analyzedUrl, setAnalyzedUrl] = useState<string>("");
+
+  // Auto-analyze mutation
+  const autoAnalyzeMutation = useMutation({
+    mutationFn: async (url: string) => {
+      const res = await apiRequest("POST", "/api/ai/analyze-website", { url });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Analysis failed");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setWebsiteAnalysis(data);
+      // Auto-apply detected values
+      setFormData(prev => ({
+        ...prev,
+        appName: data.appName || prev.appName,
+        primaryColor: data.primaryColor || prev.primaryColor,
+      }));
+      if (data.isAppReady) {
+        toast({
+          title: "✨ Website analyzed!",
+          description: "Colors and app name auto-detected.",
+        });
+      }
+    },
+    onError: () => {
+      // Silent fail for auto-analysis - don't annoy users
+      setWebsiteAnalysis(null);
+    },
+  });
+
+  // Debounced auto-analysis when URL changes
+  useEffect(() => {
+    if (!aiStatus?.available) return;
+    
+    const url = formData.url;
+    // Check if it's a valid URL and different from what we've analyzed
+    const isValidUrl = url.length > 10 && url.includes(".") && url.startsWith("http") && !url.endsWith("https://");
+    
+    if (!isValidUrl || url === analyzedUrl) return;
+
+    // Debounce: wait 1.5 seconds after user stops typing
+    const timeoutId = setTimeout(() => {
+      setAnalyzedUrl(url);
+      autoAnalyzeMutation.mutate(url);
+    }, 1500);
+
+    return () => clearTimeout(timeoutId);
+  }, [formData.url, aiStatus?.available, analyzedUrl]);
 
   // Check if resuming after login
   const isResuming = params.get("resume") === "true";
@@ -474,23 +537,39 @@ export default function CreateApp() {
                         placeholder="https://yourwebsite.com"
                         className="h-12 text-lg bg-white/5 border-white/10 focus:border-cyan-500/50 text-white rounded-lg"
                       />
-                      {/* AI Website Analyzer */}
-                      <WebsiteAnalyzer 
-                        url={formData.url}
-                        onAnalysisComplete={(analysis) => {
-                          setFormData(prev => ({
-                            ...prev,
-                            appName: analysis.appName || prev.appName,
-                            primaryColor: analysis.primaryColor || prev.primaryColor,
-                          }));
-                          toast({
-                            title: "Website Analyzed!",
-                            description: analysis.isAppReady 
-                              ? "Your website is ready for conversion." 
-                              : `Found ${analysis.issues.length} potential issues.`,
-                          });
-                        }}
-                      />
+                      {/* Auto-detection status */}
+                      {aiStatus?.available && formData.url.length > 10 && formData.url.includes(".") && (
+                        <div className="flex items-center gap-2 text-sm mt-2">
+                          {autoAnalyzeMutation.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+                              <span className="text-muted-foreground">Analyzing website colors...</span>
+                            </>
+                          ) : websiteAnalysis ? (
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-2">
+                                {websiteAnalysis.isAppReady ? (
+                                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                ) : (
+                                  <AlertCircle className="w-4 h-4 text-yellow-500" />
+                                )}
+                                <span className="text-muted-foreground">
+                                  {websiteAnalysis.isAppReady ? "Ready for app" : `${websiteAnalysis.issues.length} issue(s) found`}
+                                </span>
+                              </div>
+                              {websiteAnalysis.primaryColor && (
+                                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/5 border border-white/10">
+                                  <div 
+                                    className="w-3 h-3 rounded-full border border-white/20" 
+                                    style={{ backgroundColor: websiteAnalysis.primaryColor }}
+                                  />
+                                  <span className="text-xs text-muted-foreground">Color detected</span>
+                                </div>
+                              )}
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="appName" className="text-muted-foreground">App Name</Label>
@@ -945,11 +1024,23 @@ export default function CreateApp() {
         {/* Right Panel: Live Preview */}
         <div className="flex-1 order-1 lg:order-2 flex justify-center items-center lg:items-start pt-8">
           <div className="sticky top-24">
-            <MobilePreview
+            <DevicePreview
               url={formData.url}
               appName={formData.appName}
               primaryColor={formData.primaryColor}
-              icon={formData.icon}
+              icon={formData.customLogo || formData.icon}
+              availablePlatforms={
+                // Determine available platforms based on plan
+                selectedPlan === "starter" 
+                  ? ["android"] 
+                  : ["android", "ios"]
+              }
+              defaultPlatform={formData.platform === "ios" ? "ios" : "android"}
+              onPlatformChange={(platform) => {
+                // Update form data when platform changes
+                setFormData(prev => ({ ...prev, platform }));
+              }}
+              showToggle={true}
             />
           </div>
         </div>
