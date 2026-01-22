@@ -266,6 +266,8 @@ export class MemStorage implements IStorage {
       name: insertApp.name,
       url: insertApp.url,
       icon: insertApp.icon ?? "🚀",
+      iconUrl: insertApp.iconUrl ?? null,
+      iconColor: insertApp.iconColor ?? null,
       primaryColor: insertApp.primaryColor ?? "#2563EB",
       platform: insertApp.platform ?? "android",
       status: insertApp.status ?? "draft",

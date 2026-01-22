@@ -54,6 +54,7 @@ type AppItem = {
   status: "draft" | "processing" | "live" | "failed" | string;
   platform: "android" | "ios" | "both" | string;
   icon: string;
+  iconUrl?: string | null;
   primaryColor: string;
   packageName?: string | null;
   versionCode?: number | null;
@@ -617,10 +618,14 @@ export default function Dashboard() {
                   <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
                     <div className="flex items-center gap-3">
                       <div 
-                        className="h-12 w-12 rounded-xl flex items-center justify-center text-2xl"
+                        className="h-12 w-12 rounded-xl flex items-center justify-center text-2xl overflow-hidden"
                         style={{ backgroundColor: `${app.primaryColor}20` }}
                       >
-                        {app.icon}
+                        {app.iconUrl ? (
+                          <img src={app.iconUrl} alt={app.name} className="h-full w-full object-cover" />
+                        ) : (
+                          app.icon
+                        )}
                       </div>
                       <div>
                         <CardTitle className="text-base text-white">{app.name}</CardTitle>

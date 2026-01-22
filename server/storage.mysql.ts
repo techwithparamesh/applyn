@@ -204,6 +204,8 @@ export class MysqlStorage {
       name: app.name,
       url: app.url,
       icon: app.icon ?? "🚀",
+      iconUrl: app.iconUrl ?? null,
+      iconColor: app.iconColor ?? null,
       primaryColor: app.primaryColor ?? "#2563EB",
       platform: app.platform ?? "android",
       status: app.status ?? "draft",
