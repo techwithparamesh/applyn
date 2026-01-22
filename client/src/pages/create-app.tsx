@@ -120,6 +120,39 @@ const PLAN_FEATURES = {
     // Support
     rebuilds: 3,
   },
+  agency: {
+    platforms: ["android", "ios", "both"],
+    customLogo: true,
+    customColors: true,
+    customSplashImage: true,
+    statusBarCustomization: true,
+    // Native features - Full hybrid enhancements
+    nativeHeader: true,
+    pullToRefresh: true,
+    offlineScreen: true,
+    smartBackButton: true,
+    nativeLoadingProgress: true,
+    bottomNavigation: true,
+    deepLinking: true,
+    customNativeMenu: true,
+    // Push notifications
+    pushNotifications: true,
+    pushNotificationsIos: true,
+    // Builds
+    iosBuilds: true,
+    aabFormat: true,
+    apkFormat: true,
+    playStoreReady: true,
+    appStoreReady: true,
+    // Branding
+    whiteLabel: true,
+    // Support
+    rebuilds: 20,
+    // Agency extras
+    multiApp: true,
+    teamAccess: true,
+    priorityBuildQueue: true,
+  },
 };
 
 const PLANS = [
@@ -189,6 +222,29 @@ const PLANS = [
     label: "Brands & Agencies",
     recommended: false,
   },
+  {
+    id: "agency",
+    name: "Agency",
+    tagline: "Multi-App & Team",
+    price: 19999,
+    originalPrice: 24999,
+    features: [
+      "Everything in Pro",
+      "Up to 10 apps included",
+      "20 rebuilds per year",
+      "Multi-app dashboard",
+      "3 team member seats",
+      "Priority build queue",
+      "Dedicated account manager",
+      "Custom integrations",
+      "White-label for all apps",
+      "24/7 Priority support",
+    ],
+    limitations: [],
+    label: "Agencies & Enterprises",
+    recommended: false,
+    isAgency: true,
+  },
 ];
 
 export default function CreateApp() {
@@ -211,8 +267,8 @@ export default function CreateApp() {
   const urlFromQuery = params.get("url") || "";
   const planFromQuery = params.get("plan") || "pro";
 
-  const [selectedPlan, setSelectedPlan] = useState<"starter" | "standard" | "pro">(
-    ["starter", "standard", "pro"].includes(planFromQuery) ? planFromQuery as any : "pro"
+  const [selectedPlan, setSelectedPlan] = useState<"starter" | "standard" | "pro" | "agency">(
+    ["starter", "standard", "pro", "agency"].includes(planFromQuery) ? planFromQuery as any : "pro"
   );
 
   // Get current plan features
@@ -1240,7 +1296,7 @@ export default function CreateApp() {
 
       {/* Plan Selection Modal */}
       <Dialog open={showPlanModal} onOpenChange={setShowPlanModal}>
-        <DialogContent className="max-w-4xl bg-background border-white/10 max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl bg-background border-white/10 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-white flex items-center gap-2">
               <CreditCard className="h-6 w-6 text-cyan-400" />
@@ -1266,26 +1322,31 @@ export default function CreateApp() {
             </div>
           )}
 
-          <div className="grid md:grid-cols-3 gap-4 mt-4">
+          <div className="grid md:grid-cols-4 gap-3 mt-4">
             {PLANS.map((plan) => (
               <div
                 key={plan.id}
                 onClick={() => setSelectedPlan(plan.id as any)}
-                className={`border-2 rounded-xl p-5 relative overflow-hidden cursor-pointer transition-all flex flex-col ${
+                className={`border-2 rounded-xl p-4 relative overflow-hidden cursor-pointer transition-all flex flex-col ${
                   selectedPlan === plan.id
                     ? "border-cyan-500/50 bg-gradient-to-br from-cyan-500/10 to-purple-500/5 shadow-lg shadow-cyan-500/10"
                     : "border-white/10 bg-white/5 hover:border-white/20"
-                }`}
+                } ${(plan as any).isAgency ? "border-amber-500/30" : ""}`}
               >
                 {plan.recommended && (
                   <div className="absolute top-0 right-0 bg-gradient-to-r from-cyan-500 to-purple-500 text-white text-[10px] px-2 py-1 rounded-bl-xl font-semibold flex items-center gap-1">
                     <Crown className="h-3 w-3" /> BEST VALUE
                   </div>
                 )}
+                {(plan as any).isAgency && (
+                  <div className="absolute top-0 right-0 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] px-2 py-1 rounded-bl-xl font-semibold flex items-center gap-1">
+                    <Zap className="h-3 w-3" /> AGENCY
+                  </div>
+                )}
                 
                 {/* Header */}
-                <div className="text-center mb-4">
-                  <h3 className="font-bold text-lg text-white flex items-center justify-center gap-2">
+                <div className="text-center mb-3">
+                  <h3 className="font-bold text-base text-white flex items-center justify-center gap-2">
                     {plan.name}
                     {selectedPlan === plan.id && <Check className="h-4 w-4 text-cyan-400" />}
                   </h3>
@@ -1293,6 +1354,7 @@ export default function CreateApp() {
                     {plan.id === "starter" && "Android only"}
                     {plan.id === "standard" && "Android + iOS (Ad-Hoc)"}
                     {plan.id === "pro" && "Android + iOS (App Store Ready)"}
+                    {plan.id === "agency" && "Multi-App & Team"}
                   </p>
                   <div className="mt-3">
                     {isAdmin ? (
