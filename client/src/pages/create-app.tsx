@@ -665,6 +665,12 @@ export default function CreateApp() {
                             onChange={(e) => {
                               const file = e.target.files?.[0];
                               if (file) {
+                                // Check file size (max 5MB)
+                                if (file.size > 5 * 1024 * 1024) {
+                                  alert("Image too large. Maximum file size is 5MB. Please compress your image or use a smaller file.");
+                                  e.target.value = "";
+                                  return;
+                                }
                                 const reader = new FileReader();
                                 reader.onloadend = () => {
                                   setFormData({ ...formData, customLogo: reader.result as string, icon: "" });
@@ -703,7 +709,7 @@ export default function CreateApp() {
                             ) : (
                               <div className="text-center">
                                 <Upload className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-                                <p className="text-sm text-muted-foreground">Upload custom logo (512x512)</p>
+                                <p className="text-sm text-muted-foreground">Upload custom logo (512x512, max 5MB)</p>
                               </div>
                             )}
                           </div>
@@ -836,6 +842,12 @@ export default function CreateApp() {
                             onChange={(e) => {
                               const file = e.target.files?.[0];
                               if (file) {
+                                // Check file size (max 5MB)
+                                if (file.size > 5 * 1024 * 1024) {
+                                  alert("Image too large. Maximum file size is 5MB. Please compress your image or use a smaller file.");
+                                  e.target.value = "";
+                                  return;
+                                }
                                 const reader = new FileReader();
                                 reader.onloadend = () => setSplashImage(reader.result as string);
                                 reader.readAsDataURL(file);

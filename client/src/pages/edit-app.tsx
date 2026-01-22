@@ -199,6 +199,12 @@ export default function EditApp() {
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (file) {
+                            // Check file size (max 5MB)
+                            if (file.size > 5 * 1024 * 1024) {
+                              alert("Image too large. Maximum file size is 5MB. Please compress your image or use a smaller file.");
+                              e.target.value = "";
+                              return;
+                            }
                             const reader = new FileReader();
                             reader.onload = () => {
                               setFormData({ ...formData, customLogo: reader.result as string, icon: "" });
@@ -242,7 +248,7 @@ export default function EditApp() {
                             </div>
                             <div>
                               <p className="text-sm font-medium">Upload custom logo</p>
-                              <p className="text-xs text-muted-foreground">PNG or JPG, 512x512 recommended</p>
+                              <p className="text-xs text-muted-foreground">PNG or JPG, 512x512 recommended (max 5MB)</p>
                             </div>
                           </>
                         )}

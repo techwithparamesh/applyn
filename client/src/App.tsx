@@ -22,6 +22,7 @@ import Ops from "@/pages/ops";
 import Tickets from "@/pages/tickets";
 import EditApp from "@/pages/edit-app";
 import PushNotifications from "@/pages/push-notifications";
+import PreviewApp from "@/pages/preview-app";
 import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
 
@@ -47,6 +48,7 @@ function Router() {
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/apps/:id/edit" component={EditApp} />
       <Route path="/apps/:id/push" component={PushNotifications} />
+      <Route path="/apps/:id/preview" component={PreviewApp} />
       <Route component={NotFound} />
     </Switch>
   );

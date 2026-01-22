@@ -27,6 +27,7 @@ import {
   LifeBuoy,
   CreditCard,
   Wand2,
+  Eye,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -681,6 +682,9 @@ export default function Dashboard() {
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuSeparator className="bg-white/10" />
+                        <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/preview`)}>
+                          <Eye className="mr-2 h-4 w-4" /> Preview App
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/edit`)}>
                           Edit App
                         </DropdownMenuItem>
