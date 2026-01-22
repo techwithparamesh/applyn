@@ -127,8 +127,7 @@ class MainActivity : AppCompatActivity() {
         // WebViewClient for navigation handling
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                val url = request?.url?.toString() ?: return false
-                val uri = request.url ?: return false
+                val uri = request?.url ?: return false
                 return handleUrlLoading(uri)
             }
 
@@ -151,16 +150,18 @@ class MainActivity : AppCompatActivity() {
 
             override fun onReceivedError(
                 view: WebView?,
-                errorCode: Int,
-                description: String?,
-                failingUrl: String?
+                request: WebResourceRequest?,
+                error: android.webkit.WebResourceError?
             ) {
-                super.onReceivedError(view, errorCode, description, failingUrl)
-                progressBar.visibility = View.GONE
-                swipeRefresh.isRefreshing = false
-                
-                if (offlineScreenEnabled && !isNetworkAvailable()) {
-                    showOfflineScreen()
+                super.onReceivedError(view, request, error)
+                // Only handle errors for main frame
+                if (request?.isForMainFrame == true) {
+                    progressBar.visibility = View.GONE
+                    swipeRefresh.isRefreshing = false
+                    
+                    if (offlineScreenEnabled && !isNetworkAvailable()) {
+                        showOfflineScreen()
+                    }
                 }
             }
         }
