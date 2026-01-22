@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Mail, Phone, MapPin, Sparkles, Twitter, Github, Linkedin } from "lucide-react";
+import { Mail, Phone, MapPin, Sparkles } from "lucide-react";
 
 
 export function Footer() {
@@ -21,17 +21,6 @@ export function Footer() {
             <p className="text-sm text-muted-foreground leading-relaxed">
               Transform any website into a native mobile app in minutes. No coding required.
             </p>
-            <div className="flex gap-3 pt-2">
-              <a href="#" className="h-9 w-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-muted-foreground hover:text-white hover:bg-white/10 transition-colors">
-                <Twitter className="h-4 w-4" />
-              </a>
-              <a href="#" className="h-9 w-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-muted-foreground hover:text-white hover:bg-white/10 transition-colors">
-                <Github className="h-4 w-4" />
-              </a>
-              <a href="#" className="h-9 w-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-muted-foreground hover:text-white hover:bg-white/10 transition-colors">
-                <Linkedin className="h-4 w-4" />
-              </a>
-            </div>
           </div>
 
           <div>
@@ -40,7 +29,6 @@ export function Footer() {
               <li><Link href="/features" className="text-muted-foreground hover:text-white transition-colors">Features</Link></li>
               <li><Link href="/pricing" className="text-muted-foreground hover:text-white transition-colors">Pricing</Link></li>
               <li><Link href="/create" className="text-muted-foreground hover:text-white transition-colors">Convert URL</Link></li>
-              <li><a href="#" className="text-muted-foreground hover:text-white transition-colors">Showcase</a></li>
             </ul>
           </div>
 
