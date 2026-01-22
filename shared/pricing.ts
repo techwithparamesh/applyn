@@ -10,16 +10,17 @@
  * - Always allow renewal at any time
  * 
  * PRICING (per year):
- * - Starter: ₹1,999/year - Android Play Store ready, basic native shell
- * - Standard: ₹3,999/year - Smart Hybrid Native Layer, push notifications
- * - Pro: ₹6,999/year - Android + iOS, white-label, priority support
+ * - Starter: ₹1,999/year - 1 Android app, basic native shell
+ * - Standard: ₹3,999/year - 1 Android app, smart hybrid enhancements
+ * - Pro: ₹6,999/year - 1 Android + 1 iOS app, full features
+ * - Agency: ₹19,999/year - Up to 10 apps, team access
  */
 
 // ============================================
 // PLAN TYPES & DEFINITIONS
 // ============================================
 
-export type PlanId = "starter" | "standard" | "pro";
+export type PlanId = "starter" | "standard" | "pro" | "agency";
 export type PlanStatus = "active" | "expired" | "cancelled";
 
 export interface PlanDefinition {
@@ -30,6 +31,10 @@ export interface PlanDefinition {
   originalPrice?: number;     // For showing "was" price
   monthlyEquivalent: number;  // Price / 12 for display
   currency: "INR";
+  
+  // App limits
+  maxApps: number;            // Maximum apps allowed
+  maxTeamMembers: number;     // Team members allowed (Agency only)
   
   // Build outputs
   outputs: {
@@ -62,14 +67,18 @@ export interface PlanDefinition {
     customColors: boolean;
     customLogo: boolean;
     storeComplianceUpdates: boolean;
+    // Agency features
+    multiAppDashboard: boolean;
+    teamAccess: boolean;
+    priorityBuildQueue: boolean;
   };
   
   // Support
   support: {
-    type: "email" | "priority";
+    type: "email" | "priority" | "dedicated";
     responseTime: string;
     whatsappSupport: boolean;
-    fasterBuildQueue: boolean;    // Priority build queue for Pro
+    fasterBuildQueue: boolean;
   };
   
   // Rebuilds per year
@@ -78,6 +87,7 @@ export interface PlanDefinition {
   // Display
   cta: string;
   popular: boolean;
+  badge?: string;            // Special badge like "Best for Agencies"
   featureList: string[];
   restrictions: string[];
   label: string;
@@ -101,6 +111,9 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     originalPrice: 2499,
     monthlyEquivalent: 167,  // ~₹167/month
     currency: "INR",
+    
+    maxApps: 1,
+    maxTeamMembers: 1,
     
     outputs: {
       androidApk: false,       // No APK, only AAB for store
@@ -131,6 +144,10 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       customColors: true,          // Theme color
       customLogo: true,            // Custom app icon
       storeComplianceUpdates: true, // Android only
+      // Agency features - Not included
+      multiAppDashboard: false,
+      teamAccess: false,
+      priorityBuildQueue: false,
     },
     
     support: {
@@ -144,25 +161,21 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     cta: "Get Android App",
     popular: false,
     featureList: [
-      "Android Play Store ready",
-      "Signed AAB build",
-      "WebView + Basic Native Shell",
-      "Native header with theme color",
+      "1 Android App",
+      "Basic Native Shell",
       "Pull-to-refresh",
       "Offline screen",
-      "Smart back button handling",
+      "Smart back handling",
       "1 rebuild per year",
-      "Store compliance updates (Android)",
-      "Email support (72h response)",
+      "Store compliance updates",
+      "Email support (72h)",
     ],
     restrictions: [
       "❌ No push notifications",
       "❌ No native bottom navigation",
       "❌ No iOS build",
-      "❌ No white-label",
-      "❌ No priority support",
     ],
-    label: "Entry-level Android businesses",
+    label: "Entry-level Android",
   },
   
   /**
@@ -173,11 +186,14 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
   standard: {
     id: "standard",
     name: "Standard",
-    tagline: "Most Popular",
+    tagline: "Smart Hybrid Enhancements",
     price: 3999,
     originalPrice: 4999,
     monthlyEquivalent: 333,  // ~₹333/month
     currency: "INR",
+    
+    maxApps: 1,
+    maxTeamMembers: 1,
     
     outputs: {
       androidApk: true,        // APK for testing
@@ -208,6 +224,10 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       customColors: true,
       customLogo: true,
       storeComplianceUpdates: true,
+      // Agency features - Not included
+      multiAppDashboard: false,
+      teamAccess: false,
+      priorityBuildQueue: false,
     },
     
     support: {
@@ -221,25 +241,20 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     cta: "Get Hybrid Android App",
     popular: true,
     featureList: [
-      "Android APK + AAB (release signed)",
-      "✅ Play Store ready",
-      "WebView + Smart Hybrid Native Layer",
+      "1 Android App",
+      "Smart Hybrid Enhancements",
       "Native bottom navigation",
-      "Pull-to-refresh",
-      "Offline screen",
       "Push notifications (FCM)",
-      "Deep linking support",
-      "Native loading progress bar",
+      "Deep linking",
       "2 rebuilds per year",
       "Store compliance updates",
-      "Email support (48h response)",
+      "Email support (48h)",
     ],
     restrictions: [
       "❌ No iOS build",
       "❌ No white-label branding",
-      "❌ No WhatsApp priority support",
     ],
-    label: "Serious Android businesses",
+    label: "Most Popular",
   },
   
   /**
@@ -255,6 +270,9 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     originalPrice: 8999,
     monthlyEquivalent: 583,  // ~₹583/month
     currency: "INR",
+    
+    maxApps: 2,              // 1 Android + 1 iOS
+    maxTeamMembers: 1,
     
     outputs: {
       androidApk: true,
@@ -285,35 +303,111 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       customColors: true,
       customLogo: true,
       storeComplianceUpdates: true, // Android + iOS
+      // Agency features - Not included
+      multiAppDashboard: false,
+      teamAccess: false,
+      priorityBuildQueue: true,    // Priority build queue
     },
     
     support: {
       type: "priority",
       responseTime: "24 hours",
       whatsappSupport: true,
-      fasterBuildQueue: true,     // ✓ Priority build queue
+      fasterBuildQueue: true,
     },
     rebuildsPerYear: 3,
     
     cta: "Get Android + iOS App",
     popular: false,
     featureList: [
-      "Android APK + AAB",
-      "iOS IPA (App Store ready)",
-      "✅ Play Store & App Store ready",
-      "WebView + Full Native Hybrid Enhancements",
-      "Native bottom navigation",
+      "1 Android + 1 iOS App",
+      "Full Hybrid Enhancements",
       "Push notifications (FCM + APNs)",
-      "Deep linking",
-      "Custom native menu",
       "White-label branding",
       "3 rebuilds per year",
-      "Store compliance updates (Android + iOS)",
+      "Store compliance (Android + iOS)",
       "Priority WhatsApp support",
-      "Faster build queue",
     ],
     restrictions: [],
-    label: "Brands & Agencies",
+    label: "Brands & Businesses",
+  },
+  
+  /**
+   * AGENCY - ₹19,999/year
+   * Positioning: Digital Agencies & Resellers
+   * Multi-app dashboard, team access, priority queue
+   */
+  agency: {
+    id: "agency",
+    name: "Agency",
+    tagline: "Up to 10 Apps",
+    price: 19999,
+    originalPrice: 24999,
+    monthlyEquivalent: 1667, // ~₹1,667/month
+    currency: "INR",
+    
+    maxApps: 10,
+    maxTeamMembers: 3,
+    
+    outputs: {
+      androidApk: true,
+      androidAab: true,
+      iosIpa: true,
+      iosAppStore: true,
+    },
+    
+    features: {
+      playStoreReady: true,
+      appStoreReady: true,
+      // Native features - Full hybrid enhancements
+      nativeHeader: true,
+      pullToRefresh: true,
+      offlineScreen: true,
+      smartBackButton: true,
+      nativeLoadingProgress: true,
+      bottomNavigation: true,
+      deepLinking: true,
+      customNativeMenu: true,
+      // Push notifications - FCM + APNs
+      pushNotifications: true,
+      pushNotificationsIos: true,
+      // Branding
+      whiteLabel: true,
+      customBranding: true,
+      customSplash: true,
+      customColors: true,
+      customLogo: true,
+      storeComplianceUpdates: true,
+      // Agency features - All included
+      multiAppDashboard: true,
+      teamAccess: true,
+      priorityBuildQueue: true,
+    },
+    
+    support: {
+      type: "dedicated",
+      responseTime: "Same day",
+      whatsappSupport: true,
+      fasterBuildQueue: true,
+    },
+    rebuildsPerYear: 20,
+    
+    cta: "Start Agency Plan",
+    popular: false,
+    badge: "Best for Agencies",
+    featureList: [
+      "Up to 10 Apps",
+      "Android + iOS builds",
+      "Full Hybrid Enhancements",
+      "White-label branding",
+      "20 rebuilds per year",
+      "Priority build queue",
+      "Team access (up to 3 users)",
+      "Store compliance updates",
+      "Dedicated WhatsApp support",
+    ],
+    restrictions: [],
+    label: "Digital Agencies",
   },
 };
 
@@ -321,13 +415,42 @@ export const PLANS_LIST: PlanDefinition[] = [
   PLANS.starter,
   PLANS.standard,
   PLANS.pro,
+  PLANS.agency,
 ];
 
 // ============================================
-// EXTRA REBUILD PRICING
+// ADD-ON PRICING
 // ============================================
 
-export const EXTRA_REBUILD_PRICE = 499; // ₹499 per extra rebuild
+export const ADDONS = {
+  extraAppSlot: {
+    id: "extra_app_slot",
+    name: "Extra App Slot",
+    price: 1499,
+    description: "Add one more app to your plan",
+    perYear: true,
+  },
+  extraRebuildPack: {
+    id: "extra_rebuild_pack",
+    name: "Extra Rebuild Pack",
+    price: 2999,
+    description: "10 additional rebuilds",
+    quantity: 10,
+    perYear: false,
+  },
+  singleRebuild: {
+    id: "single_rebuild",
+    name: "Single Rebuild",
+    price: 499,
+    description: "One additional rebuild",
+    quantity: 1,
+    perYear: false,
+  },
+};
+
+export const EXTRA_REBUILD_PRICE = 499;       // ₹499 per single rebuild
+export const EXTRA_REBUILD_PACK_PRICE = 2999; // ₹2,999 for 10 rebuilds
+export const EXTRA_APP_SLOT_PRICE = 1499;     // ₹1,499 per extra app slot/year
 
 // ============================================
 // SUBSCRIPTION HELPERS
@@ -338,6 +461,20 @@ export const EXTRA_REBUILD_PRICE = 499; // ₹499 per extra rebuild
  */
 export function getRebuildsForPlan(planId: PlanId): number {
   return PLANS[planId]?.rebuildsPerYear || 1;
+}
+
+/**
+ * Get max apps allowed for a plan
+ */
+export function getMaxAppsForPlan(planId: PlanId): number {
+  return PLANS[planId]?.maxApps || 1;
+}
+
+/**
+ * Get max team members for a plan
+ */
+export function getMaxTeamMembersForPlan(planId: PlanId): number {
+  return PLANS[planId]?.maxTeamMembers || 1;
 }
 
 /**
@@ -392,7 +529,8 @@ export function canDownloadFormat(planId: string, format: "apk" | "aab" | "ipa")
 export function getMinimumPlanForFeature(feature: keyof PlanDefinition["features"]): PlanId {
   if (PLANS.starter.features[feature]) return "starter";
   if (PLANS.standard.features[feature]) return "standard";
-  return "pro";
+  if (PLANS.pro.features[feature]) return "pro";
+  return "agency";
 }
 
 export function getUpgradeMessage(currentPlan: string, requiredFeature: string): string {
@@ -403,7 +541,58 @@ export function getUpgradeMessage(currentPlan: string, requiredFeature: string):
   if (plan.id === "standard") {
     return `Upgrade to Pro to unlock ${requiredFeature}`;
   }
+  if (plan.id === "pro") {
+    return `Upgrade to Agency to unlock ${requiredFeature}`;
+  }
   return "";
+}
+
+/**
+ * Get all features allowed for a plan
+ */
+export function getAllowedFeatures(planId: PlanId): PlanDefinition["features"] {
+  return PLANS[planId]?.features || PLANS.starter.features;
+}
+
+// ============================================
+// APP LIMIT HELPERS
+// ============================================
+
+export interface AppLimitCheck {
+  allowed: boolean;
+  reason?: string;
+  currentCount: number;
+  maxAllowed: number;
+  canPurchaseSlot: boolean;
+}
+
+/**
+ * Check if user can create a new app based on their plan limits
+ */
+export function checkAppLimit(
+  planId: PlanId,
+  currentAppsCount: number,
+  extraAppSlots: number = 0
+): AppLimitCheck {
+  const plan = PLANS[planId];
+  const maxAllowed = plan.maxApps + extraAppSlots;
+  
+  if (currentAppsCount >= maxAllowed) {
+    return {
+      allowed: false,
+      reason: `You've reached your app limit (${maxAllowed}). Upgrade your plan or purchase an extra app slot.`,
+      currentCount: currentAppsCount,
+      maxAllowed,
+      canPurchaseSlot: true,
+    };
+  }
+  
+  return {
+    allowed: true,
+    currentCount: currentAppsCount,
+    maxAllowed,
+    canPurchaseSlot: currentAppsCount >= plan.maxApps,
+  };
 }
 
 // ============================================
@@ -541,7 +730,7 @@ export const PLAY_STORE_CHECKS = {
 };
 
 // ============================================
-// APP STORE REQUIREMENTS (iOS - Pro Plan)
+// APP STORE REQUIREMENTS (iOS - Pro/Agency Plan)
 // ============================================
 
 export const APP_STORE_CHECKS = {

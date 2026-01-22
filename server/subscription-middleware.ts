@@ -28,7 +28,7 @@
 
 import { Request, Response, NextFunction } from "express";
 import { User, PlanStatus, PlanId } from "@shared/schema";
-import { getPlan, getRebuildsForPlan, isSubscriptionActive, PlanDefinition } from "@shared/pricing";
+import { getPlan, getRebuildsForPlan, getMaxAppsForPlan, getMaxTeamMembersForPlan, isSubscriptionActive, PlanDefinition, checkAppLimit } from "@shared/pricing";
 
 // ============================================
 // TYPES
@@ -59,7 +59,10 @@ export type GatedFeature =
   | "whiteLabel"
   | "rebuild"
   | "newBuild"
-  | "supportTicket";
+  | "supportTicket"
+  | "multiAppDashboard"
+  | "teamAccess"
+  | "priorityBuildQueue";
 
 // ============================================
 // HELPER FUNCTIONS
@@ -284,6 +287,42 @@ export function checkPlanAccess(user: User, feature: GatedFeature): {
         };
       }
       break;
+      
+    case "multiAppDashboard":
+      if (!planDef.features.multiAppDashboard) {
+        return {
+          allowed: false,
+          reason: "Multi-app dashboard is only available with the Agency plan.",
+          requiredPlan: "agency",
+          currentPlan,
+          isExpired,
+        };
+      }
+      break;
+      
+    case "teamAccess":
+      if (!planDef.features.teamAccess) {
+        return {
+          allowed: false,
+          reason: "Team access is only available with the Agency plan.",
+          requiredPlan: "agency",
+          currentPlan,
+          isExpired,
+        };
+      }
+      break;
+      
+    case "priorityBuildQueue":
+      if (!planDef.features.priorityBuildQueue) {
+        return {
+          allowed: false,
+          reason: "Priority build queue requires Pro or Agency plan.",
+          requiredPlan: "pro",
+          currentPlan,
+          isExpired,
+        };
+      }
+      break;
   }
   
   return {
@@ -299,6 +338,8 @@ export function checkPlanAccess(user: User, feature: GatedFeature): {
 export function getAllowedFeatures(user: User): {
   plan: PlanId | null;
   isActive: boolean;
+  maxApps: number;
+  maxTeamMembers: number;
   features: {
     pushNotifications: boolean;
     bottomNavigation: boolean;
@@ -307,6 +348,9 @@ export function getAllowedFeatures(user: User): {
     nativeLoadingProgress: boolean;
     iosBuild: boolean;
     whiteLabel: boolean;
+    multiAppDashboard: boolean;
+    teamAccess: boolean;
+    priorityBuildQueue: boolean;
   };
 } {
   const info = getSubscriptionInfo(user);
@@ -315,6 +359,8 @@ export function getAllowedFeatures(user: User): {
     return {
       plan: info.plan,
       isActive: false,
+      maxApps: 0,
+      maxTeamMembers: 1,
       features: {
         pushNotifications: false,
         bottomNavigation: false,
@@ -323,6 +369,9 @@ export function getAllowedFeatures(user: User): {
         nativeLoadingProgress: false,
         iosBuild: false,
         whiteLabel: false,
+        multiAppDashboard: false,
+        teamAccess: false,
+        priorityBuildQueue: false,
       },
     };
   }
@@ -332,6 +381,8 @@ export function getAllowedFeatures(user: User): {
   return {
     plan: info.plan,
     isActive: true,
+    maxApps: planDef.maxApps + (user.extraAppSlots || 0),
+    maxTeamMembers: planDef.maxTeamMembers,
     features: {
       pushNotifications: planDef.features.pushNotifications,
       bottomNavigation: planDef.features.bottomNavigation,
@@ -340,6 +391,9 @@ export function getAllowedFeatures(user: User): {
       nativeLoadingProgress: planDef.features.nativeLoadingProgress,
       iosBuild: planDef.outputs.iosIpa,
       whiteLabel: planDef.features.whiteLabel,
+      multiAppDashboard: planDef.features.multiAppDashboard,
+      teamAccess: planDef.features.teamAccess,
+      priorityBuildQueue: planDef.features.priorityBuildQueue,
     },
   };
 }
@@ -411,6 +465,123 @@ export function canRequestRebuild(user: User): {
     allowed: true,
     remainingRebuilds: info.remainingRebuilds,
     subscriptionInfo: info,
+  };
+}
+
+// ============================================
+// APP LIMIT ENFORCEMENT
+// ============================================
+
+export interface AppLimitResult {
+  allowed: boolean;
+  reason?: string;
+  currentCount: number;
+  maxAllowed: number;
+  canPurchaseSlot: boolean;
+  plan: PlanId | null;
+}
+
+/**
+ * Check if user can create a new app based on their plan limits
+ */
+export function checkUserAppLimit(user: User, currentAppsCount: number): AppLimitResult {
+  const info = getSubscriptionInfo(user);
+  
+  // No plan = no apps allowed
+  if (!info.plan) {
+    return {
+      allowed: false,
+      reason: "No subscription found. Please subscribe to a plan to create apps.",
+      currentCount: currentAppsCount,
+      maxAllowed: 0,
+      canPurchaseSlot: false,
+      plan: null,
+    };
+  }
+  
+  // Expired plan = no new apps, but existing apps stay
+  if (!info.isActive) {
+    return {
+      allowed: false,
+      reason: "Your subscription has expired. Renew to create new apps.",
+      currentCount: currentAppsCount,
+      maxAllowed: 0,
+      canPurchaseSlot: false,
+      plan: info.plan,
+    };
+  }
+  
+  const planDef = getPlan(info.plan);
+  const extraSlots = user.extraAppSlots || 0;
+  const maxAllowed = planDef.maxApps + extraSlots;
+  
+  if (currentAppsCount >= maxAllowed) {
+    return {
+      allowed: false,
+      reason: `You've reached your app limit (${maxAllowed}). Upgrade your plan or purchase an extra app slot for ₹1,499/year.`,
+      currentCount: currentAppsCount,
+      maxAllowed,
+      canPurchaseSlot: true,
+      plan: info.plan,
+    };
+  }
+  
+  return {
+    allowed: true,
+    currentCount: currentAppsCount,
+    maxAllowed,
+    canPurchaseSlot: currentAppsCount >= planDef.maxApps,
+    plan: info.plan,
+  };
+}
+
+/**
+ * Check if user can add a team member (Agency plan feature)
+ */
+export function checkTeamMemberLimit(user: User): {
+  allowed: boolean;
+  reason?: string;
+  currentCount: number;
+  maxAllowed: number;
+} {
+  const info = getSubscriptionInfo(user);
+  
+  if (!info.plan || !info.isActive) {
+    return {
+      allowed: false,
+      reason: "Team access requires an active Agency plan.",
+      currentCount: user.teamMembers || 1,
+      maxAllowed: 1,
+    };
+  }
+  
+  const planDef = getPlan(info.plan);
+  
+  if (!planDef.features.teamAccess) {
+    return {
+      allowed: false,
+      reason: "Team access is only available with the Agency plan.",
+      currentCount: 1,
+      maxAllowed: 1,
+    };
+  }
+  
+  const currentMembers = user.teamMembers || 1;
+  const maxMembers = planDef.maxTeamMembers;
+  
+  if (currentMembers >= maxMembers) {
+    return {
+      allowed: false,
+      reason: `You've reached your team member limit (${maxMembers}).`,
+      currentCount: currentMembers,
+      maxAllowed: maxMembers,
+    };
+  }
+  
+  return {
+    allowed: true,
+    currentCount: currentMembers,
+    maxAllowed: maxMembers,
   };
 }
 
@@ -524,6 +695,8 @@ export function getSubscriptionActivationData(planId: PlanId, currentExpiryDate?
   const now = new Date();
   const expiryDate = calculateExpiryDate(currentExpiryDate);
   const rebuilds = getRebuildsForPlan(planId);
+  const maxApps = getMaxAppsForPlan(planId);
+  const maxTeamMembers = getMaxTeamMembersForPlan(planId);
   
   return {
     plan: planId,
@@ -531,6 +704,8 @@ export function getSubscriptionActivationData(planId: PlanId, currentExpiryDate?
     planStartDate: now,
     planExpiryDate: expiryDate,
     remainingRebuilds: rebuilds,
+    maxAppsAllowed: maxApps,
+    maxTeamMembers: maxTeamMembers,
   };
 }
 
@@ -539,4 +714,22 @@ export function getSubscriptionActivationData(planId: PlanId, currentExpiryDate?
  */
 export function decrementRebuilds(currentRebuilds: number): number {
   return Math.max(0, currentRebuilds - 1);
+}
+
+/**
+ * Get data for purchasing extra app slot add-on
+ */
+export function getExtraAppSlotData(currentSlots: number = 0) {
+  return {
+    extraAppSlots: currentSlots + 1,
+  };
+}
+
+/**
+ * Get data for purchasing extra rebuilds
+ */
+export function getExtraRebuildsData(currentRebuilds: number, quantity: number = 1) {
+  return {
+    remainingRebuilds: currentRebuilds + quantity,
+  };
 }

@@ -79,6 +79,8 @@ export interface IStorage {
     planExpiryDate: Date;
     remainingRebuilds: number;
     subscriptionId?: string;
+    maxAppsAllowed?: number;
+    maxTeamMembers?: number;
   }): Promise<User | undefined>;
   updateSubscriptionStatus(userId: string, status: string): Promise<User | undefined>;
   decrementRebuilds(userId: string): Promise<User | undefined>;
@@ -266,6 +268,8 @@ export class MemStorage implements IStorage {
       planExpiryDate: Date;
       remainingRebuilds: number;
       subscriptionId?: string;
+      maxAppsAllowed?: number;
+      maxTeamMembers?: number;
     }
   ): Promise<User | undefined> {
     const existing = this.users.get(userId);
@@ -278,6 +282,8 @@ export class MemStorage implements IStorage {
       planExpiryDate: data.planExpiryDate,
       remainingRebuilds: data.remainingRebuilds,
       subscriptionId: data.subscriptionId ?? null,
+      maxAppsAllowed: data.maxAppsAllowed ?? existing.maxAppsAllowed ?? 1,
+      maxTeamMembers: data.maxTeamMembers ?? existing.maxTeamMembers ?? 1,
       updatedAt: new Date(),
     };
     this.users.set(userId, updated);

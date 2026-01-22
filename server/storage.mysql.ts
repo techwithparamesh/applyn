@@ -145,19 +145,31 @@ export class MysqlStorage {
       planExpiryDate: Date;
       remainingRebuilds: number;
       subscriptionId?: string;
+      maxAppsAllowed?: number;
+      maxTeamMembers?: number;
     }
   ): Promise<User | undefined> {
+    const updateData: any = {
+      plan: data.plan,
+      planStatus: data.planStatus,
+      planStartDate: data.planStartDate,
+      planExpiryDate: data.planExpiryDate,
+      remainingRebuilds: data.remainingRebuilds,
+      subscriptionId: data.subscriptionId ?? null,
+      updatedAt: new Date(),
+    };
+    
+    // Only update maxAppsAllowed and maxTeamMembers if provided
+    if (data.maxAppsAllowed !== undefined) {
+      updateData.maxAppsAllowed = data.maxAppsAllowed;
+    }
+    if (data.maxTeamMembers !== undefined) {
+      updateData.maxTeamMembers = data.maxTeamMembers;
+    }
+    
     await getMysqlDb()
       .update(users)
-      .set({
-        plan: data.plan,
-        planStatus: data.planStatus,
-        planStartDate: data.planStartDate,
-        planExpiryDate: data.planExpiryDate,
-        remainingRebuilds: data.remainingRebuilds,
-        subscriptionId: data.subscriptionId ?? null,
-        updatedAt: new Date(),
-      })
+      .set(updateData)
       .where(eq(users.id, userId));
     return await this.getUser(userId);
   }

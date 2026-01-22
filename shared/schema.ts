@@ -17,7 +17,7 @@ export type UserRole = z.infer<typeof userRoleSchema>;
 export const planStatusSchema = z.enum(["active", "expired", "cancelled"]);
 export type PlanStatus = z.infer<typeof planStatusSchema>;
 
-export const planIdSchema = z.enum(["starter", "standard", "pro"]);
+export const planIdSchema = z.enum(["starter", "standard", "pro", "agency"]);
 export type PlanId = z.infer<typeof planIdSchema>;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -35,6 +35,13 @@ export type User = {
   planExpiryDate?: Date | null;
   remainingRebuilds?: number | null;
   subscriptionId?: string | null;  // Razorpay subscription ID
+  // App limit tracking
+  maxAppsAllowed?: number | null;    // From plan + purchased slots
+  currentAppsCount?: number | null;  // Current apps owned
+  extraAppSlots?: number | null;     // Purchased extra slots
+  // Team access (Agency plan)
+  teamMembers?: number | null;       // Current team members count
+  maxTeamMembers?: number | null;    // From plan
   createdAt: Date;
   updatedAt: Date;
 };

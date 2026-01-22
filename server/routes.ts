@@ -251,6 +251,12 @@ export async function registerRoutes(
 
       // Get plan details
       const planDetails = plan ? getPlan(plan as any) : null;
+      
+      // Get app count for limit info
+      const userApps = await storage.listAppsByOwner(freshUser.id);
+      const currentAppsCount = userApps.length;
+      const extraAppSlots = freshUser.extraAppSlots ?? 0;
+      const maxAppsAllowed = planDetails ? planDetails.maxApps + extraAppSlots : 0;
 
       return res.json({
         plan,
@@ -259,11 +265,20 @@ export async function registerRoutes(
         planExpiryDate,
         remainingRebuilds,
         daysUntilExpiry,
+        // App limits
+        currentAppsCount,
+        maxAppsAllowed,
+        extraAppSlots,
+        // Team limits (Agency)
+        teamMembers: freshUser.teamMembers ?? 1,
+        maxTeamMembers: planDetails?.maxTeamMembers ?? 1,
         planDetails: planDetails ? {
           name: planDetails.name,
           price: planDetails.price,
           monthlyEquivalent: planDetails.monthlyEquivalent,
           rebuildsPerYear: planDetails.rebuildsPerYear,
+          maxApps: planDetails.maxApps,
+          maxTeamMembers: planDetails.maxTeamMembers,
           features: planDetails.features,
         } : null,
         isActive: planStatus === "active",
@@ -516,6 +531,24 @@ export async function registerRoutes(
     try {
       const user = getAuthedUser(req);
       if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      // --- Enforce app limit based on plan (staff bypass) ---
+      if (!isStaff(user)) {
+        const { checkUserAppLimit } = await import("./subscription-middleware");
+        const userApps = await storage.listAppsByOwner(user.id);
+        const appLimitCheck = checkUserAppLimit(user, userApps.length);
+        
+        if (!appLimitCheck.allowed) {
+          return res.status(403).json({
+            message: appLimitCheck.reason,
+            code: "APP_LIMIT_REACHED",
+            currentApps: appLimitCheck.currentCount,
+            maxApps: appLimitCheck.maxAllowed,
+            canPurchaseSlot: appLimitCheck.canPurchaseSlot,
+            plan: appLimitCheck.plan,
+          });
+        }
+      }
 
       // Clients must not be able to set server-owned states like "live" / "failed".
       // Accept a simple buildNow flag instead.
@@ -847,25 +880,37 @@ export async function registerRoutes(
 
   // Plan pricing (in paise) - YEARLY SUBSCRIPTION MODEL
   const PLAN_PRICES: Record<string, number> = {
-    starter: 149900,   // ₹1,499/year - Android Play Store ready
-    standard: 299900,  // ₹2,999/year - Android APK + AAB + Push
-    pro: 599900,       // ₹5,999/year - Android + iOS + White-label
+    starter: 199900,   // ₹1,999/year - 1 Android app, basic native shell
+    standard: 399900,  // ₹3,999/year - 1 Android app, smart hybrid enhancements
+    pro: 699900,       // ₹6,999/year - 1 Android + 1 iOS app, full features
+    agency: 1999900,   // ₹19,999/year - Up to 10 apps, team access
   };
 
-  // Extra rebuild price
-  const EXTRA_REBUILD_PRICE = 49900; // ₹499 per extra rebuild
+  // Extra rebuild prices
+  const EXTRA_REBUILD_PRICE = 49900;      // ₹499 per single rebuild
+  const EXTRA_REBUILD_PACK_PRICE = 299900; // ₹2,999 for 10 rebuilds
+  const EXTRA_APP_SLOT_PRICE = 149900;     // ₹1,499 per extra app slot/year
 
   // Rebuilds per plan (yearly)
   const PLAN_REBUILDS: Record<string, number> = {
     starter: 1,
     standard: 2,
     pro: 3,
+    agency: 20,
+  };
+
+  // Max apps per plan
+  const PLAN_MAX_APPS: Record<string, number> = {
+    starter: 1,
+    standard: 1,
+    pro: 2,
+    agency: 10,
   };
 
   const createOrderSchema = z.object({
-    plan: z.enum(["starter", "standard", "pro"]),
+    plan: z.enum(["starter", "standard", "pro", "agency"]),
     appId: z.string().uuid().optional().nullable(),
-    type: z.enum(["subscription", "extra_rebuild"]).default("subscription"),
+    type: z.enum(["subscription", "extra_rebuild", "extra_rebuild_pack", "extra_app_slot"]).default("subscription"),
   }).strict();
 
   app.post("/api/payments/create-order", requireAuth, async (req, res, next) => {
@@ -885,7 +930,13 @@ export async function registerRoutes(
       
       if (type === "extra_rebuild") {
         amountInPaise = EXTRA_REBUILD_PRICE;
-        description = "Extra Rebuild";
+        description = "Extra Rebuild (1)";
+      } else if (type === "extra_rebuild_pack") {
+        amountInPaise = EXTRA_REBUILD_PACK_PRICE;
+        description = "Extra Rebuild Pack (10)";
+      } else if (type === "extra_app_slot") {
+        amountInPaise = EXTRA_APP_SLOT_PRICE;
+        description = "Extra App Slot";
       } else {
         amountInPaise = PLAN_PRICES[plan];
         if (!amountInPaise) {
@@ -953,7 +1004,7 @@ export async function registerRoutes(
   // --- Admin Payment Bypass ---
   // Allows admin users to create apps without payment and activates subscription
   const adminBypassSchema = z.object({
-    plan: z.enum(["starter", "standard", "pro"]),
+    plan: z.enum(["starter", "standard", "pro", "agency"]),
     appId: z.string().uuid(),
   }).strict();
 
@@ -987,6 +1038,7 @@ export async function registerRoutes(
         planStartDate: now,
         planExpiryDate: expiryDate,
         remainingRebuilds: PLAN_REBUILDS[plan] || 1,
+        maxAppsAllowed: PLAN_MAX_APPS[plan] || 1,
       });
 
       return res.json({ ok: true, payment, message: "Admin bypass - payment skipped, subscription activated" });
@@ -1042,13 +1094,23 @@ export async function registerRoutes(
       }
 
       // Handle subscription activation or extra rebuild
-      const plan = payment.plan as PlanId | "extra_rebuild";
+      const plan = payment.plan as PlanId | "extra_rebuild" | "extra_rebuild_pack" | "extra_app_slot";
       
       if (plan === "extra_rebuild") {
         // Add 1 rebuild to user's remaining rebuilds
         await storage.addRebuilds(user.id, 1);
         console.log(`[Payment Verify] Added 1 extra rebuild for user ${user.id}`);
-      } else if (plan === "starter" || plan === "standard" || plan === "pro") {
+      } else if (plan === "extra_rebuild_pack") {
+        // Add 10 rebuilds to user's remaining rebuilds
+        await storage.addRebuilds(user.id, 10);
+        console.log(`[Payment Verify] Added 10 extra rebuilds for user ${user.id}`);
+      } else if (plan === "extra_app_slot") {
+        // Add 1 extra app slot to user
+        const freshUser = await storage.getUser(user.id);
+        const currentSlots = freshUser?.extraAppSlots || 0;
+        await storage.updateUser(user.id, { extraAppSlots: currentSlots + 1 });
+        console.log(`[Payment Verify] Added 1 extra app slot for user ${user.id}, now has ${currentSlots + 1} extra slots`);
+      } else if (plan === "starter" || plan === "standard" || plan === "pro" || plan === "agency") {
         // Activate or extend subscription
         const now = new Date();
         
@@ -1074,6 +1136,7 @@ export async function registerRoutes(
           planStartDate: startDate,
           planExpiryDate: expiryDate,
           remainingRebuilds: PLAN_REBUILDS[plan] || 1,
+          maxAppsAllowed: PLAN_MAX_APPS[plan] || 1,
         });
         
         console.log(`[Payment Verify] Activated ${plan} subscription for user ${user.id} until ${expiryDate.toISOString()}`);
