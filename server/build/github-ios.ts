@@ -8,7 +8,14 @@ export interface GitHubIOSBuildConfig {
   appName: string;
   bundleId: string;
   websiteUrl: string;
+  primaryColor?: string;
   versionCode?: number;
+  // Native enhancement feature toggles
+  features?: {
+    bottomNav?: boolean;
+    pullToRefresh?: boolean;
+    offlineScreen?: boolean;
+  };
 }
 
 interface GitHubConfig {
@@ -52,6 +59,8 @@ export async function triggerIOSBuild(config: GitHubIOSBuildConfig): Promise<{
   const url = `https://api.github.com/repos/${gh.owner}/${gh.repo}/actions/workflows/ios-build.yml/dispatches`;
 
   try {
+    const features = config.features || { bottomNav: false, pullToRefresh: true, offlineScreen: true };
+    
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -67,8 +76,11 @@ export async function triggerIOSBuild(config: GitHubIOSBuildConfig): Promise<{
           app_name: config.appName,
           bundle_id: config.bundleId,
           website_url: config.websiteUrl,
+          primary_color: config.primaryColor || '#2563EB',
           version_code: String(config.versionCode || 1),
           callback_url: gh.callbackUrl,
+          // Feature flags as JSON string for GitHub Actions
+          features: JSON.stringify(features),
         },
       }),
     });

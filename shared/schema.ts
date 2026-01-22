@@ -13,6 +13,13 @@ export const insertUserSchema = z.object({
 export const userRoleSchema = z.enum(["admin", "support", "user"]);
 export type UserRole = z.infer<typeof userRoleSchema>;
 
+// Subscription status for yearly renewal model
+export const planStatusSchema = z.enum(["active", "expired", "cancelled"]);
+export type PlanStatus = z.infer<typeof planStatusSchema>;
+
+export const planIdSchema = z.enum(["starter", "standard", "pro"]);
+export type PlanId = z.infer<typeof planIdSchema>;
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = {
   id: string;
@@ -21,6 +28,13 @@ export type User = {
   role: UserRole;
   googleId?: string | null;
   password: string;
+  // Subscription fields for yearly renewal model
+  plan?: PlanId | null;
+  planStatus?: PlanStatus | null;
+  planStartDate?: Date | null;
+  planExpiryDate?: Date | null;
+  remainingRebuilds?: number | null;
+  subscriptionId?: string | null;  // Razorpay subscription ID
   createdAt: Date;
   updatedAt: Date;
 };
@@ -34,6 +48,15 @@ export const appStatusSchema = z.enum([
 
 export const appPlatformSchema = z.enum(["android", "ios", "both"]);
 
+// Native enhancement features schema
+export const appFeaturesSchema = z.object({
+  bottomNav: z.boolean().optional().default(false),
+  pullToRefresh: z.boolean().optional().default(true),
+  offlineScreen: z.boolean().optional().default(true),
+}).optional();
+
+export type AppFeatures = z.infer<typeof appFeaturesSchema>;
+
 export const insertAppSchema = z.object({
   name: z.string().min(2).max(200),
   url: z.string().url().max(2000),
@@ -43,6 +66,7 @@ export const insertAppSchema = z.object({
   primaryColor: z.string().min(4).max(32).default("#2563EB"),
   platform: appPlatformSchema.default("android"),
   status: appStatusSchema.default("draft"),
+  features: appFeaturesSchema.optional(), // Native enhancement features
 });
 
 export type InsertApp = z.infer<typeof insertAppSchema>;
@@ -57,6 +81,7 @@ export type App = {
   primaryColor: string;
   platform: z.infer<typeof appPlatformSchema>;
   status: z.infer<typeof appStatusSchema>;
+  features?: AppFeatures | null; // Native enhancement features
   packageName?: string | null;
   versionCode?: number | null;
   artifactPath?: string | null;

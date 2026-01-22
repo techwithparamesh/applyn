@@ -9,6 +9,9 @@ import { storage } from "./storage";
 import { generateAndroidWrapperProject } from "./build/android-wrapper";
 import { runDockerGradleBuild } from "./build/docker-gradle";
 import { triggerIOSBuild } from "./build/github-ios";
+import { getPlan, PlanId } from "@shared/pricing";
+import { getAllowedFeatures } from "./subscription-middleware";
+import { User } from "@shared/schema";
 
 function artifactsRoot() {
   return process.env.ARTIFACTS_DIR || path.resolve(process.cwd(), "artifacts");
@@ -108,6 +111,36 @@ async function cleanupArtifactsForApp(appId: string) {
   }
 }
 
+/**
+ * Get features allowed for a user based on their plan
+ * Used during build to enable/disable native features
+ */
+function getPlanBasedFeatures(user: User | null, appFeatures: any) {
+  // If no user (shouldn't happen), use app's stored features
+  if (!user || !user.plan) {
+    return appFeatures || {
+      bottomNav: false,
+      pullToRefresh: true,
+      offlineScreen: true,
+    };
+  }
+  
+  const planDef = getPlan(user.plan as PlanId);
+  
+  // Apply plan-based restrictions:
+  // - Starter: No push, no bottom nav, no native progress
+  // - Standard: Push + bottom nav + deep linking
+  // - Pro: All features
+  return {
+    bottomNav: planDef.features.bottomNavigation && (appFeatures?.bottomNav ?? false),
+    pullToRefresh: planDef.features.pullToRefresh && (appFeatures?.pullToRefresh ?? true),
+    offlineScreen: planDef.features.offlineScreen && (appFeatures?.offlineScreen ?? true),
+    nativeLoadingProgress: planDef.features.nativeLoadingProgress,
+    deepLinking: planDef.features.deepLinking,
+    pushNotifications: planDef.features.pushNotifications,
+  };
+}
+
 export async function handleOneJob(workerId: string) {
   let job;
   try {
@@ -129,13 +162,36 @@ export async function handleOneJob(workerId: string) {
       return;
     }
 
+    // Fetch the app owner to check their plan
+    const owner = await storage.getUser(app.ownerId);
+    
     console.log(`[Worker] Building app: ${app.name} (${app.id})`);
+    console.log(`[Worker] Owner plan: ${owner?.plan || 'none'}`);
 
     const platform = (app as any).platform || "android";
     const pkg = app.packageName || safePackageName(app.id);
     const versionCode = (app.versionCode ?? 0) + 1;
 
+    // Get plan-based feature restrictions
+    const features = getPlanBasedFeatures(owner || null, (app as any).features);
+    
     console.log(`[Worker] Platform: ${platform}, Package: ${pkg}, Version: ${versionCode}`);
+    console.log(`[Worker] Features:`, features);
+
+    // Check iOS build permission for Pro plan only
+    if ((platform === "ios" || platform === "both") && owner) {
+      const planDef = getPlan((owner.plan as PlanId) || "starter");
+      if (!planDef.outputs.iosIpa) {
+        console.log(`[Worker] iOS build not allowed for plan: ${owner.plan}`);
+        await storage.updateAppBuild(app.id, {
+          status: "failed",
+          buildError: "iOS builds require Pro plan. Please upgrade to access iOS builds.",
+          lastBuildAt: new Date(),
+        });
+        await storage.completeBuildJob(job.id, "failed", "iOS builds require Pro plan");
+        return;
+      }
+    }
 
     await storage.updateAppBuild(app.id, {
       status: "processing",
@@ -146,6 +202,9 @@ export async function handleOneJob(workerId: string) {
     });
 
     console.log(`[Worker] Updated app status to processing`);
+
+    // Store computed features for build
+    (app as any).computedFeatures = features;
 
     // Route to the appropriate build handler based on platform
     if (platform === "ios") {
@@ -193,7 +252,13 @@ async function handleIOSBuild(job: any, app: any, pkg: string, versionCode: numb
       appName: app.name,
       bundleId: pkg,
       websiteUrl: app.url,
+      primaryColor: app.primaryColor,
       versionCode,
+      features: (app as any).features || {
+        bottomNav: false,
+        pullToRefresh: true,
+        offlineScreen: true,
+      },
     });
 
     if (result.success) {
@@ -236,7 +301,13 @@ async function triggerIOSBuildAsync(app: any, pkg: string, versionCode: number) 
       appName: app.name,
       bundleId: pkg,
       websiteUrl: app.url,
+      primaryColor: app.primaryColor,
       versionCode,
+      features: (app as any).features || {
+        bottomNav: false,
+        pullToRefresh: true,
+        offlineScreen: true,
+      },
     });
     console.log(`[iOS] Triggered build for app ${app.id}`);
   } catch (err) {
@@ -313,6 +384,12 @@ async function handleAndroidBuild(job: any, app: any, pkg: string, versionCode: 
         packageName: pkg,
         versionCode,
         iconUrl: (app as any).iconUrl || null,
+        // Use computed features (plan-restricted)
+        features: (app as any).computedFeatures || {
+          bottomNav: false,
+          pullToRefresh: true,
+          offlineScreen: true,
+        },
       },
       workDir,
     );

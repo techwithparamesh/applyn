@@ -10,9 +10,16 @@ export interface IOSBuildConfig {
   appName: string;
   packageName: string; // Bundle identifier like com.example.app
   websiteUrl: string;
+  primaryColor?: string; // Hex color for app theme
   versionCode?: number;
   onesignalAppId?: string;
   appIconEmoji?: string;
+  // Native enhancement feature toggles
+  features?: {
+    bottomNav?: boolean;
+    pullToRefresh?: boolean;
+    offlineScreen?: boolean;
+  };
 }
 
 /**
@@ -92,11 +99,23 @@ export async function generateIOSProject(
 
   // Replace placeholders
   const versionCode = config.versionCode || 1;
+  const primaryColor = config.primaryColor || '#2563EB';
+  const features = {
+    pullToRefresh: config.features?.pullToRefresh ?? true,
+    offlineScreen: config.features?.offlineScreen ?? true,
+    bottomNav: config.features?.bottomNav ?? false,
+  };
   
   replaceInDirectory(outputPath, '__APP_NAME__', config.appName);
   replaceInDirectory(outputPath, '__BUNDLE_ID__', config.packageName);
   replaceInDirectory(outputPath, '__WEBSITE_URL__', config.websiteUrl);
   replaceInDirectory(outputPath, '__VERSION_CODE__', versionCode.toString());
+  replaceInDirectory(outputPath, '__PRIMARY_COLOR__', primaryColor);
+  
+  // Feature flags for Swift (true/false as strings)
+  replaceInDirectory(outputPath, '__PULL_TO_REFRESH_ENABLED__', String(features.pullToRefresh));
+  replaceInDirectory(outputPath, '__OFFLINE_SCREEN_ENABLED__', String(features.offlineScreen));
+  replaceInDirectory(outputPath, '__BOTTOM_NAV_ENABLED__', String(features.bottomNav));
 
   // Handle OneSignal if configured
   if (config.onesignalAppId) {

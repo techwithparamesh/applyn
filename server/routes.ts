@@ -17,7 +17,7 @@ import {
   type User,
   userRoleSchema,
 } from "@shared/schema";
-import { getPlan, PLANS } from "@shared/pricing";
+import { getPlan, PLANS, type PlanId } from "@shared/pricing";
 import { storage } from "./storage";
 import { hashPassword, sanitizeUser, verifyPassword } from "./auth";
 import { sendPasswordResetEmail, isEmailConfigured } from "./email";
@@ -223,6 +223,56 @@ export async function registerRoutes(
     const user = getAuthedUser(req);
     if (!user) return res.status(401).json({ message: "Unauthorized" });
     return res.json(sanitizeUser(user));
+  });
+
+  // --- Subscription Status Endpoint ---
+  app.get("/api/subscription", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      // Fetch fresh user data to get subscription info
+      const freshUser = await storage.getUser(user.id);
+      if (!freshUser) return res.status(404).json({ message: "User not found" });
+
+      const plan = freshUser.plan || null;
+      const planStatus = freshUser.planStatus || null;
+      const planStartDate = freshUser.planStartDate || null;
+      const planExpiryDate = freshUser.planExpiryDate || null;
+      const remainingRebuilds = freshUser.remainingRebuilds ?? 0;
+
+      // Calculate days until expiry
+      let daysUntilExpiry: number | null = null;
+      if (planExpiryDate) {
+        const now = new Date();
+        const expiry = new Date(planExpiryDate);
+        daysUntilExpiry = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      }
+
+      // Get plan details
+      const planDetails = plan ? getPlan(plan as any) : null;
+
+      return res.json({
+        plan,
+        planStatus,
+        planStartDate,
+        planExpiryDate,
+        remainingRebuilds,
+        daysUntilExpiry,
+        planDetails: planDetails ? {
+          name: planDetails.name,
+          price: planDetails.price,
+          monthlyEquivalent: planDetails.monthlyEquivalent,
+          rebuildsPerYear: planDetails.rebuildsPerYear,
+          features: planDetails.features,
+        } : null,
+        isActive: planStatus === "active",
+        isExpired: planStatus === "expired",
+        needsRenewal: daysUntilExpiry !== null && daysUntilExpiry <= 7,
+      });
+    } catch (err) {
+      return next(err);
+    }
   });
 
   app.post("/api/contact", contactLimiter, async (req, res, next) => {
@@ -795,16 +845,27 @@ export async function registerRoutes(
     return !!(razorpayKeyId && razorpayKeySecret);
   }
 
-  // Plan pricing (in paise)
+  // Plan pricing (in paise) - YEARLY SUBSCRIPTION MODEL
   const PLAN_PRICES: Record<string, number> = {
-    starter: 49900,    // ₹499 - Android only
-    standard: 149900,  // ₹1,499 - Android + iOS
-    pro: 299900,       // ₹2,999 - Full package with App Store ready
+    starter: 149900,   // ₹1,499/year - Android Play Store ready
+    standard: 299900,  // ₹2,999/year - Android APK + AAB + Push
+    pro: 599900,       // ₹5,999/year - Android + iOS + White-label
+  };
+
+  // Extra rebuild price
+  const EXTRA_REBUILD_PRICE = 49900; // ₹499 per extra rebuild
+
+  // Rebuilds per plan (yearly)
+  const PLAN_REBUILDS: Record<string, number> = {
+    starter: 1,
+    standard: 2,
+    pro: 3,
   };
 
   const createOrderSchema = z.object({
     plan: z.enum(["starter", "standard", "pro"]),
     appId: z.string().uuid().optional().nullable(),
+    type: z.enum(["subscription", "extra_rebuild"]).default("subscription"),
   }).strict();
 
   app.post("/api/payments/create-order", requireAuth, async (req, res, next) => {
@@ -816,21 +877,34 @@ export async function registerRoutes(
         return res.status(503).json({ message: "Payment gateway not configured" });
       }
 
-      const { plan, appId } = createOrderSchema.parse(req.body);
-      const amountInPaise = PLAN_PRICES[plan];
-      if (!amountInPaise) {
-        return res.status(400).json({ message: "Invalid plan" });
+      const { plan, appId, type } = createOrderSchema.parse(req.body);
+      
+      // Determine amount based on type
+      let amountInPaise: number;
+      let description: string;
+      
+      if (type === "extra_rebuild") {
+        amountInPaise = EXTRA_REBUILD_PRICE;
+        description = "Extra Rebuild";
+      } else {
+        amountInPaise = PLAN_PRICES[plan];
+        if (!amountInPaise) {
+          return res.status(400).json({ message: "Invalid plan" });
+        }
+        description = `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan - Yearly`;
       }
 
       // Create Razorpay order via API
       const orderPayload = {
         amount: amountInPaise,
         currency: "INR",
-        receipt: `app_${appId || "new"}_${Date.now()}`,
+        receipt: `${type}_${plan}_${Date.now()}`,
         notes: {
           userId: user.id,
           plan,
           appId: appId || "",
+          type,
+          description,
         },
       };
 
@@ -858,7 +932,7 @@ export async function registerRoutes(
         provider: "razorpay",
         providerOrderId: rzpOrder.id,
         amountInr: amountInPaise / 100,
-        plan,
+        plan: type === "extra_rebuild" ? "extra_rebuild" : plan,
       });
 
       return res.json({
@@ -868,6 +942,8 @@ export async function registerRoutes(
         keyId: razorpayKeyId,
         paymentId: payment.id,
         plan,
+        type,
+        description,
       });
     } catch (err) {
       return next(err);
@@ -875,7 +951,7 @@ export async function registerRoutes(
   });
 
   // --- Admin Payment Bypass ---
-  // Allows admin users to create apps without payment
+  // Allows admin users to create apps without payment and activates subscription
   const adminBypassSchema = z.object({
     plan: z.enum(["starter", "standard", "pro"]),
     appId: z.string().uuid(),
@@ -900,7 +976,20 @@ export async function registerRoutes(
       // Mark as completed immediately
       await storage.updatePaymentStatus(payment.id, "completed", `admin_${user.id}_${Date.now()}`);
 
-      return res.json({ ok: true, payment, message: "Admin bypass - payment skipped" });
+      // Activate subscription for admin
+      const now = new Date();
+      const expiryDate = new Date(now);
+      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      
+      await storage.activateSubscription(user.id, {
+        plan,
+        planStatus: "active",
+        planStartDate: now,
+        planExpiryDate: expiryDate,
+        remainingRebuilds: PLAN_REBUILDS[plan] || 1,
+      });
+
+      return res.json({ ok: true, payment, message: "Admin bypass - payment skipped, subscription activated" });
     } catch (err) {
       return next(err);
     }
@@ -950,6 +1039,44 @@ export async function registerRoutes(
       const payment = await storage.updatePaymentStatus(paymentId, "completed", razorpay_payment_id);
       if (!payment) {
         return res.status(404).json({ message: "Payment record not found" });
+      }
+
+      // Handle subscription activation or extra rebuild
+      const plan = payment.plan as PlanId | "extra_rebuild";
+      
+      if (plan === "extra_rebuild") {
+        // Add 1 rebuild to user's remaining rebuilds
+        await storage.addRebuilds(user.id, 1);
+        console.log(`[Payment Verify] Added 1 extra rebuild for user ${user.id}`);
+      } else if (plan === "starter" || plan === "standard" || plan === "pro") {
+        // Activate or extend subscription
+        const now = new Date();
+        
+        // If user already has an active subscription that hasn't expired yet,
+        // extend from the current expiry date, otherwise start from now
+        const freshUser = await storage.getUser(user.id);
+        let startDate = now;
+        let expiryDate = new Date(now);
+        
+        if (freshUser?.planExpiryDate && freshUser.planStatus === "active") {
+          const currentExpiry = new Date(freshUser.planExpiryDate);
+          if (currentExpiry > now) {
+            // Extend from current expiry
+            expiryDate = new Date(currentExpiry);
+          }
+        }
+        
+        expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+        
+        await storage.activateSubscription(user.id, {
+          plan,
+          planStatus: "active",
+          planStartDate: startDate,
+          planExpiryDate: expiryDate,
+          remainingRebuilds: PLAN_REBUILDS[plan] || 1,
+        });
+        
+        console.log(`[Payment Verify] Activated ${plan} subscription for user ${user.id} until ${expiryDate.toISOString()}`);
       }
 
       return res.json({ ok: true, payment });

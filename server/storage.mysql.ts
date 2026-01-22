@@ -129,6 +129,143 @@ export class MysqlStorage {
     return await this.getUser(userId);
   }
 
+  // ============================================
+  // SUBSCRIPTION MANAGEMENT
+  // ============================================
+
+  /**
+   * Activate or renew a user's subscription
+   */
+  async activateSubscription(
+    userId: string,
+    data: {
+      plan: string;
+      planStatus: string;
+      planStartDate: Date;
+      planExpiryDate: Date;
+      remainingRebuilds: number;
+      subscriptionId?: string;
+    }
+  ): Promise<User | undefined> {
+    await getMysqlDb()
+      .update(users)
+      .set({
+        plan: data.plan,
+        planStatus: data.planStatus,
+        planStartDate: data.planStartDate,
+        planExpiryDate: data.planExpiryDate,
+        remainingRebuilds: data.remainingRebuilds,
+        subscriptionId: data.subscriptionId ?? null,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+    return await this.getUser(userId);
+  }
+
+  /**
+   * Update subscription status (for expiry or cancellation)
+   */
+  async updateSubscriptionStatus(userId: string, status: string): Promise<User | undefined> {
+    await getMysqlDb()
+      .update(users)
+      .set({
+        planStatus: status,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+    return await this.getUser(userId);
+  }
+
+  /**
+   * Decrement remaining rebuilds
+   */
+  async decrementRebuilds(userId: string): Promise<User | undefined> {
+    await getMysqlDb()
+      .update(users)
+      .set({
+        remainingRebuilds: sql`GREATEST(0, remaining_rebuilds - 1)`,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+    return await this.getUser(userId);
+  }
+
+  /**
+   * Add extra rebuilds (for purchased rebuilds)
+   */
+  async addRebuilds(userId: string, count: number): Promise<User | undefined> {
+    await getMysqlDb()
+      .update(users)
+      .set({
+        remainingRebuilds: sql`remaining_rebuilds + ${count}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+    return await this.getUser(userId);
+  }
+
+  /**
+   * Get users with expiring subscriptions (for renewal reminders)
+   */
+  async getUsersWithExpiringSubscriptions(daysUntilExpiry: number): Promise<User[]> {
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + daysUntilExpiry);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const rows = await getMysqlDb()
+      .select()
+      .from(users)
+      .where(
+        and(
+          eq(users.planStatus, "active"),
+          sql`plan_expiry_date > ${today}`,
+          sql`plan_expiry_date <= ${futureDate}`
+        )
+      );
+    return rows as unknown as User[];
+  }
+
+  /**
+   * Get users with expired subscriptions (for status update)
+   */
+  async getUsersWithExpiredSubscriptions(): Promise<User[]> {
+    const now = new Date();
+    
+    const rows = await getMysqlDb()
+      .select()
+      .from(users)
+      .where(
+        and(
+          eq(users.planStatus, "active"),
+          sql`plan_expiry_date < ${now}`
+        )
+      );
+    return rows as unknown as User[];
+  }
+
+  /**
+   * Bulk update expired subscriptions
+   */
+  async expireSubscriptions(): Promise<number> {
+    const now = new Date();
+    
+    const result = await getMysqlDb()
+      .update(users)
+      .set({
+        planStatus: "expired",
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(users.planStatus, "active"),
+          sql`plan_expiry_date < ${now}`
+        )
+      );
+    
+    return (result as any)?.rowsAffected ?? (result as any)?.affectedRows ?? 0;
+  }
+
   async linkGoogleId(userId: string, googleId: string): Promise<User | undefined> {
     await getMysqlDb()
       .update(users)
@@ -158,6 +295,7 @@ export class MysqlStorage {
       primaryColor: apps.primaryColor,
       platform: apps.platform,
       status: apps.status,
+      features: apps.features,
       packageName: apps.packageName,
       versionCode: apps.versionCode,
       artifactPath: apps.artifactPath,
@@ -171,18 +309,26 @@ export class MysqlStorage {
     };
   }
 
+  // Parse features JSON from database row
+  private parseAppRow(row: any): App {
+    return {
+      ...row,
+      features: row.features ? JSON.parse(row.features) : null,
+    } as App;
+  }
+
   async listAppsByOwner(ownerId: string): Promise<App[]> {
     const rows = await getMysqlDb()
       .select(this.getAppColumns())
       .from(apps)
       .where(eq(apps.ownerId, ownerId))
       .orderBy(desc(apps.updatedAt));
-    return rows as unknown as App[];
+    return rows.map(row => this.parseAppRow(row));
   }
 
   async listAppsAll(): Promise<App[]> {
     const rows = await getMysqlDb().select(this.getAppColumns()).from(apps).orderBy(desc(apps.updatedAt));
-    return rows as unknown as App[];
+    return rows.map(row => this.parseAppRow(row));
   }
 
   async getApp(id: string): Promise<App | undefined> {
@@ -191,7 +337,7 @@ export class MysqlStorage {
       .from(apps)
       .where(eq(apps.id, id))
       .limit(1);
-    return rows[0] as unknown as App;
+    return rows[0] ? this.parseAppRow(rows[0]) : undefined;
   }
 
   async createApp(ownerId: string, app: InsertApp): Promise<App> {
@@ -209,6 +355,7 @@ export class MysqlStorage {
       primaryColor: app.primaryColor ?? "#2563EB",
       platform: app.platform ?? "android",
       status: app.status ?? "draft",
+      features: app.features ? JSON.stringify(app.features) : null,
       createdAt: now,
       updatedAt: now,
     });

@@ -71,6 +71,22 @@ export interface IStorage {
   clearResetToken(userId: string): Promise<User | undefined>;
   setEmailVerified(userId: string, verified: boolean): Promise<User | undefined>;
 
+  // Subscription management (yearly renewal model)
+  activateSubscription(userId: string, data: {
+    plan: string;
+    planStatus: string;
+    planStartDate: Date;
+    planExpiryDate: Date;
+    remainingRebuilds: number;
+    subscriptionId?: string;
+  }): Promise<User | undefined>;
+  updateSubscriptionStatus(userId: string, status: string): Promise<User | undefined>;
+  decrementRebuilds(userId: string): Promise<User | undefined>;
+  addRebuilds(userId: string, count: number): Promise<User | undefined>;
+  getUsersWithExpiringSubscriptions(daysUntilExpiry: number): Promise<User[]>;
+  getUsersWithExpiredSubscriptions(): Promise<User[]>;
+  expireSubscriptions(): Promise<number>;
+
   // Admin use-cases
   listUsers(): Promise<Array<Omit<User, "password">>>;
 
@@ -237,6 +253,113 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
+  // ============================================
+  // SUBSCRIPTION MANAGEMENT (In-Memory)
+  // ============================================
+
+  async activateSubscription(
+    userId: string,
+    data: {
+      plan: string;
+      planStatus: string;
+      planStartDate: Date;
+      planExpiryDate: Date;
+      remainingRebuilds: number;
+      subscriptionId?: string;
+    }
+  ): Promise<User | undefined> {
+    const existing = this.users.get(userId);
+    if (!existing) return undefined;
+    const updated: any = {
+      ...existing,
+      plan: data.plan,
+      planStatus: data.planStatus,
+      planStartDate: data.planStartDate,
+      planExpiryDate: data.planExpiryDate,
+      remainingRebuilds: data.remainingRebuilds,
+      subscriptionId: data.subscriptionId ?? null,
+      updatedAt: new Date(),
+    };
+    this.users.set(userId, updated);
+    return updated;
+  }
+
+  async updateSubscriptionStatus(userId: string, status: string): Promise<User | undefined> {
+    const existing = this.users.get(userId);
+    if (!existing) return undefined;
+    const updated: any = {
+      ...existing,
+      planStatus: status,
+      updatedAt: new Date(),
+    };
+    this.users.set(userId, updated);
+    return updated;
+  }
+
+  async decrementRebuilds(userId: string): Promise<User | undefined> {
+    const existing = this.users.get(userId);
+    if (!existing) return undefined;
+    const current = (existing as any).remainingRebuilds || 0;
+    const updated: any = {
+      ...existing,
+      remainingRebuilds: Math.max(0, current - 1),
+      updatedAt: new Date(),
+    };
+    this.users.set(userId, updated);
+    return updated;
+  }
+
+  async addRebuilds(userId: string, count: number): Promise<User | undefined> {
+    const existing = this.users.get(userId);
+    if (!existing) return undefined;
+    const current = (existing as any).remainingRebuilds || 0;
+    const updated: any = {
+      ...existing,
+      remainingRebuilds: current + count,
+      updatedAt: new Date(),
+    };
+    this.users.set(userId, updated);
+    return updated;
+  }
+
+  async getUsersWithExpiringSubscriptions(daysUntilExpiry: number): Promise<User[]> {
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + daysUntilExpiry);
+    const today = new Date();
+    
+    return Array.from(this.users.values()).filter((user: any) => {
+      if (user.planStatus !== "active" || !user.planExpiryDate) return false;
+      return user.planExpiryDate > today && user.planExpiryDate <= futureDate;
+    });
+  }
+
+  async getUsersWithExpiredSubscriptions(): Promise<User[]> {
+    const now = new Date();
+    return Array.from(this.users.values()).filter((user: any) => {
+      if (user.planStatus !== "active" || !user.planExpiryDate) return false;
+      return user.planExpiryDate < now;
+    });
+  }
+
+  async expireSubscriptions(): Promise<number> {
+    const now = new Date();
+    let count = 0;
+    
+    for (const [id, user] of this.users.entries()) {
+      const u = user as any;
+      if (u.planStatus === "active" && u.planExpiryDate && u.planExpiryDate < now) {
+        this.users.set(id, {
+          ...user,
+          planStatus: "expired",
+          updatedAt: new Date(),
+        } as any);
+        count++;
+      }
+    }
+    
+    return count;
+  }
+
   async listUsers(): Promise<Array<Omit<User, "password">>> {
     return Array.from(this.users.values())
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
@@ -271,6 +394,7 @@ export class MemStorage implements IStorage {
       primaryColor: insertApp.primaryColor ?? "#2563EB",
       platform: insertApp.platform ?? "android",
       status: insertApp.status ?? "draft",
+      features: insertApp.features ?? null,
       createdAt: now,
       updatedAt: now,
     };

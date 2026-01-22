@@ -1,3 +1,24 @@
 <resources>
-  <string name="app_name">__APP_NAME__</string>
+    <!-- App Info -->
+    <string name="app_name">__APP_NAME__</string>
+    
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_back">Back</string>
+    <string name="nav_forward">Forward</string>
+    <string name="nav_reload">Reload</string>
+    
+    <!-- Offline Screen -->
+    <string name="offline">Offline</string>
+    <string name="offline_title">You\'re Offline</string>
+    <string name="offline_message">Please check your internet connection and try again.</string>
+    <string name="retry">Retry</string>
+    
+    <!-- Error Messages -->
+    <string name="error_loading">Failed to load page</string>
+    <string name="no_app_found">No app found to handle this link</string>
+    
+    <!-- Accessibility -->
+    <string name="loading">Loading…</string>
+    <string name="content_description_webview">App content</string>
 </resources>

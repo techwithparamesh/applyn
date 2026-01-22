@@ -37,6 +37,12 @@ export type AndroidWrapperConfig = {
   versionCode: number;
   iconUrl?: string | null; // Custom icon as base64 data URL or http URL
   onesignalAppId?: string; // Optional OneSignal App ID for push notifications
+  // Native enhancement feature toggles
+  features?: {
+    bottomNav?: boolean;
+    pullToRefresh?: boolean;
+    offlineScreen?: boolean;
+  };
 };
 
 function escapeXml(value: string) {
@@ -61,6 +67,28 @@ function sanitizeHexColor(value: string) {
   const v = (value || "").trim();
   if (/^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(v)) return v;
   return "#2563EB";
+}
+
+/**
+ * Darken a hex color by a percentage
+ */
+function darkenColor(hex: string, percent: number): string {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const r = Math.max(0, (num >> 16) - Math.round(255 * (percent / 100)));
+  const g = Math.max(0, ((num >> 8) & 0x00FF) - Math.round(255 * (percent / 100)));
+  const b = Math.max(0, (num & 0x0000FF) - Math.round(255 * (percent / 100)));
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+}
+
+/**
+ * Lighten a hex color by a percentage
+ */
+function lightenColor(hex: string, percent: number): string {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const r = Math.min(255, (num >> 16) + Math.round(255 * (percent / 100)));
+  const g = Math.min(255, ((num >> 8) & 0x00FF) + Math.round(255 * (percent / 100)));
+  const b = Math.min(255, (num & 0x0000FF) + Math.round(255 * (percent / 100)));
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
 }
 
 function sanitizeForFileName(input: string) {
@@ -239,33 +267,58 @@ export async function generateAndroidWrapperProject(
   await fs.cp(templateDir, projectDir, { recursive: true });
 
   const onesignalId = config.onesignalAppId || process.env.ONESIGNAL_APP_ID || "";
+  
+  // Feature flags with defaults
+  const features = {
+    bottomNav: config.features?.bottomNav ?? false,
+    pullToRefresh: config.features?.pullToRefresh ?? true,
+    offlineScreen: config.features?.offlineScreen ?? true,
+  };
+
+  // Derive dark primary color (for status bar)
+  const primaryColor = sanitizeHexColor(config.primaryColor);
+  const primaryColorDark = darkenColor(primaryColor, 20);
+  const primaryColorLight = lightenColor(primaryColor, 20);
 
   const common = {
     "__PACKAGE_NAME__": config.packageName,
     "__PACKAGE_PATH__": config.packageName.replace(/\./g, path.sep),
     "__VERSION_CODE__": String(config.versionCode),
+    "__VERSION_NAME__": `1.0.${config.versionCode}`,
     "__ONESIGNAL_APP_ID__": onesignalId,
+    // Feature flags as boolean strings for Kotlin
+    "__PULL_REFRESH_ENABLED__": String(features.pullToRefresh),
+    "__BOTTOM_NAV_ENABLED__": String(features.bottomNav),
+    "__OFFLINE_SCREEN_ENABLED__": String(features.offlineScreen),
   };
 
   const xmlReplacements = {
     ...common,
     "__APP_NAME__": escapeXml(config.appName),
     "__START_URL__": escapeXml(config.startUrl),
-    "__PRIMARY_COLOR__": escapeXml(sanitizeHexColor(config.primaryColor)),
+    "__PRIMARY_COLOR__": escapeXml(primaryColor),
+    "__PRIMARY_COLOR_DARK__": escapeXml(primaryColorDark),
+    "__PRIMARY_COLOR_LIGHT__": escapeXml(primaryColorLight),
+    // Visibility attributes for XML
+    "__HEADER_VISIBILITY__": "gone", // Can be "visible" or "gone"
+    "__BOTTOM_NAV_VISIBILITY__": features.bottomNav ? "visible" : "gone",
+    "__PULL_REFRESH_ENABLED__": features.pullToRefresh ? "true" : "false",
   };
 
   const kotlinReplacements = {
     ...common,
     "__APP_NAME__": escapeKotlinString(config.appName),
     "__START_URL__": escapeKotlinString(config.startUrl),
-    "__PRIMARY_COLOR__": sanitizeHexColor(config.primaryColor),
+    "__PRIMARY_COLOR__": primaryColor,
+    "__PRIMARY_COLOR_DARK__": primaryColorDark,
+    "__PRIMARY_COLOR_LIGHT__": primaryColorLight,
   };
 
   const gradleReplacements = {
     ...common,
     "__APP_NAME__": config.appName,
     "__START_URL__": config.startUrl,
-    "__PRIMARY_COLOR__": sanitizeHexColor(config.primaryColor),
+    "__PRIMARY_COLOR__": primaryColor,
   };
 
   // Fix placeholder folder name

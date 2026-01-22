@@ -2,7 +2,7 @@
  * Applyn Pricing Page
  * 
  * Displays the three pricing tiers with clear feature differentiation.
- * Emphasizes one-time payment model and Play Store / App Store readiness.
+ * Yearly subscription model with rebuild limits.
  */
 
 import { Navbar } from "@/components/layout/navbar";
@@ -20,8 +20,9 @@ import {
   Play,
   Crown,
   Star,
-  Gift,
+  RefreshCw,
   Lock,
+  Calendar,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
@@ -74,16 +75,16 @@ export default function Pricing() {
                 {/* Trust Badges */}
                 <div className="flex flex-wrap justify-center gap-3 mb-8">
                   <Badge variant="outline" className="px-3 py-1.5 gap-2 border-green-500/30 text-green-400">
-                    <Gift className="w-4 h-4" />
-                    One-Time Payment
+                    <Calendar className="w-4 h-4" />
+                    Yearly Plans
                   </Badge>
                   <Badge variant="outline" className="px-3 py-1.5 gap-2 border-cyan-500/30 text-cyan-400">
-                    <Shield className="w-4 h-4" />
-                    No Monthly Fees
+                    <RefreshCw className="w-4 h-4" />
+                    Free Rebuilds Included
                   </Badge>
                   <Badge variant="outline" className="px-3 py-1.5 gap-2 border-purple-500/30 text-purple-400">
-                    <Star className="w-4 h-4" />
-                    Own Your App Forever
+                    <Shield className="w-4 h-4" />
+                    Store Compliance Updates
                   </Badge>
                 </div>
 
@@ -96,8 +97,8 @@ export default function Pricing() {
                   <span className="text-gradient">Perfect Plan</span>
                 </h1>
                 <p className="text-lg text-muted-foreground mt-6 max-w-2xl mx-auto">
-                  Pay once, own your app files forever. No recurring fees. 
-                  Perfect for Indian startups, businesses, and agencies.
+                  Affordable yearly subscriptions with free rebuilds, store compliance updates, 
+                  and priority support. Perfect for Indian startups, businesses, and agencies.
                 </p>
               </motion.div>
               
@@ -171,21 +172,21 @@ export default function Pricing() {
               <h3 className="text-xl font-bold text-white text-center mb-8">Common Questions</h3>
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="p-4 rounded-xl border border-white/10 bg-white/5">
-                  <h4 className="font-semibold text-white mb-2">What's the difference between APK and AAB?</h4>
+                  <h4 className="font-semibold text-white mb-2">What's included in yearly subscription?</h4>
                   <p className="text-sm text-muted-foreground">
-                    APK is for direct installation. AAB (Android App Bundle) is required by Google Play Store for publishing.
+                    Each plan includes free rebuilds, store compliance updates, and priority support for one year.
                   </p>
                 </div>
                 <div className="p-4 rounded-xl border border-white/10 bg-white/5">
-                  <h4 className="font-semibold text-white mb-2">Can I upgrade later?</h4>
+                  <h4 className="font-semibold text-white mb-2">What happens after subscription expires?</h4>
                   <p className="text-sm text-muted-foreground">
-                    Yes! You can upgrade anytime. Only pay the difference between plans.
+                    Your existing apps continue working. You just can't rebuild or modify them until you renew.
                   </p>
                 </div>
                 <div className="p-4 rounded-xl border border-white/10 bg-white/5">
-                  <h4 className="font-semibold text-white mb-2">What does "App Store ready" mean?</h4>
+                  <h4 className="font-semibold text-white mb-2">Can I purchase extra rebuilds?</h4>
                   <p className="text-sm text-muted-foreground">
-                    Your app will be properly signed and formatted for Apple App Store submission (Pro plan).
+                    Yes! Extra rebuilds are available for ₹499 each if you need more than your plan includes.
                   </p>
                 </div>
                 <div className="p-4 rounded-xl border border-white/10 bg-white/5">
@@ -257,7 +258,20 @@ function PricingCard({ plan, delay, onSelect }: PricingCardProps) {
             </span>
           )}
         </div>
-        <span className="text-sm text-muted-foreground">one-time payment</span>
+        <div className="flex flex-col">
+          <span className="text-sm text-muted-foreground">per year</span>
+          {plan.monthlyEquivalent && (
+            <span className="text-xs text-cyan-400">~₹{plan.monthlyEquivalent}/month</span>
+          )}
+        </div>
+      </div>
+
+      {/* Rebuilds Badge */}
+      <div className="flex gap-2 mb-4">
+        <Badge variant="outline" className="gap-1 border-purple-500/30 text-purple-400">
+          <RefreshCw className="w-3 h-3" />
+          {plan.rebuildsPerYear} Rebuild{plan.rebuildsPerYear > 1 ? 's' : ''}/Year
+        </Badge>
       </div>
 
       {/* Platform Badges */}
@@ -316,12 +330,10 @@ function PricingCard({ plan, delay, onSelect }: PricingCardProps) {
         {plan.cta}
       </Button>
 
-      {/* Rebuilds Info */}
-      {plan.rebuilds.count > 0 && (
-        <p className="text-xs text-center text-muted-foreground mt-3">
-          Includes {plan.rebuilds.count} free rebuild{plan.rebuilds.count > 1 ? 's' : ''} within {plan.rebuilds.windowDays} days
-        </p>
-      )}
+      {/* Subscription Info */}
+      <p className="text-xs text-center text-muted-foreground mt-3">
+        Renews yearly • Cancel anytime
+      </p>
     </motion.div>
   );
 }

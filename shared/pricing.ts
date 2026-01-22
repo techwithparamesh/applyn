@@ -1,8 +1,18 @@
 /**
  * Applyn Pricing & Plan Configuration
  * 
- * This file contains all pricing plans, feature gates, and build validation rules.
- * ONE-TIME PAYMENT model - no subscriptions.
+ * YEARLY RENEWAL MODEL - Annual App License with renewal logic.
+ * All plans require yearly renewal for continued updates and support.
+ * 
+ * IMPORTANT BUSINESS RULES:
+ * - Apps continue working even if subscription expires
+ * - Only rebuilds, updates, and support are blocked when expired
+ * - Always allow renewal at any time
+ * 
+ * PRICING (per year):
+ * - Starter: ₹1,999/year - Android Play Store ready, basic native shell
+ * - Standard: ₹3,999/year - Smart Hybrid Native Layer, push notifications
+ * - Pro: ₹6,999/year - Android + iOS, white-label, priority support
  */
 
 // ============================================
@@ -10,13 +20,15 @@
 // ============================================
 
 export type PlanId = "starter" | "standard" | "pro";
+export type PlanStatus = "active" | "expired" | "cancelled";
 
 export interface PlanDefinition {
   id: PlanId;
   name: string;
   tagline: string;
-  price: number;
-  originalPrice?: number; // For showing "was" price
+  price: number;              // Yearly price in INR
+  originalPrice?: number;     // For showing "was" price
+  monthlyEquivalent: number;  // Price / 12 for display
   currency: "INR";
   
   // Build outputs
@@ -27,106 +39,72 @@ export interface PlanDefinition {
     iosAppStore: boolean;     // App Store ready (vs Ad-Hoc)
   };
   
-  // Features
+  // Features - Native Enhancement Layer
   features: {
     playStoreReady: boolean;
     appStoreReady: boolean;
-    pushNotifications: boolean;
+    // Native features
+    nativeHeader: boolean;        // Native header with theme color
+    pullToRefresh: boolean;       // Swipe down to refresh
+    offlineScreen: boolean;       // Offline fallback screen
+    smartBackButton: boolean;     // Smart back button handling
+    nativeLoadingProgress: boolean; // Native loading progress bar
+    bottomNavigation: boolean;    // Native bottom navigation
+    deepLinking: boolean;         // Deep linking support
+    customNativeMenu: boolean;    // Custom native menu items
+    // Push notifications
+    pushNotifications: boolean;   // FCM for Android
+    pushNotificationsIos: boolean; // APNs for iOS
+    // Branding
     whiteLabel: boolean;
     customBranding: boolean;
     customSplash: boolean;
     customColors: boolean;
     customLogo: boolean;
+    storeComplianceUpdates: boolean;
   };
   
-  // Support & rebuilds
+  // Support
   support: {
-    type: "community" | "email" | "priority";
-    responseTime?: string;
+    type: "email" | "priority";
+    responseTime: string;
     whatsappSupport: boolean;
+    fasterBuildQueue: boolean;    // Priority build queue for Pro
   };
-  rebuilds: {
-    count: number;
-    windowDays: number;
-  };
+  
+  // Rebuilds per year
+  rebuildsPerYear: number;
   
   // Display
   cta: string;
   popular: boolean;
   featureList: string[];
   restrictions: string[];
-  label: string; // e.g., "Preview build – Not eligible for Play Store"
+  label: string;
 }
 
 // ============================================
-// PLAN CONFIGURATIONS
+// YEARLY PLAN CONFIGURATIONS
 // ============================================
 
 export const PLANS: Record<PlanId, PlanDefinition> = {
+  /**
+   * STARTER - ₹1,999/year
+   * Positioning: Entry-level Android businesses
+   * Basic native shell without advanced features
+   */
   starter: {
     id: "starter",
     name: "Starter",
-    tagline: "Preview & Learning",
-    price: 499,
-    originalPrice: 699,
-    currency: "INR",
-    
-    outputs: {
-      androidApk: true,
-      androidAab: false,
-      iosIpa: false,
-      iosAppStore: false,
-    },
-    
-    features: {
-      playStoreReady: false,
-      appStoreReady: false,
-      pushNotifications: false,
-      whiteLabel: false,
-      customBranding: false,
-      customSplash: true, // Basic branded splash
-      customColors: false, // Presets only
-      customLogo: false,
-    },
-    
-    support: {
-      type: "community",
-      whatsappSupport: false,
-    },
-    rebuilds: {
-      count: 0,
-      windowDays: 0,
-    },
-    
-    cta: "Get Preview Build",
-    popular: false,
-    featureList: [
-      "Android APK (preview build)",
-      "WebView app wrapper",
-      "Branded splash screen",
-      "Preset color themes",
-      "Community support",
-    ],
-    restrictions: [
-      "❌ NOT Play Store ready",
-      "❌ No AAB format",
-      "❌ No iOS build",
-      "❌ No rebuilds",
-    ],
-    label: "Preview build – Not eligible for Play Store submission",
-  },
-  
-  standard: {
-    id: "standard",
-    name: "Standard",
-    tagline: "Android Production",
+    tagline: "Android Play Store Ready",
     price: 1999,
     originalPrice: 2499,
+    monthlyEquivalent: 167,  // ~₹167/month
     currency: "INR",
     
     outputs: {
-      androidApk: true,
-      androidAab: true,
+      androidApk: false,       // No APK, only AAB for store
+      androidAab: true,        // Signed AAB for Play Store
       iosIpa: false,
       iosAppStore: false,
     },
@@ -134,49 +112,148 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     features: {
       playStoreReady: true,
       appStoreReady: false,
-      pushNotifications: true,
+      // Native features - Basic shell only
+      nativeHeader: true,          // ✓ Native header with theme color
+      pullToRefresh: true,         // ✓ Pull-to-refresh
+      offlineScreen: true,         // ✓ Offline screen
+      smartBackButton: true,       // ✓ Smart back button handling
+      nativeLoadingProgress: false, // ✗ No native progress bar
+      bottomNavigation: false,     // ✗ No bottom nav
+      deepLinking: false,          // ✗ No deep linking
+      customNativeMenu: false,     // ✗ No custom menu
+      // Push notifications - Not included
+      pushNotifications: false,
+      pushNotificationsIos: false,
+      // Branding
+      whiteLabel: false,
+      customBranding: false,
+      customSplash: true,          // Basic splash
+      customColors: true,          // Theme color
+      customLogo: true,            // Custom app icon
+      storeComplianceUpdates: true, // Android only
+    },
+    
+    support: {
+      type: "email",
+      responseTime: "72 hours",
+      whatsappSupport: false,
+      fasterBuildQueue: false,
+    },
+    rebuildsPerYear: 1,
+    
+    cta: "Get Android App",
+    popular: false,
+    featureList: [
+      "Android Play Store ready",
+      "Signed AAB build",
+      "WebView + Basic Native Shell",
+      "Native header with theme color",
+      "Pull-to-refresh",
+      "Offline screen",
+      "Smart back button handling",
+      "1 rebuild per year",
+      "Store compliance updates (Android)",
+      "Email support (72h response)",
+    ],
+    restrictions: [
+      "❌ No push notifications",
+      "❌ No native bottom navigation",
+      "❌ No iOS build",
+      "❌ No white-label",
+      "❌ No priority support",
+    ],
+    label: "Entry-level Android businesses",
+  },
+  
+  /**
+   * STANDARD - ₹3,999/year (Most Popular)
+   * Positioning: Serious Android businesses
+   * Smart Hybrid Native Layer with push notifications
+   */
+  standard: {
+    id: "standard",
+    name: "Standard",
+    tagline: "Most Popular",
+    price: 3999,
+    originalPrice: 4999,
+    monthlyEquivalent: 333,  // ~₹333/month
+    currency: "INR",
+    
+    outputs: {
+      androidApk: true,        // APK for testing
+      androidAab: true,        // AAB for Play Store
+      iosIpa: false,
+      iosAppStore: false,
+    },
+    
+    features: {
+      playStoreReady: true,
+      appStoreReady: false,
+      // Native features - Full Android native layer
+      nativeHeader: true,
+      pullToRefresh: true,
+      offlineScreen: true,
+      smartBackButton: true,
+      nativeLoadingProgress: true, // ✓ Native loading progress bar
+      bottomNavigation: true,      // ✓ Native bottom navigation
+      deepLinking: true,           // ✓ Deep linking support
+      customNativeMenu: false,     // ✗ Pro only
+      // Push notifications - FCM only
+      pushNotifications: true,     // ✓ FCM for Android
+      pushNotificationsIos: false,
+      // Branding
       whiteLabel: false,
       customBranding: true,
       customSplash: true,
       customColors: true,
       customLogo: true,
+      storeComplianceUpdates: true,
     },
     
     support: {
       type: "email",
       responseTime: "48 hours",
       whatsappSupport: false,
+      fasterBuildQueue: false,
     },
-    rebuilds: {
-      count: 1,
-      windowDays: 30,
-    },
+    rebuildsPerYear: 2,
     
-    cta: "Get Play Store Ready App",
+    cta: "Get Hybrid Android App",
     popular: true,
     featureList: [
       "Android APK + AAB (release signed)",
-      "✅ Google Play Store ready",
-      "Push notifications ready",
-      "Custom branded splash",
-      "Full color customization",
-      "Custom logo upload",
+      "✅ Play Store ready",
+      "WebView + Smart Hybrid Native Layer",
+      "Native bottom navigation",
+      "Pull-to-refresh",
+      "Offline screen",
+      "Push notifications (FCM)",
+      "Deep linking support",
+      "Native loading progress bar",
+      "2 rebuilds per year",
+      "Store compliance updates",
       "Email support (48h response)",
-      "1 free rebuild within 30 days",
     ],
     restrictions: [
       "❌ No iOS build",
-      "❌ No white-label",
+      "❌ No white-label branding",
+      "❌ No WhatsApp priority support",
     ],
-    label: "Google Play Store–ready Android app",
+    label: "Serious Android businesses",
   },
   
+  /**
+   * PRO - ₹6,999/year
+   * Positioning: Brands & Agencies
+   * Full native hybrid enhancements + iOS + White-label
+   */
   pro: {
     id: "pro",
     name: "Pro",
-    tagline: "Android + iOS Store-Ready",
-    price: 4999,
-    originalPrice: 6999,
+    tagline: "Android + iOS",
+    price: 6999,
+    originalPrice: 8999,
+    monthlyEquivalent: 583,  // ~₹583/month
     currency: "INR",
     
     outputs: {
@@ -189,38 +266,54 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     features: {
       playStoreReady: true,
       appStoreReady: true,
+      // Native features - Full hybrid enhancements
+      nativeHeader: true,
+      pullToRefresh: true,
+      offlineScreen: true,
+      smartBackButton: true,
+      nativeLoadingProgress: true,
+      bottomNavigation: true,
+      deepLinking: true,
+      customNativeMenu: true,      // ✓ Custom native menu
+      // Push notifications - FCM + APNs
       pushNotifications: true,
-      whiteLabel: true,
+      pushNotificationsIos: true,  // ✓ APNs for iOS
+      // Branding
+      whiteLabel: true,            // ✓ White-label branding
       customBranding: true,
       customSplash: true,
       customColors: true,
       customLogo: true,
+      storeComplianceUpdates: true, // Android + iOS
     },
     
     support: {
       type: "priority",
       responseTime: "24 hours",
       whatsappSupport: true,
+      fasterBuildQueue: true,     // ✓ Priority build queue
     },
-    rebuilds: {
-      count: 3,
-      windowDays: 90,
-    },
+    rebuildsPerYear: 3,
     
-    cta: "Get Full Store-Ready Package",
+    cta: "Get Android + iOS App",
     popular: false,
     featureList: [
-      "Android APK + AAB (Play Store ready)",
+      "Android APK + AAB",
       "iOS IPA (App Store ready)",
       "✅ Play Store & App Store ready",
+      "WebView + Full Native Hybrid Enhancements",
+      "Native bottom navigation",
       "Push notifications (FCM + APNs)",
+      "Deep linking",
+      "Custom native menu",
       "White-label branding",
-      "Full customization options",
+      "3 rebuilds per year",
+      "Store compliance updates (Android + iOS)",
       "Priority WhatsApp support",
-      "3 free rebuilds within 90 days",
+      "Faster build queue",
     ],
     restrictions: [],
-    label: "Play Store & App Store–ready apps",
+    label: "Brands & Agencies",
   },
 };
 
@@ -229,6 +322,49 @@ export const PLANS_LIST: PlanDefinition[] = [
   PLANS.standard,
   PLANS.pro,
 ];
+
+// ============================================
+// EXTRA REBUILD PRICING
+// ============================================
+
+export const EXTRA_REBUILD_PRICE = 499; // ₹499 per extra rebuild
+
+// ============================================
+// SUBSCRIPTION HELPERS
+// ============================================
+
+/**
+ * Get number of rebuilds for a plan
+ */
+export function getRebuildsForPlan(planId: PlanId): number {
+  return PLANS[planId]?.rebuildsPerYear || 1;
+}
+
+/**
+ * Check if a subscription is active based on expiry date
+ */
+export function isSubscriptionActive(expiryDate: Date | null): boolean {
+  if (!expiryDate) return false;
+  return new Date() < expiryDate;
+}
+
+/**
+ * Get days until expiry
+ */
+export function getDaysUntilExpiry(expiryDate: Date | null): number {
+  if (!expiryDate) return 0;
+  const now = new Date();
+  const diff = expiryDate.getTime() - now.getTime();
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+}
+
+/**
+ * Check if renewal reminder should be sent (7 days before expiry)
+ */
+export function shouldSendRenewalReminder(expiryDate: Date | null): boolean {
+  const days = getDaysUntilExpiry(expiryDate);
+  return days > 0 && days <= 7;
+}
 
 // ============================================
 // FEATURE GATING HELPERS
@@ -268,6 +404,36 @@ export function getUpgradeMessage(currentPlan: string, requiredFeature: string):
     return `Upgrade to Pro to unlock ${requiredFeature}`;
   }
   return "";
+}
+
+// ============================================
+// EXPIRED PLAN FEATURE GATING
+// ============================================
+
+/**
+ * Features blocked when plan is expired:
+ * - Rebuilds
+ * - Store compliance updates
+ * - iOS builds (if Pro expired)
+ * - Support tickets
+ * 
+ * Features ALLOWED when expired:
+ * - App continues working (published apps stay live)
+ * - Existing builds still downloadable
+ * - View dashboard
+ */
+export const EXPIRED_PLAN_BLOCKED_FEATURES = [
+  "rebuild",
+  "storeComplianceUpdates",
+  "newBuilds",
+  "supportTickets",
+] as const;
+
+export type ExpiredBlockedFeature = typeof EXPIRED_PLAN_BLOCKED_FEATURES[number];
+
+export function canAccessWhileExpired(feature: ExpiredBlockedFeature): boolean {
+  // When expired, these features are blocked
+  return !EXPIRED_PLAN_BLOCKED_FEATURES.includes(feature);
 }
 
 // ============================================

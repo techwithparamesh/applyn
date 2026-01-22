@@ -17,6 +17,7 @@ import { fromZodError } from "zod-validation-error";
 import { parseMysqlUrl } from "./db-mysql";
 import { randomBytes } from "crypto";
 import { runWorkerLoop } from "./worker";
+import { startSubscriptionCronInterval } from "./subscription-cron";
 
 const app = express();
 const httpServer = createServer(app);
@@ -360,6 +361,11 @@ app.use(passport.session());
 
   httpServer.listen(listenOptions, () => {
     log(`serving on port ${port}`);
+
+    // Start subscription cron job (runs daily to handle expirations and reminders)
+    if (isProd) {
+      startSubscriptionCronInterval();
+    }
 
     // Dev-only convenience: run the worker loop in-process.
     // This is primarily for local E2E sanity checks on machines without MySQL/Docker.

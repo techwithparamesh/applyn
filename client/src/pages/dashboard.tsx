@@ -28,6 +28,9 @@ import {
   CreditCard,
   Wand2,
   Eye,
+  Calendar,
+  AlertTriangle,
+  Crown,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -73,6 +76,25 @@ type Me = {
   role: "admin" | "support" | "user" | string;
 };
 
+type SubscriptionInfo = {
+  plan: string | null;
+  planStatus: string | null;
+  planStartDate: string | null;
+  planExpiryDate: string | null;
+  remainingRebuilds: number;
+  daysUntilExpiry: number | null;
+  planDetails: {
+    name: string;
+    price: number;
+    monthlyEquivalent: number;
+    rebuildsPerYear: number;
+    features: Record<string, boolean>;
+  } | null;
+  isActive: boolean;
+  isExpired: boolean;
+  needsRenewal: boolean;
+};
+
 type SupportTicket = {
   id: string;
   status: "open" | "closed" | string;
@@ -114,6 +136,13 @@ export default function Dashboard() {
 
   const { data: tickets } = useQuery<SupportTicket[]>({
     queryKey: ["/api/support/tickets"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: !!me,
+  });
+
+  // Subscription status query
+  const { data: subscription } = useQuery<SubscriptionInfo>({
+    queryKey: ["/api/subscription"],
     queryFn: getQueryFn({ on401: "returnNull" }),
     enabled: !!me,
   });
@@ -551,6 +580,110 @@ export default function Dashboard() {
               </Link>
             </div>
           </motion.div>
+
+          {/* Subscription Status */}
+          {subscription && (
+            <motion.div variants={itemVariants}>
+              <h2 className="text-lg font-semibold text-white mb-4">Plan Status</h2>
+              <Card className={`glass ${subscription.needsRenewal ? 'border-yellow-500/50' : subscription.isExpired ? 'border-red-500/50' : 'border-green-500/30'}`}>
+                <CardContent className="p-5">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className={`h-14 w-14 rounded-xl flex items-center justify-center ${
+                        subscription.isExpired 
+                          ? 'bg-red-500/10' 
+                          : subscription.needsRenewal 
+                            ? 'bg-yellow-500/10' 
+                            : 'bg-green-500/10'
+                      }`}>
+                        {subscription.isExpired ? (
+                          <AlertTriangle className="h-7 w-7 text-red-400" />
+                        ) : subscription.needsRenewal ? (
+                          <Clock className="h-7 w-7 text-yellow-400" />
+                        ) : (
+                          <Crown className="h-7 w-7 text-green-400" />
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-white text-lg">
+                            {subscription.planDetails?.name || subscription.plan || 'No Plan'}
+                          </h3>
+                          <Badge variant="outline" className={
+                            subscription.isExpired 
+                              ? 'border-red-500/30 text-red-400' 
+                              : subscription.isActive 
+                                ? 'border-green-500/30 text-green-400' 
+                                : 'border-yellow-500/30 text-yellow-400'
+                          }>
+                            {subscription.planStatus || 'No Plan'}
+                          </Badge>
+                        </div>
+                        {subscription.planExpiryDate && (
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {subscription.isExpired 
+                              ? `Expired on ${new Date(subscription.planExpiryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                              : `Expires ${new Date(subscription.planExpiryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} (${subscription.daysUntilExpiry} days)`
+                            }
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                      {/* Rebuilds Counter */}
+                      {subscription.plan && (
+                        <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-white/5">
+                          <RefreshCw className="h-5 w-5 text-purple-400" />
+                          <div>
+                            <p className="text-xs text-muted-foreground">Rebuilds Left</p>
+                            <p className="text-lg font-bold text-white">
+                              {subscription.remainingRebuilds}
+                              <span className="text-sm text-muted-foreground font-normal">
+                                /{subscription.planDetails?.rebuildsPerYear || 0}
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Action Button */}
+                      {subscription.isExpired || subscription.needsRenewal ? (
+                        <Link href="/pricing">
+                          <Button className="bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold">
+                            {subscription.isExpired ? 'Renew Now' : 'Renew Early'}
+                          </Button>
+                        </Link>
+                      ) : !subscription.plan ? (
+                        <Link href="/pricing">
+                          <Button className="bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold">
+                            Choose Plan
+                          </Button>
+                        </Link>
+                      ) : null}
+                    </div>
+                  </div>
+                  
+                  {/* Warning Message */}
+                  {subscription.needsRenewal && !subscription.isExpired && (
+                    <div className="mt-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                      <p className="text-sm text-yellow-400">
+                        ⚠️ Your subscription expires soon! Renew to continue building apps and accessing premium features.
+                      </p>
+                    </div>
+                  )}
+                  
+                  {subscription.isExpired && (
+                    <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                      <p className="text-sm text-red-400">
+                        ⚠️ Your subscription has expired. Your apps will continue to work, but you cannot rebuild or modify them until you renew.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
 
           {/* Apps Section */}
           <motion.div variants={itemVariants}>

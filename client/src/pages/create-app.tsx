@@ -28,25 +28,39 @@ const STEPS = [
   { id: 3, name: "Review", icon: Smartphone },
 ];
 
-// Feature access by plan - UPDATED PRICING SYSTEM
-// Starter: Preview only, NOT Play Store ready
-// Standard: Play Store ready (Android)
-// Pro: Play Store + App Store ready
+// Feature access by plan - YEARLY PRICING MODEL
+// Starter: ₹1,999/year - Basic Android native shell
+// Standard: ₹3,999/year - Smart Hybrid Native Layer with push
+// Pro: ₹6,999/year - Full Android + iOS with white-label
 const PLAN_FEATURES = {
   starter: {
     platforms: ["android"],
-    customLogo: false,
-    customColors: false, // Only presets
-    customSplashImage: false,
-    statusBarCustomization: false,
-    pullToRefresh: false,
+    customLogo: true,
+    customColors: true,
+    customSplashImage: true,
+    statusBarCustomization: true,
+    // Native features - basic shell
+    nativeHeader: true,
+    pullToRefresh: true,
+    offlineScreen: true,
+    smartBackButton: true,
+    nativeLoadingProgress: false,
+    bottomNavigation: false,     // Not in Starter
+    deepLinking: false,
+    customNativeMenu: false,
+    // Push notifications
+    pushNotifications: false,    // Not in Starter
+    pushNotificationsIos: false,
+    // Builds
     iosBuilds: false,
-    aabFormat: false, // No AAB = NOT Play Store ready
-    playStoreReady: false,
+    aabFormat: true,
+    apkFormat: false,            // Only AAB in Starter
+    playStoreReady: true,
     appStoreReady: false,
+    // Branding
     whiteLabel: false,
-    pushNotifications: false,
-    rebuilds: 0,
+    // Support
+    rebuilds: 1,
   },
   standard: {
     platforms: ["android"],
@@ -54,14 +68,28 @@ const PLAN_FEATURES = {
     customColors: true,
     customSplashImage: true,
     statusBarCustomization: true,
+    // Native features - Smart Hybrid Layer
+    nativeHeader: true,
     pullToRefresh: true,
-    iosBuilds: false, // No iOS on Standard
-    aabFormat: true, // Play Store ready
+    offlineScreen: true,
+    smartBackButton: true,
+    nativeLoadingProgress: true,
+    bottomNavigation: true,      // ✓ Included
+    deepLinking: true,           // ✓ Included
+    customNativeMenu: false,     // Pro only
+    // Push notifications
+    pushNotifications: true,     // ✓ FCM
+    pushNotificationsIos: false,
+    // Builds
+    iosBuilds: false,
+    aabFormat: true,
+    apkFormat: true,             // APK + AAB
     playStoreReady: true,
     appStoreReady: false,
+    // Branding
     whiteLabel: false,
-    pushNotifications: true,
-    rebuilds: 1,
+    // Support
+    rebuilds: 2,
   },
   pro: {
     platforms: ["android", "ios", "both"],
@@ -69,13 +97,27 @@ const PLAN_FEATURES = {
     customColors: true,
     customSplashImage: true,
     statusBarCustomization: true,
+    // Native features - Full hybrid enhancements
+    nativeHeader: true,
     pullToRefresh: true,
+    offlineScreen: true,
+    smartBackButton: true,
+    nativeLoadingProgress: true,
+    bottomNavigation: true,
+    deepLinking: true,
+    customNativeMenu: true,      // ✓ Custom menu
+    // Push notifications
+    pushNotifications: true,     // ✓ FCM
+    pushNotificationsIos: true,  // ✓ APNs
+    // Builds
     iosBuilds: true,
     aabFormat: true,
+    apkFormat: true,
     playStoreReady: true,
     appStoreReady: true,
+    // Branding
     whiteLabel: true,
-    pushNotifications: true,
+    // Support
     rebuilds: 3,
   },
 };
@@ -84,34 +126,67 @@ const PLANS = [
   {
     id: "starter",
     name: "Starter",
-    tagline: "Preview & Learning",
-    price: 499,
-    originalPrice: 699,
-    features: ["Android APK (preview)", "WebView wrapper", "Branded splash", "Preset colors", "Community support"],
-    limitations: ["NOT Play Store ready", "No AAB format", "No iOS", "No rebuilds"],
-    label: "Preview build – Not eligible for Play Store",
+    tagline: "Android Play Store Ready",
+    price: 1999,
+    originalPrice: 2499,
+    features: [
+      "Android Play Store ready",
+      "Signed AAB build",
+      "WebView + Basic Native Shell",
+      "Native header with theme color",
+      "Pull-to-refresh",
+      "Offline screen",
+      "Smart back button handling",
+      "1 rebuild per year",
+      "Store compliance updates",
+      "Email support (72h)",
+    ],
+    limitations: ["No push notifications", "No bottom navigation", "No iOS build", "No white-label"],
+    label: "Entry-level Android businesses",
     recommended: false,
   },
   {
     id: "standard",
     name: "Standard",
-    tagline: "Android Production",
-    price: 1999,
-    originalPrice: 2499,
-    features: ["Android APK + AAB (signed)", "✅ Play Store ready", "Push notifications", "Custom branding", "Custom logo", "Email support", "1 rebuild (30 days)"],
-    limitations: ["No iOS build", "No white-label"],
-    label: "Google Play Store–ready Android app",
+    tagline: "Most Popular",
+    price: 3999,
+    originalPrice: 4999,
+    features: [
+      "Android APK + AAB (signed)",
+      "✅ Play Store ready",
+      "WebView + Smart Hybrid Native Layer",
+      "Native bottom navigation",
+      "Push notifications (FCM)",
+      "Deep linking support",
+      "Native loading progress bar",
+      "2 rebuilds per year",
+      "Store compliance updates",
+      "Email support (48h)",
+    ],
+    limitations: ["No iOS build", "No white-label branding"],
+    label: "Serious Android businesses",
     recommended: true,
   },
   {
     id: "pro",
     name: "Pro",
-    tagline: "Android + iOS Store-Ready",
-    price: 4999,
-    originalPrice: 6999,
-    features: ["Android APK + AAB", "iOS IPA (App Store)", "✅ Play Store & App Store ready", "Push notifications (FCM + APNs)", "White-label branding", "Priority WhatsApp support", "3 rebuilds (90 days)"],
+    tagline: "Android + iOS",
+    price: 6999,
+    originalPrice: 8999,
+    features: [
+      "Android APK + AAB",
+      "iOS IPA (App Store ready)",
+      "✅ Play Store & App Store ready",
+      "Full Native Hybrid Enhancements",
+      "Push notifications (FCM + APNs)",
+      "Custom native menu",
+      "White-label branding",
+      "3 rebuilds per year",
+      "Store compliance updates (Android + iOS)",
+      "Priority WhatsApp support",
+    ],
     limitations: [],
-    label: "Play Store & App Store–ready apps",
+    label: "Brands & Agencies",
     recommended: false,
   },
 ];
@@ -155,6 +230,8 @@ export default function CreateApp() {
     statusBarStyle: "light" as "light" | "dark",
     enablePullToRefresh: true,
     enableLoadingIndicator: true,
+    enableBottomNav: false, // Native bottom navigation
+    enableOfflineScreen: true, // Offline fallback screen
     platform: "android",
   });
 
@@ -377,6 +454,11 @@ export default function CreateApp() {
         primaryColor: formData.primaryColor,
         platform: formData.platform,
         buildNow: false, // Don't build yet, wait for payment
+        features: {
+          bottomNav: formData.enableBottomNav,
+          pullToRefresh: formData.enablePullToRefresh,
+          offlineScreen: formData.enableOfflineScreen,
+        },
       });
       const app = await appRes.json();
 
@@ -916,6 +998,28 @@ export default function CreateApp() {
                           <Switch 
                             checked={formData.enableLoadingIndicator}
                             onCheckedChange={(checked) => setFormData({ ...formData, enableLoadingIndicator: checked })}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-white">Offline Screen</p>
+                            <p className="text-xs text-muted-foreground">Show retry when offline</p>
+                          </div>
+                          <Switch 
+                            checked={formData.enableOfflineScreen}
+                            onCheckedChange={(checked) => setFormData({ ...formData, enableOfflineScreen: checked })}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-white">Bottom Navigation</p>
+                            <p className="text-xs text-muted-foreground">Home, back, forward, refresh</p>
+                          </div>
+                          <Switch 
+                            checked={formData.enableBottomNav}
+                            onCheckedChange={(checked) => setFormData({ ...formData, enableBottomNav: checked })}
                           />
                         </div>
                       </div>

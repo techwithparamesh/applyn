@@ -11,10 +11,19 @@ export const users = mysqlTable("users", {
   emailVerifyToken: varchar("email_verify_token", { length: 128 }),
   resetToken: varchar("reset_token", { length: 128 }),
   resetTokenExpiresAt: timestamp("reset_token_expires_at", { mode: "date" }),
+  // Subscription fields for yearly renewal model
+  plan: varchar("plan", { length: 16 }),  // starter, standard, pro
+  planStatus: varchar("plan_status", { length: 16 }),  // active, expired, cancelled
+  planStartDate: timestamp("plan_start_date", { mode: "date" }),
+  planExpiryDate: timestamp("plan_expiry_date", { mode: "date" }),
+  remainingRebuilds: int("remaining_rebuilds").default(0),
+  subscriptionId: varchar("subscription_id", { length: 128 }),  // Razorpay subscription ID
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 }, (table) => ({
   resetTokenIdx: index("users_reset_token_idx").on(table.resetToken),
+  planStatusIdx: index("users_plan_status_idx").on(table.planStatus),
+  planExpiryIdx: index("users_plan_expiry_idx").on(table.planExpiryDate),
 }));
 
 export const apps = mysqlTable("apps", {
@@ -34,6 +43,8 @@ export const apps = mysqlTable("apps", {
   primaryColor: varchar("primary_color", { length: 16 }).notNull().default("#2563EB"),
   platform: varchar("platform", { length: 16 }).notNull().default("android"),
   status: varchar("status", { length: 16 }).notNull().default("draft"),
+  // Native enhancement features as JSON: { bottomNav: boolean, pullToRefresh: boolean, offlineScreen: boolean }
+  features: text("features"), // JSON string for feature toggles
   packageName: varchar("package_name", { length: 200 }),
   versionCode: int("version_code"),
   artifactPath: text("artifact_path"),
