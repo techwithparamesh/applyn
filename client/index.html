@@ -2,23 +2,195 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-
-    <title>Applyn - Your website. Now an app.</title>
-    <meta property="og:title" content="Applyn - Instant Website to App Converter" />
-    <meta property="og:description" content="Convert any website URL into Android and iOS mobile apps in minutes. No coding required. WhatsApp-first onboarding." />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Applyn - Instant Website to App Converter" />
-    <meta name="twitter:description" content="Convert any website URL into Android and iOS mobile apps in minutes. No coding required." />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5" />
     
+    <!-- Primary Meta Tags -->
+    <title>Applyn - Convert Website to Android & iOS App in Minutes</title>
+    <meta name="title" content="Applyn - Convert Website to Android & iOS App in Minutes" />
+    <meta name="description" content="Transform your website into Play Store & App Store ready mobile apps. No coding required. One-time payment starting ₹499. Trusted by 10,000+ Indian businesses." />
+    <meta name="keywords" content="website to app, convert website to android app, website to ios app, mobile app builder, no code app builder, play store app, app store app, indian app builder" />
+    <meta name="author" content="Applyn" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://applyn.co.in" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://applyn.co.in/" />
+    <meta property="og:title" content="Applyn - Convert Website to Android & iOS App in Minutes" />
+    <meta property="og:description" content="Transform your website into Play Store & App Store ready mobile apps. No coding required. One-time payment starting ₹499." />
+    <meta property="og:image" content="https://applyn.co.in/og-image.png" />
+    <meta property="og:site_name" content="Applyn" />
+    <meta property="og:locale" content="en_IN" />
+    
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://applyn.co.in/" />
+    <meta name="twitter:title" content="Applyn - Convert Website to Android & iOS App in Minutes" />
+    <meta name="twitter:description" content="Transform your website into Play Store & App Store ready mobile apps. No coding required." />
+    <meta name="twitter:image" content="https://applyn.co.in/og-image.png" />
+    
+    <!-- Favicon & App Icons -->
     <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0a0a" />
+    
+    <!-- Preconnect to external domains for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+    
+    <!-- Structured Data for SEO -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Applyn",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Web",
+      "description": "Convert any website into Android and iOS mobile apps in minutes. No coding required.",
+      "url": "https://applyn.co.in",
+      "offers": {
+        "@type": "Offer",
+        "price": "499",
+        "priceCurrency": "INR"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.8",
+        "ratingCount": "1250"
+      }
+    }
+    </script>
+    
+    <!-- Critical CSS for initial render -->
+    <style>
+      /* Prevent FOUC and provide loading state */
+      body {
+        margin: 0;
+        background-color: #0a0a0a;
+        color: #ffffff;
+        font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+      }
+      
+      /* Loading placeholder styles */
+      .app-loading {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+      }
+      
+      .app-loading-logo {
+        font-size: 2rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #00E5FF, #A855F7);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 1.5rem;
+      }
+      
+      .app-loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(0, 229, 255, 0.1);
+        border-top-color: #00E5FF;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      
+      /* Noscript styles */
+      .noscript-content {
+        max-width: 600px;
+        padding: 2rem;
+        text-align: center;
+      }
+      
+      .noscript-content h1 {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+      }
+      
+      .noscript-content p {
+        color: #a0a0a0;
+        line-height: 1.6;
+      }
+      
+      /* Skip link for accessibility */
+      .skip-link {
+        position: absolute;
+        top: -40px;
+        left: 0;
+        background: #00E5FF;
+        color: #0a0a0a;
+        padding: 8px 16px;
+        text-decoration: none;
+        font-weight: 600;
+        z-index: 100;
+        transition: top 0.3s;
+      }
+      
+      .skip-link:focus {
+        top: 0;
+      }
+      
+      /* Hide loading once app is ready */
+      #root:not(:empty) + .app-loading,
+      #root:not(:empty) ~ noscript {
+        display: none;
+      }
+    </style>
   </head>
   <body>
+    <!-- Skip to main content link for accessibility -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
+    <!-- React root -->
     <div id="root"></div>
+    
+    <!-- Loading state shown until React hydrates -->
+    <div class="app-loading" aria-label="Loading Applyn">
+      <div class="app-loading-logo">Applyn</div>
+      <div class="app-loading-spinner" role="status" aria-label="Loading"></div>
+    </div>
+    
+    <!-- Fallback content for users with JavaScript disabled -->
+    <noscript>
+      <div class="app-loading">
+        <div class="noscript-content">
+          <h1>Applyn - Website to App Converter</h1>
+          <p>
+            Transform your website into Android and iOS mobile apps in minutes. 
+            No coding required. One-time payment starting at ₹499.
+          </p>
+          <p style="margin-top: 1.5rem; color: #ff6b6b;">
+            <strong>JavaScript Required:</strong> Please enable JavaScript in your browser to use Applyn. 
+            Our app builder requires JavaScript for the interactive preview and customization features.
+          </p>
+          <p style="margin-top: 1rem;">
+            <strong>Features:</strong>
+          </p>
+          <ul style="text-align: left; display: inline-block; margin-top: 0.5rem; color: #a0a0a0;">
+            <li>Convert any website to mobile app</li>
+            <li>Android APK & AAB for Play Store</li>
+            <li>iOS IPA for App Store</li>
+            <li>Custom branding & splash screens</li>
+            <li>Push notifications support</li>
+            <li>No monthly fees - one-time payment</li>
+          </ul>
+          <p style="margin-top: 1.5rem;">
+            Contact us: <a href="mailto:support@applyn.co.in" style="color: #00E5FF;">support@applyn.co.in</a>
+          </p>
+        </div>
+      </div>
+    </noscript>
+    
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

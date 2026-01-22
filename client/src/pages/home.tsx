@@ -25,9 +25,9 @@ export default function Home() {
     <div className="min-h-screen bg-background bg-mesh selection:bg-primary/30">
       <Navbar />
 
-      <main>
+      <main id="main-content" role="main" aria-label="Main content">
         {/* Hero Section */}
-        <section className="relative pt-20 pb-32 overflow-hidden">
+        <section className="relative pt-20 pb-32 overflow-hidden" aria-labelledby="hero-heading">
           <div className="container mx-auto px-6">
             <div className="grid lg:grid-cols-12 gap-16 items-center">
               <motion.div 
@@ -41,7 +41,7 @@ export default function Home() {
                   Trusted by 10,000+ Indian Businesses
                 </div>
                 
-                <h1 className="text-5xl md:text-7xl font-bold tracking-tight leading-[1.1]">
+                <h1 id="hero-heading" className="text-5xl md:text-7xl font-bold tracking-tight leading-[1.1]">
                   <span className="text-white">Your Website is</span> <br />
                   <span className="text-gradient">Your New App.</span>
                 </h1>
@@ -52,12 +52,13 @@ export default function Home() {
 
                 <div className="flex flex-col sm:flex-row gap-4 max-w-lg">
                   <div className="relative flex-1 group">
-                    <Globe className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-cyan-400 transition-colors" />
+                    <Globe className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-cyan-400 transition-colors" aria-hidden="true" />
                     <Input 
                       placeholder="https://yourbusiness.com"
                       value={websiteUrl}
                       onChange={(e) => setWebsiteUrl(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handleGetStarted()}
+                      aria-label="Enter your website URL"
                       className="h-14 pl-12 text-lg rounded-xl border-white/10 bg-white/5 focus:border-cyan-500/50 text-white placeholder:text-muted-foreground"
                     />
                   </div>

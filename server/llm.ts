@@ -127,12 +127,17 @@ export async function analyzeWebsite(url: string, htmlContent: string): Promise<
 Return a JSON object with:
 - appName: Suggested app name (short, catchy, based on the website brand/title)
 - appDescription: A compelling app store description (max 150 chars)
-- primaryColor: The primary brand color detected in hex format (e.g., "#3B82F6")
-- isAppReady: Boolean - whether the website is suitable for conversion (responsive, no major issues)
-- issues: Array of strings - any problems that might affect the app
-- suggestions: Array of strings - recommendations for better app experience
+- primaryColor: The primary brand color detected in hex format (e.g., "#3B82F6"). Look for colors in CSS, meta theme-color, or brand elements.
+- isAppReady: Boolean - true if website can be converted (most websites can). Only false for completely broken sites.
+- issues: Array of strings - ONLY list critical issues that would actually break the mobile app experience. Do NOT list:
+  * SPA/React/Vue detection (these work fine in WebView)
+  * Development tools (user may be testing locally)
+  * SEO concerns (not relevant for apps)
+  * Client-side rendering (normal for modern sites)
+  Keep this array SHORT (0-2 items max). Only real problems like: mixed content, login walls, geo-blocks.
+- suggestions: Array of strings - helpful tips for better mobile experience (max 2)
 
-Be concise and practical.`
+Be POSITIVE and encouraging. Most websites work great as apps.`
       },
       {
         role: "user",
