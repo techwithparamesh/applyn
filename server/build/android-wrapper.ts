@@ -334,6 +334,8 @@ export async function generateAndroidWrapperProject(
   await replaceInFile(path.join(projectDir, "app", "src", "main", "res", "values", "strings.xml"), xmlReplacements);
   await replaceInFile(path.join(projectDir, "app", "src", "main", "res", "values", "colors.xml"), xmlReplacements);
   await replaceInFileIfExists(path.join(projectDir, "app", "src", "main", "res", "values", "themes.xml"), xmlReplacements);
+  // Replace placeholders in layout files
+  await replaceInFile(path.join(projectDir, "app", "src", "main", "res", "layout", "activity_main.xml"), xmlReplacements);
   await replaceInFile(path.join(newPath, "MainActivity.kt"), kotlinReplacements);
   await replaceInFileIfExists(path.join(projectDir, "app", "proguard-rules.pro"), common);
 
