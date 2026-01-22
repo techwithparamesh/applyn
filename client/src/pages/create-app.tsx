@@ -206,6 +206,7 @@ export default function CreateApp() {
     issues: string[];
   } | null>(null);
   const [analyzedUrl, setAnalyzedUrl] = useState<string>("");
+  const [showAnalysisDetails, setShowAnalysisDetails] = useState(false);
 
   // Auto-analyze mutation
   const autoAnalyzeMutation = useMutation({
@@ -554,35 +555,65 @@ export default function CreateApp() {
                       />
                       {/* Auto-detection status */}
                       {aiStatus?.available && formData.url.length > 10 && formData.url.includes(".") && (
-                        <div className="flex items-center gap-2 text-sm mt-2">
-                          {autoAnalyzeMutation.isPending ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
-                              <span className="text-muted-foreground">Analyzing website colors...</span>
-                            </>
-                          ) : websiteAnalysis ? (
-                            <div className="flex items-center gap-3">
-                              <div className="flex items-center gap-2">
-                                {websiteAnalysis.isAppReady ? (
-                                  <CheckCircle2 className="w-4 h-4 text-green-500" />
-                                ) : (
-                                  <AlertCircle className="w-4 h-4 text-yellow-500" />
-                                )}
-                                <span className="text-muted-foreground">
-                                  {websiteAnalysis.isAppReady ? "Ready for app" : `${websiteAnalysis.issues.length} issue(s) found`}
-                                </span>
-                              </div>
-                              {websiteAnalysis.primaryColor && (
-                                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/5 border border-white/10">
-                                  <div 
-                                    className="w-3 h-3 rounded-full border border-white/20" 
-                                    style={{ backgroundColor: websiteAnalysis.primaryColor }}
-                                  />
-                                  <span className="text-xs text-muted-foreground">Color detected</span>
+                        <div className="mt-2 space-y-2">
+                          <div className="flex items-center gap-2 text-sm">
+                            {autoAnalyzeMutation.isPending ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+                                <span className="text-muted-foreground">Analyzing website colors...</span>
+                              </>
+                            ) : websiteAnalysis ? (
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <div className="flex items-center gap-2">
+                                  {websiteAnalysis.isAppReady ? (
+                                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                  ) : (
+                                    <AlertCircle className="w-4 h-4 text-yellow-500" />
+                                  )}
+                                  <span className="text-muted-foreground">
+                                    {websiteAnalysis.isAppReady ? "Ready for app" : `${websiteAnalysis.issues.length} issue(s) found`}
+                                  </span>
+                                  {/* Show details toggle */}
+                                  {websiteAnalysis.issues.length > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowAnalysisDetails(!showAnalysisDetails)}
+                                      className="text-xs text-cyan-400 hover:text-cyan-300 underline underline-offset-2 transition-colors"
+                                    >
+                                      {showAnalysisDetails ? "Hide" : "Show"}
+                                    </button>
+                                  )}
                                 </div>
-                              )}
+                                {websiteAnalysis.primaryColor && (
+                                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/5 border border-white/10">
+                                    <div 
+                                      className="w-3 h-3 rounded-full border border-white/20" 
+                                      style={{ backgroundColor: websiteAnalysis.primaryColor }}
+                                    />
+                                    <span className="text-xs text-muted-foreground">Color detected</span>
+                                  </div>
+                                )}
+                              </div>
+                            ) : null}
+                          </div>
+                          
+                          {/* Expandable issues list */}
+                          {websiteAnalysis && showAnalysisDetails && websiteAnalysis.issues.length > 0 && (
+                            <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                              <p className="text-xs font-medium text-yellow-400">Issues detected:</p>
+                              <ul className="space-y-1">
+                                {websiteAnalysis.issues.map((issue, index) => (
+                                  <li key={index} className="text-xs text-yellow-400/80 flex items-start gap-2">
+                                    <span className="text-yellow-500 mt-0.5">•</span>
+                                    <span>{issue}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                              <p className="text-xs text-muted-foreground mt-2 pt-2 border-t border-yellow-500/20">
+                                💡 These issues may affect app quality but won't block the build.
+                              </p>
                             </div>
-                          ) : null}
+                          )}
                         </div>
                       )}
                     </div>
