@@ -28,7 +28,10 @@ const STEPS = [
   { id: 3, name: "Review", icon: Smartphone },
 ];
 
-// Feature access by plan - what each plan unlocks
+// Feature access by plan - UPDATED PRICING SYSTEM
+// Starter: Preview only, NOT Play Store ready
+// Standard: Play Store ready (Android)
+// Pro: Play Store + App Store ready
 const PLAN_FEATURES = {
   starter: {
     platforms: ["android"],
@@ -38,24 +41,26 @@ const PLAN_FEATURES = {
     statusBarCustomization: false,
     pullToRefresh: false,
     iosBuilds: false,
-    aabFormat: false,
+    aabFormat: false, // No AAB = NOT Play Store ready
+    playStoreReady: false,
     appStoreReady: false,
     whiteLabel: false,
     pushNotifications: false,
     rebuilds: 0,
   },
   standard: {
-    platforms: ["android", "ios", "both"],
+    platforms: ["android"],
     customLogo: true,
     customColors: true,
     customSplashImage: true,
     statusBarCustomization: true,
     pullToRefresh: true,
-    iosBuilds: true,
-    aabFormat: true,
-    appStoreReady: false, // Ad-Hoc only
+    iosBuilds: false, // No iOS on Standard
+    aabFormat: true, // Play Store ready
+    playStoreReady: true,
+    appStoreReady: false,
     whiteLabel: false,
-    pushNotifications: false,
+    pushNotifications: true,
     rebuilds: 1,
   },
   pro: {
@@ -67,6 +72,7 @@ const PLAN_FEATURES = {
     pullToRefresh: true,
     iosBuilds: true,
     aabFormat: true,
+    playStoreReady: true,
     appStoreReady: true,
     whiteLabel: true,
     pushNotifications: true,
@@ -77,27 +83,36 @@ const PLAN_FEATURES = {
 const PLANS = [
   {
     id: "starter",
-    name: "Starter Build",
+    name: "Starter",
+    tagline: "Preview & Learning",
     price: 499,
-    features: ["Android .apk only", "Emoji icons", "Preset colors", "Basic splash", "Community Support"],
-    limitations: ["No iOS", "No custom logo", "No rebuilds"],
+    originalPrice: 699,
+    features: ["Android APK (preview)", "WebView wrapper", "Branded splash", "Preset colors", "Community support"],
+    limitations: ["NOT Play Store ready", "No AAB format", "No iOS", "No rebuilds"],
+    label: "Preview build – Not eligible for Play Store",
     recommended: false,
   },
   {
     id: "standard",
-    name: "Standard Build",
-    price: 1499,
-    features: ["Android .apk & .aab", "iOS .ipa (Ad-Hoc)", "Custom logo upload", "Full color picker", "Custom splash", "1 Rebuild"],
-    limitations: ["No App Store ready iOS", "No white-label"],
-    recommended: false,
+    name: "Standard",
+    tagline: "Android Production",
+    price: 1999,
+    originalPrice: 2499,
+    features: ["Android APK + AAB (signed)", "✅ Play Store ready", "Push notifications", "Custom branding", "Custom logo", "Email support", "1 rebuild (30 days)"],
+    limitations: ["No iOS build", "No white-label"],
+    label: "Google Play Store–ready Android app",
+    recommended: true,
   },
   {
     id: "pro",
-    name: "Pro Build",
-    price: 2999,
-    features: ["Android + iOS (App Store)", "Custom branding", "White-label", "Push notifications", "3 Rebuilds", "Priority support"],
+    name: "Pro",
+    tagline: "Android + iOS Store-Ready",
+    price: 4999,
+    originalPrice: 6999,
+    features: ["Android APK + AAB", "iOS IPA (App Store)", "✅ Play Store & App Store ready", "Push notifications (FCM + APNs)", "White-label branding", "Priority WhatsApp support", "3 rebuilds (90 days)"],
     limitations: [],
-    recommended: true,
+    label: "Play Store & App Store–ready apps",
+    recommended: false,
   },
 ];
 
@@ -977,6 +992,36 @@ export default function CreateApp() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Starter Plan Warning Banner */}
+                    {selectedPlan === "starter" && (
+                      <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
+                        <div className="flex items-start gap-3">
+                          <div className="p-2 rounded-lg bg-yellow-500/20 shrink-0">
+                            <AlertCircle className="h-5 w-5 text-yellow-400" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-yellow-400">Preview Build Only</h4>
+                            <p className="text-sm text-yellow-400/80 mt-1">
+                              Starter plan builds are for preview and testing only. 
+                              <strong> NOT eligible for Play Store submission.</strong>
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Upgrade to Standard (₹1,999) for a Play Store-ready build with AAB format.
+                            </p>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="mt-3 border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10"
+                              onClick={() => setSelectedPlan("standard")}
+                            >
+                              <Zap className="w-3 h-3 mr-1" />
+                              Upgrade to Standard
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Features Reminder */}
                     <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">

@@ -17,6 +17,7 @@ import {
   type User,
   userRoleSchema,
 } from "@shared/schema";
+import { getPlan, PLANS } from "@shared/pricing";
 import { storage } from "./storage";
 import { hashPassword, sanitizeUser, verifyPassword } from "./auth";
 import { sendPasswordResetEmail, isEmailConfigured } from "./email";
@@ -32,6 +33,14 @@ import {
   supportChat,
   categorizeTicket,
 } from "./llm";
+import {
+  validatePlayStoreReadiness,
+  validateAppStoreReadiness,
+  canDownloadAab,
+  canSubmitToPlayStore,
+  canDownloadIpa,
+  canSubmitToAppStore,
+} from "./build-validation";
 
 function isGoogleConfigured() {
   return !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
@@ -94,11 +103,46 @@ function requireAuth(req: any, res: any, next: any) {
   return res.status(401).json({ message: "Unauthorized" });
 }
 
-// --- Plan-based limits configuration ---
-const PLAN_LIMITS: Record<string, { rebuilds: number; rebuildWindowDays: number; pushEnabled: boolean }> = {
-  starter: { rebuilds: 0, rebuildWindowDays: 0, pushEnabled: false },
-  standard: { rebuilds: 1, rebuildWindowDays: 30, pushEnabled: true },
-  pro: { rebuilds: 3, rebuildWindowDays: 90, pushEnabled: true },
+// --- Plan-based limits configuration (UPDATED PRICING) ---
+// Starter: Preview only, NO Play Store
+// Standard: Play Store ready, NO iOS
+// Pro: Both stores ready
+const PLAN_LIMITS: Record<string, { 
+  rebuilds: number; 
+  rebuildWindowDays: number; 
+  pushEnabled: boolean;
+  playStoreReady: boolean;
+  appStoreReady: boolean;
+  aabEnabled: boolean;
+  iosEnabled: boolean;
+}> = {
+  starter: { 
+    rebuilds: 0, 
+    rebuildWindowDays: 0, 
+    pushEnabled: false,
+    playStoreReady: false,
+    appStoreReady: false,
+    aabEnabled: false,
+    iosEnabled: false,
+  },
+  standard: { 
+    rebuilds: 1, 
+    rebuildWindowDays: 30, 
+    pushEnabled: true,
+    playStoreReady: true,
+    appStoreReady: false,
+    aabEnabled: true,
+    iosEnabled: false,
+  },
+  pro: { 
+    rebuilds: 3, 
+    rebuildWindowDays: 90, 
+    pushEnabled: true,
+    playStoreReady: true,
+    appStoreReady: true,
+    aabEnabled: true,
+    iosEnabled: true,
+  },
 };
 
 function getPlanLimits(plan: string) {
@@ -980,6 +1024,154 @@ export async function registerRoutes(
       return next(err);
     }
   });
+
+  // ============================================
+  // BUILD READINESS CHECK ENDPOINTS
+  // ============================================
+
+  // Check Play Store readiness for an app
+  app.get("/api/apps/:id/readiness/playstore", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const appItem = await storage.getApp(req.params.id);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "App not found" });
+      }
+
+      // Get plan info to check if Play Store is even available
+      const { plan, limits } = await getAppPlanInfo(appItem.id);
+      
+      if (!limits.playStoreReady) {
+        return res.status(403).json({
+          ready: false,
+          message: "Play Store submission is not available on Starter plan",
+          requiresUpgrade: true,
+          minimumPlan: "standard",
+          checks: [],
+          passCount: 0,
+          failCount: 1,
+          warningCount: 0,
+        });
+      }
+
+      // Perform readiness validation
+      // In production, these would come from the actual build artifacts
+      const buildInfo = {
+        isReleaseSigned: appItem.status === "live", // Assume live builds are signed
+        hasAabOutput: limits.aabEnabled && appItem.status === "live",
+        targetSdk: 34,
+        hasDebugFlags: false,
+        hasInternetPermission: true,
+        iconSize: appItem.iconUrl ? 512 : 48, // Custom icons are larger
+      };
+
+      const result = validatePlayStoreReadiness(appItem, buildInfo);
+
+      return res.json({
+        ...result,
+        plan,
+        canSubmit: result.ready && limits.playStoreReady,
+      });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Check App Store readiness for an app (Pro plan only)
+  app.get("/api/apps/:id/readiness/appstore", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const appItem = await storage.getApp(req.params.id);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "App not found" });
+      }
+
+      // Get plan info
+      const { plan, limits } = await getAppPlanInfo(appItem.id);
+      
+      if (!limits.appStoreReady) {
+        return res.status(403).json({
+          ready: false,
+          message: "App Store submission is only available on Pro plan",
+          requiresUpgrade: true,
+          minimumPlan: "pro",
+          checks: [],
+          passCount: 0,
+          failCount: 1,
+          warningCount: 0,
+        });
+      }
+
+      // Perform iOS readiness validation
+      const buildInfo = {
+        bundleId: appItem.packageName?.replace(/^com\./, ""), // Derive from package name
+        appVersion: "1.0.0",
+        buildNumber: appItem.versionCode || 1,
+        hasAllIcons: !!appItem.iconUrl,
+        hasLaunchScreen: true, // Default splash is always included
+        hasPushCapability: limits.pushEnabled,
+        hasSigningProfile: appItem.status === "live",
+      };
+
+      const result = validateAppStoreReadiness(appItem, buildInfo);
+
+      return res.json({
+        ...result,
+        plan,
+        canSubmit: result.ready && limits.appStoreReady,
+      });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Validate before AAB download (Play Store format)
+  app.get("/api/apps/:id/validate/aab", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const appItem = await storage.getApp(req.params.id);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "App not found" });
+      }
+
+      const { plan, limits } = await getAppPlanInfo(appItem.id);
+
+      // Check if AAB is allowed for this plan
+      if (!limits.aabEnabled) {
+        return res.status(403).json({
+          allowed: false,
+          reason: "AAB format (Play Store) is not available on Starter plan. Preview builds are not eligible for Play Store submission.",
+          requiresUpgrade: true,
+          minimumPlan: "standard",
+        });
+      }
+
+      // Run readiness checks
+      const buildInfo = {
+        isReleaseSigned: appItem.status === "live",
+        hasAabOutput: appItem.status === "live",
+        targetSdk: 34,
+        hasDebugFlags: false,
+        hasInternetPermission: true,
+      };
+
+      const validation = canDownloadAab(appItem, plan, buildInfo);
+
+      return res.json(validation);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // ============================================
+  // END BUILD READINESS ENDPOINTS
+  // ============================================
 
   // --- Push Notifications ---
   
