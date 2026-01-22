@@ -702,13 +702,6 @@ export default function Dashboard() {
                   </span>
                 )}
               </div>
-              {(apps || []).length > 0 && (
-                <Link href="/create">
-                  <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground hover:text-white">
-                    Create new <Plus className="h-4 w-4" />
-                  </Button>
-                </Link>
-              )}
             </div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
