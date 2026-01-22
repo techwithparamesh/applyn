@@ -1,9 +1,12 @@
 package __PACKAGE_NAME__
 
 import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.Uri
 import android.os.Bundle
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -11,6 +14,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -74,11 +78,51 @@ class MainActivity : AppCompatActivity() {
 
     webView.webViewClient = object : WebViewClient() {
       override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-        // Keep navigation within the app
         val url = request?.url?.toString() ?: return false
-        if (url.startsWith("__START_URL__".substringBefore("://") + "://")) {
-          return false // Load in WebView
+        val uri = request?.url ?: return false
+        val scheme = uri.scheme ?: return false
+        
+        // Handle external URL schemes - open with native apps
+        val externalSchemes = listOf(
+          "tel", "mailto", "sms", "whatsapp", "tg", "telegram",
+          "fb", "facebook", "instagram", "twitter", "x",
+          "linkedin", "snapchat", "viber", "skype",
+          "geo", "maps", "market", "intent"
+        )
+        
+        if (externalSchemes.contains(scheme.lowercase())) {
+          return openExternalIntent(uri)
         }
+        
+        // Handle http/https links to external domains
+        if (scheme == "http" || scheme == "https") {
+          val appHost = "__START_URL__".replace(Regex("^https?://"), "").split("/")[0]
+          val linkHost = uri.host ?: ""
+          
+          // Check if it's a social media or external link that should open in native app
+          val externalDomains = listOf(
+            "wa.me", "api.whatsapp.com", "whatsapp.com",
+            "t.me", "telegram.me", "telegram.org",
+            "facebook.com", "fb.com", "m.facebook.com",
+            "instagram.com", "twitter.com", "x.com",
+            "linkedin.com", "youtube.com", "youtu.be",
+            "play.google.com", "apps.apple.com",
+            "maps.google.com", "maps.app.goo.gl"
+          )
+          
+          if (externalDomains.any { linkHost.contains(it) }) {
+            return openExternalIntent(uri)
+          }
+          
+          // Keep same-domain navigation within the app
+          if (linkHost.contains(appHost) || appHost.contains(linkHost)) {
+            return false // Load in WebView
+          }
+          
+          // Open other external http/https links in browser
+          return openExternalIntent(uri)
+        }
+        
         return false
       }
 
@@ -104,6 +148,21 @@ class MainActivity : AppCompatActivity() {
     val network = connectivityManager.activeNetwork ?: return false
     val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
     return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+  }
+
+  private fun openExternalIntent(uri: Uri): Boolean {
+    return try {
+      val intent = Intent(Intent.ACTION_VIEW, uri)
+      intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      startActivity(intent)
+      true
+    } catch (e: ActivityNotFoundException) {
+      // If no app can handle the intent, show a toast
+      Toast.makeText(this, "No app found to handle this link", Toast.LENGTH_SHORT).show()
+      false
+    } catch (e: Exception) {
+      false
+    }
   }
 
   private fun showOfflinePage() {
