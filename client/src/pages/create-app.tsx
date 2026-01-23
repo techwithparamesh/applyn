@@ -280,8 +280,8 @@ export default function CreateApp() {
     icon: "🚀",
     customLogo: null as string | null,
     iconColor: "#2563EB",
-    primaryColor: "#00E5FF",
-    secondaryColor: "#A855F7",
+    primaryColor: "", // Empty = will use detected or default cyan
+    secondaryColor: "", // Empty = will use detected or default purple
     splashBgColor: "#0a0a0a",
     statusBarStyle: "light" as "light" | "dark",
     enablePullToRefresh: true,
@@ -500,6 +500,10 @@ export default function CreateApp() {
   const handlePayment = async () => {
     setLoading(true);
     try {
+      // Use detected color or defaults if not set
+      const primaryColorToUse = formData.primaryColor || websiteAnalysis?.primaryColor || "#00E5FF";
+      const secondaryColorToUse = formData.secondaryColor || "#A855F7";
+      
       // First create the app
       const appRes = await apiRequest("POST", "/api/apps", {
         name: formData.appName,
@@ -507,7 +511,7 @@ export default function CreateApp() {
         icon: formData.icon,
         iconUrl: formData.customLogo,
         iconColor: formData.iconColor,
-        primaryColor: formData.primaryColor,
+        primaryColor: primaryColorToUse,
         platform: formData.platform,
         buildNow: false, // Don't build yet, wait for payment
         features: {
@@ -885,19 +889,40 @@ export default function CreateApp() {
 
                     {/* Brand Colors */}
                     <div className="space-y-3">
-                      <Label className="text-white font-medium">Brand Colors</Label>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-white font-medium">Brand Colors</Label>
+                        {websiteAnalysis?.primaryColor && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData(prev => ({
+                                ...prev,
+                                primaryColor: websiteAnalysis.primaryColor,
+                              }));
+                              toast({
+                                title: "🎨 Auto-detected color applied!",
+                                description: `Using ${websiteAnalysis.primaryColor} from your website.`,
+                              });
+                            }}
+                            className="text-xs px-2 py-1 rounded-md bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors flex items-center gap-1"
+                          >
+                            <Wand2 className="h-3 w-3" />
+                            Use Detected Color
+                          </button>
+                        )}
+                      </div>
                       
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <p className="text-xs text-muted-foreground">Primary Color</p>
+                          <p className="text-xs text-muted-foreground">Primary Color {!formData.primaryColor && <span className="text-cyan-400">(auto)</span>}</p>
                           <div className="flex gap-2 flex-wrap">
                             {["#00E5FF", "#A855F7", "#10B981", "#F59E0B", "#EF4444", "#3B82F6"].map((color) => (
                               <div
                                 key={color}
                                 onClick={() => {
-                                  // Toggle: if already selected, deselect by clearing to empty-ish
+                                  // Toggle: if already selected, clear to auto/empty
                                   if (formData.primaryColor.toUpperCase() === color.toUpperCase()) {
-                                    setFormData({ ...formData, primaryColor: "#2563EB" }); // Default blue, no preset selected
+                                    setFormData({ ...formData, primaryColor: "" }); // Empty = auto
                                   } else {
                                     setFormData({ ...formData, primaryColor: color });
                                   }
@@ -910,7 +935,7 @@ export default function CreateApp() {
                             ))}
                             <Input
                               type="color"
-                              value={formData.primaryColor}
+                              value={formData.primaryColor || "#00E5FF"}
                               onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
                               className="h-8 w-8 p-1 rounded-full cursor-pointer bg-transparent border-white/20"
                             />
@@ -918,15 +943,15 @@ export default function CreateApp() {
                         </div>
                         
                         <div className="space-y-2">
-                          <p className="text-xs text-muted-foreground">Secondary Color</p>
+                          <p className="text-xs text-muted-foreground">Secondary Color {!formData.secondaryColor && <span className="text-purple-400">(auto)</span>}</p>
                           <div className="flex gap-2 flex-wrap">
                             {["#A855F7", "#00E5FF", "#F97316", "#22C55E", "#6366F1", "#14B8A6"].map((color) => (
                               <div
                                 key={color}
                                 onClick={() => {
-                                  // Toggle: if already selected, deselect by clearing to default
+                                  // Toggle: if already selected, clear to auto/empty
                                   if (formData.secondaryColor.toUpperCase() === color.toUpperCase()) {
-                                    setFormData({ ...formData, secondaryColor: "#8B5CF6" }); // Default purple, no preset selected
+                                    setFormData({ ...formData, secondaryColor: "" }); // Empty = auto
                                   } else {
                                     setFormData({ ...formData, secondaryColor: color });
                                   }
@@ -939,7 +964,7 @@ export default function CreateApp() {
                             ))}
                             <Input
                               type="color"
-                              value={formData.secondaryColor}
+                              value={formData.secondaryColor || "#A855F7"}
                               onChange={(e) => setFormData({ ...formData, secondaryColor: e.target.value })}
                               className="h-8 w-8 p-1 rounded-full cursor-pointer bg-transparent border-white/20"
                             />
@@ -1162,15 +1187,19 @@ export default function CreateApp() {
                         <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">Primary Color:</span>
                           <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 rounded-full border border-white/20" style={{ backgroundColor: formData.primaryColor }} />
-                            <span className="font-mono text-xs text-muted-foreground">{formData.primaryColor}</span>
+                            <div className="w-5 h-5 rounded-full border border-white/20" style={{ backgroundColor: formData.primaryColor || websiteAnalysis?.primaryColor || "#00E5FF" }} />
+                            <span className="font-mono text-xs text-muted-foreground">
+                              {formData.primaryColor || (websiteAnalysis?.primaryColor ? `${websiteAnalysis.primaryColor} (detected)` : "#00E5FF (auto)")}
+                            </span>
                           </div>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">Secondary Color:</span>
                           <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 rounded-full border border-white/20" style={{ backgroundColor: formData.secondaryColor }} />
-                            <span className="font-mono text-xs text-muted-foreground">{formData.secondaryColor}</span>
+                            <div className="w-5 h-5 rounded-full border border-white/20" style={{ backgroundColor: formData.secondaryColor || "#A855F7" }} />
+                            <span className="font-mono text-xs text-muted-foreground">
+                              {formData.secondaryColor || "#A855F7 (auto)"}
+                            </span>
                           </div>
                         </div>
                         <div className="flex justify-between items-center">
@@ -1275,7 +1304,7 @@ export default function CreateApp() {
             <DevicePreview
               url={formData.url}
               appName={formData.appName}
-              primaryColor={formData.primaryColor}
+              primaryColor={formData.primaryColor || websiteAnalysis?.primaryColor || "#00E5FF"}
               icon={formData.customLogo || formData.icon}
               availablePlatforms={
                 // Determine available platforms based on plan

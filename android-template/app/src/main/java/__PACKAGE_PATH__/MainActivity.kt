@@ -283,6 +283,12 @@ class MainActivity : AppCompatActivity() {
             android.graphics.Color.parseColor(primaryColor)
         )
 
+        // CRITICAL: Only enable swipe refresh when WebView is at the top
+        // This prevents refresh triggering when user is scrolling up in content
+        webView.setOnScrollChangeListener { _, _, scrollY, _, _ ->
+            swipeRefresh.isEnabled = pullToRefreshEnabled && scrollY == 0
+        }
+
         swipeRefresh.setOnRefreshListener {
             webView.reload()
         }
