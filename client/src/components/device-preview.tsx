@@ -102,7 +102,7 @@ export function DevicePreview({
   const domain = url.replace(/^https?:\/\//, "").replace(/\/$/, "").split('/')[0];
   const normalizedUrl = url.startsWith("http") ? url : `https://${url}`;
 
-  // Screenshot service URL with mobile viewport
+  // Use thum.io for screenshot preview
   const screenshotUrl = `https://image.thum.io/get/viewportWidth/414/width/414/noanimate/${normalizedUrl}?v=${retryCount}`;
 
   const handleRetry = () => {
@@ -320,6 +320,7 @@ function IOSDeviceFrame({
             onImageLoad={onImageLoad}
             onImageError={onImageError}
             onRetry={onRetry}
+            url={url}
           />
         </div>
 
@@ -433,6 +434,7 @@ function AndroidDeviceFrame({
             onImageLoad={onImageLoad}
             onImageError={onImageError}
             onRetry={onRetry}
+            url={url}
           />
         </div>
 
@@ -471,6 +473,7 @@ interface PreviewContentProps {
   onImageLoad: () => void;
   onImageError: () => void;
   onRetry: () => void;
+  url?: string;
 }
 
 function PreviewContent({
@@ -482,49 +485,97 @@ function PreviewContent({
   onImageLoad,
   onImageError,
   onRetry,
+  url,
 }: PreviewContentProps) {
+  const [useIframe, setUseIframe] = useState(false);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
+  
+  // Check if URL is valid (not just "https://" or empty)
+  const isValidUrl = domain && domain.length > 3 && domain.includes(".");
+  
+  // Get the full URL for iframe - use url prop if available, otherwise build from domain
+  const fullUrl = url || (domain ? (domain.startsWith("http") ? domain : `https://${domain}`) : "");
+
+  // Auto-switch to iframe if screenshot fails or takes too long
+  useEffect(() => {
+    if (!isValidUrl) return;
+    
+    // After 5 seconds, if still loading, switch to iframe
+    const timeout = setTimeout(() => {
+      if (!imageLoaded && !imageError) {
+        setUseIframe(true);
+      }
+    }, 5000);
+    
+    return () => clearTimeout(timeout);
+  }, [isValidUrl, imageLoaded, imageError, domain]);
+
+  // Switch to iframe on error
+  useEffect(() => {
+    if (imageError && isValidUrl) {
+      setUseIframe(true);
+    }
+  }, [imageError, isValidUrl]);
+
   return (
     <>
-      {/* Loading State */}
-      {!imageLoaded && !imageError && (
+      {/* Invalid URL State - show placeholder */}
+      {!isValidUrl && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 z-10 p-4">
+          <Globe className="w-12 h-12 text-gray-300 mb-3" />
+          <p className="text-sm text-gray-500 font-medium text-center">Enter your website URL</p>
+          <p className="text-xs text-gray-400 text-center mt-1">Preview will appear here</p>
+        </div>
+      )}
+
+      {/* Loading State for Screenshot */}
+      {isValidUrl && !useIframe && !imageLoaded && !imageError && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10">
           <Loader2 className="w-8 h-8 animate-spin text-gray-400 mb-3" />
           <p className="text-xs text-gray-500 font-medium">Loading preview...</p>
+          <p className="text-xs text-gray-400 mt-1">{domain}</p>
         </div>
       )}
 
-      {/* Error State */}
-      {imageError && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10 p-4">
-          <Globe className="w-10 h-10 text-gray-300 mb-3" />
-          <p className="text-xs text-gray-500 font-medium text-center">Unable to load preview</p>
-          <button
-            onClick={onRetry}
-            className="mt-3 flex items-center gap-1 text-xs text-cyan-500 hover:text-cyan-400 transition-colors"
-          >
-            <RefreshCw className="w-3 h-3" />
-            Try again
-          </button>
-        </div>
+      {/* Iframe Preview (fallback) */}
+      {isValidUrl && useIframe && (
+        <>
+          {!iframeLoaded && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10">
+              <Loader2 className="w-8 h-8 animate-spin text-gray-400 mb-3" />
+              <p className="text-xs text-gray-500 font-medium">Loading live preview...</p>
+              <p className="text-xs text-gray-400 mt-1">{domain}</p>
+            </div>
+          )}
+          <iframe
+            src={fullUrl}
+            className={`w-full h-full border-0 transition-opacity duration-300 ${iframeLoaded ? 'opacity-100' : 'opacity-0'}`}
+            onLoad={() => setIframeLoaded(true)}
+            sandbox="allow-scripts allow-same-origin"
+            title={`Preview of ${domain}`}
+          />
+        </>
       )}
 
-      {/* Actual Screenshot - scaled to fit width exactly */}
-      <div
-        className={`w-full transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
-        style={{
-          transform: `scale(${phoneScreenWidth / 414})`,
-          transformOrigin: 'top left',
-          width: '414px',
-        }}
-      >
-        <img
-          src={screenshotUrl}
-          alt={`Preview of ${domain}`}
-          className="w-full"
-          onLoad={onImageLoad}
-          onError={onImageError}
-        />
-      </div>
+      {/* Screenshot Preview (primary) */}
+      {isValidUrl && !useIframe && (
+        <div
+          className={`w-full transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+          style={{
+            transform: `scale(${phoneScreenWidth / 414})`,
+            transformOrigin: 'top left',
+            width: '414px',
+          }}
+        >
+          <img
+            src={screenshotUrl}
+            alt={`Preview of ${domain}`}
+            className="w-full"
+            onLoad={onImageLoad}
+            onError={onImageError}
+          />
+        </div>
+      )}
     </>
   );
 }
