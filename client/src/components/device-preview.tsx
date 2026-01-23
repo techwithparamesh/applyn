@@ -251,6 +251,7 @@ interface DeviceFrameProps {
 }
 
 function IOSDeviceFrame({
+  url,
   appName,
   primaryColor,
   icon,
@@ -351,6 +352,7 @@ function IOSDeviceFrame({
 // ============================================
 
 function AndroidDeviceFrame({
+  url,
   appName,
   primaryColor,
   icon,
