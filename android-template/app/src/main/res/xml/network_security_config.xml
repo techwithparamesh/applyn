@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Applyn Network Security Configuration
+    
+    This file allows the WebView to load content from any domain,
+    including HTTP (cleartext) traffic for development/testing purposes.
+    
+    For production apps with HTTPS-only sites, the cleartext traffic 
+    permission can be removed for better security.
+-->
+<network-security-config>
+    <!-- Allow cleartext (HTTP) traffic to all domains -->
+    <!-- This is required for websites that don't use HTTPS -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
