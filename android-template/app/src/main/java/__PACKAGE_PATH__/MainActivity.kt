@@ -62,25 +62,38 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         // Install splash screen before super.onCreate()
-        installSplashScreen()
+        try {
+            installSplashScreen()
+        } catch (e: Exception) {
+            // Splash screen not supported - continue without it
+        }
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Initialize OneSignal for push notifications
-        initOneSignal()
+        try {
+            // Initialize OneSignal for push notifications
+            initOneSignal()
 
-        // Bind views
-        bindViews()
+            // Bind views
+            bindViews()
 
-        // Configure components
-        configureWebView()
-        configureSwipeRefresh()
-        configureBottomNavigation()
-        configureOfflineScreen()
-        configureBackButton()
+            // Configure components
+            configureWebView()
+            configureSwipeRefresh()
+            configureBottomNavigation()
+            configureOfflineScreen()
+            configureBackButton()
 
-        // Load initial URL
-        loadUrl(startUrl)
+            // Load initial URL
+            loadUrl(startUrl)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            // Fallback: just load WebView with URL
+            webView = findViewById(R.id.webView)
+            webView.settings.javaScriptEnabled = true
+            webView.settings.domStorageEnabled = true
+            webView.loadUrl(startUrl)
+        }
     }
 
     private fun bindViews() {
@@ -440,10 +453,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initOneSignal() {
-        val appId = BuildConfig.ONESIGNAL_APP_ID
-        if (appId.isNotBlank() && appId != "null" && appId != "") {
-            OneSignal.Debug.logLevel = LogLevel.WARN
-            OneSignal.initWithContext(this, appId)
+        try {
+            val appId = BuildConfig.ONESIGNAL_APP_ID
+            if (appId.isNotBlank() && appId != "null" && appId != "" && appId != "__ONESIGNAL_APP_ID__") {
+                OneSignal.Debug.logLevel = LogLevel.WARN
+                OneSignal.initWithContext(this, appId)
+            }
+        } catch (e: Exception) {
+            // OneSignal init failed - continue without push notifications
+            e.printStackTrace()
         }
     }
 
