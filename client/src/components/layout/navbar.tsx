@@ -50,6 +50,8 @@ export function Navbar() {
   const isAuthed = !!me;
   const role = ((me as any)?.role as string | undefined) || "user";
   const isStaff = role === "admin" || role === "support";
+  const isSupport = role === "support";
+  const isAdmin = role === "admin";
 
   const initials = (() => {
     const name = (me as any)?.name as string | null | undefined;
@@ -148,12 +150,15 @@ export function Navbar() {
                   >
                     Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => setLocation("/billing")}
-                    className="text-muted-foreground hover:text-white focus:text-white"
-                  >
-                    Billing
-                  </DropdownMenuItem>
+                  {/* Hide Billing for support users - they don't manage billing */}
+                  {!isSupport && (
+                    <DropdownMenuItem 
+                      onClick={() => setLocation("/billing")}
+                      className="text-muted-foreground hover:text-white focus:text-white"
+                    >
+                      Billing
+                    </DropdownMenuItem>
+                  )}
                   {isStaff && (
                     <DropdownMenuItem 
                       onClick={() => setLocation("/ops")}
@@ -162,12 +167,20 @@ export function Navbar() {
                       Ops
                     </DropdownMenuItem>
                   )}
-                  {role === "admin" && (
+                  {isAdmin && (
                     <DropdownMenuItem 
                       onClick={() => setLocation("/admin/team")}
                       className="text-muted-foreground hover:text-white focus:text-white"
                     >
                       Team
+                    </DropdownMenuItem>
+                  )}
+                  {isAdmin && (
+                    <DropdownMenuItem 
+                      onClick={() => setLocation("/admin/users")}
+                      className="text-muted-foreground hover:text-white focus:text-white"
+                    >
+                      Users
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator className="bg-white/10" />
@@ -223,7 +236,22 @@ export function Navbar() {
                     <MobileLink label="Dashboard" onClick={() => setLocation("/dashboard")} />
                     <MobileLink label="My Tickets" onClick={() => setLocation("/tickets")} />
                     <MobileLink label="Profile" onClick={() => setLocation("/profile")} />
-                    <MobileLink label="Billing" onClick={() => setLocation("/billing")} />
+                    {/* Hide Billing for support users */}
+                    {!isSupport && (
+                      <MobileLink label="Billing" onClick={() => setLocation("/billing")} />
+                    )}
+                    {/* Ops for staff only */}
+                    {isStaff && (
+                      <MobileLink label="Ops" onClick={() => setLocation("/ops")} />
+                    )}
+                    {/* Team for admin only */}
+                    {isAdmin && (
+                      <MobileLink label="Team" onClick={() => setLocation("/admin/team")} />
+                    )}
+                    {/* Users for admin only */}
+                    {isAdmin && (
+                      <MobileLink label="Users" onClick={() => setLocation("/admin/users")} />
+                    )}
                     <div className="pt-4">
                       <SheetClose asChild>
                         <Button className="w-full" variant="destructive" onClick={handleLogout}>

@@ -727,7 +727,71 @@ export async function registerRoutes(
     async (_req, res, next) => {
       try {
         const rows = await storage.listUsers();
-        return res.json(rows);
+        // Only return staff members (admin + support), NOT regular users
+        const staffOnly = rows.filter(u => u.role === "admin" || u.role === "support");
+        return res.json(staffOnly);
+      } catch (err) {
+        return next(err);
+      }
+    },
+  );
+
+  // Get all regular users for admin management (separate from team members)
+  app.get(
+    "/api/admin/users",
+    requireAuth,
+    requireRole(["admin", "support"]),
+    async (req, res, next) => {
+      try {
+        const rows = await storage.listUsers();
+        // Only return regular users (not staff)
+        const regularUsers = rows.filter(u => u.role === "user");
+        
+        // Get app counts for each user
+        const usersWithStats = await Promise.all(
+          regularUsers.map(async (user) => {
+            const apps = await storage.listAppsByOwner(user.id);
+            const tickets = await storage.listSupportTicketsByRequester(user.id);
+            return {
+              ...user,
+              appCount: apps.length,
+              ticketCount: tickets.length,
+              openTickets: tickets.filter(t => t.status === "open").length,
+            };
+          })
+        );
+        
+        return res.json(usersWithStats);
+      } catch (err) {
+        return next(err);
+      }
+    },
+  );
+
+  // Get single user details with their apps and tickets (for admin support)
+  app.get(
+    "/api/admin/users/:id",
+    requireAuth,
+    requireRole(["admin", "support"]),
+    async (req, res, next) => {
+      try {
+        const { id } = req.params;
+        const user = await storage.getUser(id);
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+        
+        const apps = await storage.listAppsByOwner(id);
+        const tickets = await storage.listSupportTicketsByRequester(id);
+        
+        // Don't expose password
+        const { password: _pw, ...safeUser } = user;
+        
+        return res.json({
+          user: safeUser,
+          apps,
+          tickets,
+        });
       } catch (err) {
         return next(err);
       }
@@ -1173,10 +1237,10 @@ export async function registerRoutes(
         console.log(`[Payment Verify] Added 10 extra rebuilds for user ${user.id}`);
       } else if (plan === "extra_app_slot") {
         // Add 1 extra app slot to user
+        await storage.addExtraAppSlot(user.id, 1);
         const freshUser = await storage.getUser(user.id);
-        const currentSlots = freshUser?.extraAppSlots || 0;
-        await storage.updateUser(user.id, { extraAppSlots: currentSlots + 1 });
-        console.log(`[Payment Verify] Added 1 extra app slot for user ${user.id}, now has ${currentSlots + 1} extra slots`);
+        const currentSlots = (freshUser as any)?.extraAppSlots || 0;
+        console.log(`[Payment Verify] Added 1 extra app slot for user ${user.id}, now has ${currentSlots} extra slots`);
       } else if (plan === "starter" || plan === "standard" || plan === "pro" || plan === "agency") {
         // Activate or extend subscription
         const now = new Date();

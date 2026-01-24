@@ -31,7 +31,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { motion } from "framer-motion";
 import {
   Users,
@@ -264,14 +264,22 @@ export default function AdminTeam() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="flex items-center gap-3 mb-2">
-            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center">
-              <Users className="h-6 w-6 text-cyan-400" />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center">
+                <Users className="h-6 w-6 text-cyan-400" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-white">Team Management</h1>
+                <p className="text-muted-foreground">Manage admin and support team members</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white">Team Management</h1>
-              <p className="text-muted-foreground">Manage admin and support team members</p>
-            </div>
+            <Link href="/admin/users">
+              <Button variant="outline" className="gap-2 border-white/10 text-white hover:bg-white/5">
+                <User className="h-4 w-4" />
+                View All Users
+              </Button>
+            </Link>
           </div>
         </motion.div>
 

@@ -227,6 +227,20 @@ export class MysqlStorage {
   }
 
   /**
+   * Add extra app slots (for purchased slots)
+   */
+  async addExtraAppSlot(userId: string, count: number): Promise<User | undefined> {
+    await getMysqlDb()
+      .update(users)
+      .set({
+        extraAppSlots: sql`COALESCE(extra_app_slots, 0) + ${count}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+    return await this.getUser(userId);
+  }
+
+  /**
    * Get users with expiring subscriptions (for renewal reminders)
    */
   async getUsersWithExpiringSubscriptions(daysUntilExpiry: number): Promise<User[]> {
@@ -386,12 +400,18 @@ export class MysqlStorage {
   }
 
   async updateApp(id: string, patch: Partial<InsertApp>): Promise<App | undefined> {
+    // Handle features field - convert object to JSON string for MySQL
+    const patchData: any = {
+      ...patch,
+      updatedAt: new Date(),
+    };
+    if (patch.features && typeof patch.features === 'object') {
+      patchData.features = JSON.stringify(patch.features);
+    }
+    
     await getMysqlDb()
       .update(apps)
-      .set({
-        ...patch,
-        updatedAt: new Date(),
-      })
+      .set(patchData)
       .where(eq(apps.id, id));
 
     return await this.getApp(id);

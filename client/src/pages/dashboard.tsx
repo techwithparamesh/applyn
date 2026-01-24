@@ -111,10 +111,12 @@ export default function Dashboard() {
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
+  const userRole = me?.role || "user";
   const isStaff = useMemo(() => {
-    const role = me?.role;
-    return role === "admin" || role === "support";
-  }, [me]);
+    return userRole === "admin" || userRole === "support";
+  }, [userRole]);
+  const isSupport = userRole === "support";
+  const isAdmin = userRole === "admin";
 
   const [logsOpen, setLogsOpen] = useState(false);
   const [logsTitle, setLogsTitle] = useState<string>("Build logs");
@@ -438,151 +440,285 @@ export default function Dashboard() {
                 Welcome back, <span className="text-gradient">{me?.name || me?.username?.split("@")[0] || "User"}</span>
               </h1>
               <p className="text-muted-foreground mt-1">
-                Here's what's happening with your apps today
+                {isSupport 
+                  ? "Support Dashboard - Help users and manage tickets"
+                  : "Here's what's happening with your apps today"
+                }
               </p>
             </div>
-            <Link href="/create">
-              <Button className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold shadow-lg glow-primary">
-                <Plus className="h-4 w-4" /> Create New App
-              </Button>
-            </Link>
+            {!isSupport && (
+              <Link href="/create">
+                <Button className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold shadow-lg glow-primary">
+                  <Plus className="h-4 w-4" /> Create New App
+                </Button>
+              </Link>
+            )}
           </motion.div>
 
-          {/* Stats Grid */}
+          {/* Stats Grid - Role-based */}
           <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card 
-              className={`glass glass-hover border stat-gradient-1 cursor-pointer transition-all ${statusFilter === "all" ? "ring-2 ring-cyan-500" : ""}`}
-              onClick={() => setStatusFilter("all")}
-            >
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Total Apps</p>
-                    <p className="text-3xl font-bold text-white mt-1">{stats.total}</p>
-                  </div>
-                  <div className="h-12 w-12 rounded-xl bg-cyan-500/10 flex items-center justify-center">
-                    <Package className="h-6 w-6 text-cyan-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {isSupport ? (
+              /* Support Team Stats */
+              <>
+                <Card 
+                  className="glass glass-hover border stat-gradient-4 cursor-pointer transition-all"
+                  onClick={() => setLocation("/tickets")}
+                >
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Open Tickets</p>
+                        <p className="text-3xl font-bold text-white mt-1">{stats.openTickets}</p>
+                      </div>
+                      <div className="h-12 w-12 rounded-xl bg-yellow-500/10 flex items-center justify-center">
+                        <LifeBuoy className="h-6 w-6 text-yellow-400" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-            <Card 
-              className={`glass glass-hover border stat-gradient-3 cursor-pointer transition-all ${statusFilter === "live" ? "ring-2 ring-green-500" : ""}`}
-              onClick={() => setStatusFilter("live")}
-            >
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Live Apps</p>
-                    <p className="text-3xl font-bold text-white mt-1">{stats.live}</p>
-                  </div>
-                  <div className="h-12 w-12 rounded-xl bg-green-500/10 flex items-center justify-center">
-                    <CheckCircle className="h-6 w-6 text-green-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                <Card className="glass glass-hover border stat-gradient-1">
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Apps</p>
+                        <p className="text-3xl font-bold text-white mt-1">{stats.total}</p>
+                      </div>
+                      <div className="h-12 w-12 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+                        <Package className="h-6 w-6 text-cyan-400" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-            <Card 
-              className={`glass glass-hover border stat-gradient-2 cursor-pointer transition-all ${statusFilter === "processing" ? "ring-2 ring-purple-500" : ""}`}
-              onClick={() => setStatusFilter("processing")}
-            >
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Processing</p>
-                    <p className="text-3xl font-bold text-white mt-1">{stats.processing}</p>
-                  </div>
-                  <div className="h-12 w-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
-                    <Activity className="h-6 w-6 text-purple-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                <Card className="glass glass-hover border stat-gradient-2">
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Processing</p>
+                        <p className="text-3xl font-bold text-white mt-1">{stats.processing}</p>
+                      </div>
+                      <div className="h-12 w-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
+                        <Activity className="h-6 w-6 text-purple-400" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-            <Card 
-              className="glass glass-hover border stat-gradient-4 cursor-pointer transition-all"
-              onClick={() => setLocation("/tickets")}
-            >
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Open Tickets</p>
-                    <p className="text-3xl font-bold text-white mt-1">{stats.openTickets}</p>
-                  </div>
-                  <div className="h-12 w-12 rounded-xl bg-yellow-500/10 flex items-center justify-center">
-                    <LifeBuoy className="h-6 w-6 text-yellow-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                <Card className="glass glass-hover border stat-gradient-3">
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Failed Builds</p>
+                        <p className="text-3xl font-bold text-white mt-1">{stats.failed}</p>
+                      </div>
+                      <div className="h-12 w-12 rounded-xl bg-red-500/10 flex items-center justify-center">
+                        <AlertCircle className="h-6 w-6 text-red-400" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              /* Regular User Stats */
+              <>
+                <Card 
+                  className={`glass glass-hover border stat-gradient-1 cursor-pointer transition-all ${statusFilter === "all" ? "ring-2 ring-cyan-500" : ""}`}
+                  onClick={() => setStatusFilter("all")}
+                >
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Apps</p>
+                        <p className="text-3xl font-bold text-white mt-1">{stats.total}</p>
+                      </div>
+                      <div className="h-12 w-12 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+                        <Package className="h-6 w-6 text-cyan-400" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card 
+                  className={`glass glass-hover border stat-gradient-3 cursor-pointer transition-all ${statusFilter === "live" ? "ring-2 ring-green-500" : ""}`}
+                  onClick={() => setStatusFilter("live")}
+                >
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Live Apps</p>
+                        <p className="text-3xl font-bold text-white mt-1">{stats.live}</p>
+                      </div>
+                      <div className="h-12 w-12 rounded-xl bg-green-500/10 flex items-center justify-center">
+                        <CheckCircle className="h-6 w-6 text-green-400" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card 
+                  className={`glass glass-hover border stat-gradient-2 cursor-pointer transition-all ${statusFilter === "processing" ? "ring-2 ring-purple-500" : ""}`}
+                  onClick={() => setStatusFilter("processing")}
+                >
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Processing</p>
+                        <p className="text-3xl font-bold text-white mt-1">{stats.processing}</p>
+                      </div>
+                      <div className="h-12 w-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
+                        <Activity className="h-6 w-6 text-purple-400" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card 
+                  className="glass glass-hover border stat-gradient-4 cursor-pointer transition-all"
+                  onClick={() => setLocation("/tickets")}
+                >
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Open Tickets</p>
+                        <p className="text-3xl font-bold text-white mt-1">{stats.openTickets}</p>
+                      </div>
+                      <div className="h-12 w-12 rounded-xl bg-yellow-500/10 flex items-center justify-center">
+                        <LifeBuoy className="h-6 w-6 text-yellow-400" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
           </motion.div>
 
-          {/* Quick Actions */}
+          {/* Quick Actions - Role-based */}
           <motion.div variants={itemVariants}>
             <h2 className="text-lg font-semibold text-white mb-4">Quick Actions</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Link href="/create">
-                <Card className="glass glass-hover cursor-pointer group">
-                  <CardContent className="p-5 flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-xl bg-cyan-500/10 flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
-                      <Sparkles className="h-5 w-5 text-cyan-400" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-white">New App</p>
-                      <p className="text-xs text-muted-foreground">Convert website</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
+              {/* Support-specific actions */}
+              {isSupport ? (
+                <>
+                  <Link href="/tickets">
+                    <Card className="glass glass-hover cursor-pointer group">
+                      <CardContent className="p-5 flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-xl bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
+                          <LifeBuoy className="h-5 w-5 text-purple-400" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-white">All Tickets</p>
+                          <p className="text-xs text-muted-foreground">View & respond</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
 
-              <Link href="/tickets">
-                <Card className="glass glass-hover cursor-pointer group">
-                  <CardContent className="p-5 flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-xl bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
-                      <LifeBuoy className="h-5 w-5 text-purple-400" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-white">Support</p>
-                      <p className="text-xs text-muted-foreground">Get help</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
+                  <Link href="/ops">
+                    <Card className="glass glass-hover cursor-pointer group">
+                      <CardContent className="p-5 flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-xl bg-cyan-500/10 flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
+                          <Activity className="h-5 w-5 text-cyan-400" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-white">Build Logs</p>
+                          <p className="text-xs text-muted-foreground">Debug issues</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
 
-              <Link href="/billing">
-                <Card className="glass glass-hover cursor-pointer group">
-                  <CardContent className="p-5 flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-xl bg-green-500/10 flex items-center justify-center group-hover:bg-green-500/20 transition-colors">
-                      <CreditCard className="h-5 w-5 text-green-400" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-white">Billing</p>
-                      <p className="text-xs text-muted-foreground">View payments</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
+                  <Link href="/profile">
+                    <Card className="glass glass-hover cursor-pointer group">
+                      <CardContent className="p-5 flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-xl bg-yellow-500/10 flex items-center justify-center group-hover:bg-yellow-500/20 transition-colors">
+                          <Settings className="h-5 w-5 text-yellow-400" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-white">Settings</p>
+                          <p className="text-xs text-muted-foreground">Profile & more</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
 
-              <Link href="/profile">
-                <Card className="glass glass-hover cursor-pointer group">
-                  <CardContent className="p-5 flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-xl bg-yellow-500/10 flex items-center justify-center group-hover:bg-yellow-500/20 transition-colors">
-                      <Settings className="h-5 w-5 text-yellow-400" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-white">Settings</p>
-                      <p className="text-xs text-muted-foreground">Profile & more</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
+                  <Card className="glass border-dashed border-white/10 opacity-60">
+                    <CardContent className="p-5 flex items-center gap-4">
+                      <div className="h-10 w-10 rounded-xl bg-gray-500/10 flex items-center justify-center">
+                        <AlertCircle className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-400">Support Role</p>
+                        <p className="text-xs text-muted-foreground">Read-only access</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              ) : (
+                /* Regular user actions */
+                <>
+                  <Link href="/create">
+                    <Card className="glass glass-hover cursor-pointer group">
+                      <CardContent className="p-5 flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-xl bg-cyan-500/10 flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
+                          <Sparkles className="h-5 w-5 text-cyan-400" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-white">New App</p>
+                          <p className="text-xs text-muted-foreground">Convert website</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+
+                  <Link href="/tickets">
+                    <Card className="glass glass-hover cursor-pointer group">
+                      <CardContent className="p-5 flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-xl bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
+                          <LifeBuoy className="h-5 w-5 text-purple-400" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-white">Support</p>
+                          <p className="text-xs text-muted-foreground">Get help</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+
+                  <Link href="/billing">
+                    <Card className="glass glass-hover cursor-pointer group">
+                      <CardContent className="p-5 flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-xl bg-green-500/10 flex items-center justify-center group-hover:bg-green-500/20 transition-colors">
+                          <CreditCard className="h-5 w-5 text-green-400" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-white">Billing</p>
+                          <p className="text-xs text-muted-foreground">View payments</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+
+                  <Link href="/profile">
+                    <Card className="glass glass-hover cursor-pointer group">
+                      <CardContent className="p-5 flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-xl bg-yellow-500/10 flex items-center justify-center group-hover:bg-yellow-500/20 transition-colors">
+                          <Settings className="h-5 w-5 text-yellow-400" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-white">Settings</p>
+                          <p className="text-xs text-muted-foreground">Profile & more</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                </>
+              )}
             </div>
           </motion.div>
 
-          {/* Subscription Status */}
-          {subscription && (
+          {/* Subscription Status - Hidden for support */}
+          {subscription && !isSupport && (
             <motion.div variants={itemVariants}>
               <h2 className="text-lg font-semibold text-white mb-4">Plan Status</h2>
               <Card className={`glass ${subscription.needsRenewal ? 'border-yellow-500/50' : subscription.isExpired ? 'border-red-500/50' : 'border-green-500/30'}`}>
@@ -685,7 +821,8 @@ export default function Dashboard() {
             </motion.div>
           )}
 
-          {/* Apps Section */}
+          {/* Apps Section - Hidden for support users */}
+          {!isSupport && (
           <motion.div variants={itemVariants}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -935,9 +1072,85 @@ export default function Dashboard() {
               )}
             </div>
           </motion.div>
+          )}
 
-          {/* Recent Tickets */}
-          {(tickets || []).length > 0 && (
+          {/* Support Dashboard - Show prominent ticket view for support users */}
+          {isSupport && (
+            <motion.div variants={itemVariants}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-white">Tickets to Review</h2>
+                <Link href="/tickets">
+                  <Button className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold">
+                    View All Tickets <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
+              
+              {(tickets || []).filter(t => t.status === "open").length > 0 ? (
+                <Card className="glass">
+                  <CardContent className="p-4">
+                    <div className="space-y-3">
+                      {(tickets || []).filter(t => t.status === "open").slice(0, 5).map((ticket) => (
+                        <div
+                          key={ticket.id}
+                          className="flex items-center justify-between p-4 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] border border-white/5 transition-colors cursor-pointer"
+                          onClick={() => setLocation("/tickets")}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full bg-yellow-500/10 flex items-center justify-center">
+                              <LifeBuoy className="h-5 w-5 text-yellow-400" />
+                            </div>
+                            <div>
+                              <span className="text-sm font-medium text-white">{ticket.subject}</span>
+                              <p className="text-xs text-muted-foreground">
+                                {formatDistanceToNow(new Date(ticket.createdAt), { addSuffix: true })}
+                              </p>
+                            </div>
+                          </div>
+                          <Badge className="bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+                            Open
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="glass border-dashed border-white/10">
+                  <CardContent className="p-12 text-center">
+                    <div className="mx-auto h-16 w-16 rounded-2xl bg-green-500/10 flex items-center justify-center mb-4">
+                      <CheckCircle className="h-8 w-8 text-green-400" />
+                    </div>
+                    <h3 className="font-semibold text-white text-lg">All caught up!</h3>
+                    <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">
+                      No open tickets to review. Great job keeping things running smoothly.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+              
+              {/* Support Info Card */}
+              <Card className="glass mt-6 border-cyan-500/20">
+                <CardContent className="p-5">
+                  <div className="flex items-start gap-4">
+                    <div className="h-10 w-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+                      <AlertCircle className="h-5 w-5 text-cyan-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-white">Support Role Access</h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        As a support team member, you can view and respond to all user tickets, access build logs for debugging, and view user apps (read-only). 
+                        You cannot create apps, manage billing, or access team settings.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {/* Recent Tickets - For regular users only */}
+          {!isSupport && (tickets || []).length > 0 && (
             <motion.div variants={itemVariants}>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-white">Recent Tickets</h2>

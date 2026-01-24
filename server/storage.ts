@@ -86,6 +86,7 @@ export interface IStorage {
   updateSubscriptionStatus(userId: string, status: string): Promise<User | undefined>;
   decrementRebuilds(userId: string): Promise<User | undefined>;
   addRebuilds(userId: string, count: number): Promise<User | undefined>;
+  addExtraAppSlot(userId: string, count: number): Promise<User | undefined>;
   getUsersWithExpiringSubscriptions(daysUntilExpiry: number): Promise<User[]>;
   getUsersWithExpiredSubscriptions(): Promise<User[]>;
   expireSubscriptions(): Promise<number>;
@@ -329,6 +330,19 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
+  async addExtraAppSlot(userId: string, count: number): Promise<User | undefined> {
+    const existing = this.users.get(userId);
+    if (!existing) return undefined;
+    const current = (existing as any).extraAppSlots || 0;
+    const updated: any = {
+      ...existing,
+      extraAppSlots: current + count,
+      updatedAt: new Date(),
+    };
+    this.users.set(userId, updated);
+    return updated;
+  }
+
   async getUsersWithExpiringSubscriptions(daysUntilExpiry: number): Promise<User[]> {
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + daysUntilExpiry);
@@ -352,7 +366,8 @@ export class MemStorage implements IStorage {
     const now = new Date();
     let count = 0;
     
-    for (const [id, user] of this.users.entries()) {
+    const entries = Array.from(this.users.entries());
+    for (const [id, user] of entries) {
       const u = user as any;
       if (u.planStatus === "active" && u.planExpiryDate && u.planExpiryDate < now) {
         this.users.set(id, {
@@ -371,6 +386,12 @@ export class MemStorage implements IStorage {
     return Array.from(this.users.values())
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
       .map(({ password: _pw, ...rest }) => rest);
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    if (!this.users.has(id)) return false;
+    this.users.delete(id);
+    return true;
   }
 
   async listAppsByOwner(ownerId: string): Promise<App[]> {

@@ -18,6 +18,7 @@ import Contact from "@/pages/contact";
 import Profile from "@/pages/profile";
 import Billing from "@/pages/billing";
 import AdminTeam from "@/pages/admin-team";
+import AdminUsers from "@/pages/admin-users";
 import Ops from "@/pages/ops";
 import Tickets from "@/pages/tickets";
 import EditApp from "@/pages/edit-app";
@@ -39,6 +40,7 @@ function Router() {
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
       <Route path="/admin/team" component={AdminTeam} />
+      <Route path="/admin/users" component={AdminUsers} />
       <Route path="/ops" component={Ops} />
       <Route path="/tickets" component={Tickets} />
       <Route path="/dashboard" component={Dashboard} />

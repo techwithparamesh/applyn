@@ -17,6 +17,7 @@ export const users = mysqlTable("users", {
   planStartDate: timestamp("plan_start_date", { mode: "date" }),
   planExpiryDate: timestamp("plan_expiry_date", { mode: "date" }),
   remainingRebuilds: int("remaining_rebuilds").default(0),
+  extraAppSlots: int("extra_app_slots").default(0),  // Purchased extra app slots
   subscriptionId: varchar("subscription_id", { length: 128 }),  // Razorpay subscription ID
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
