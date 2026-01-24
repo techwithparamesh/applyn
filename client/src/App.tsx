@@ -11,6 +11,7 @@ import CreateApp from "@/pages/create-app";
 import Login from "@/pages/login";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
+import ChangePassword from "@/pages/change-password";
 import Features from "@/pages/features";
 import Pricing from "@/pages/pricing";
 import FAQ from "@/pages/faq";
@@ -48,6 +49,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
+      <Route path="/change-password" component={ChangePassword} />
       <Route path="/apps/:id/edit" component={EditApp} />
       <Route path="/apps/:id/push" component={PushNotifications} />
       <Route path="/apps/:id/preview" component={PreviewApp} />

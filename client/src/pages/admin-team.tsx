@@ -67,6 +67,7 @@ type Me = {
   username: string;
   name: string | null;
   role: UserRole;
+  mustChangePassword?: boolean;
 };
 
 // Role badge colors and icons
@@ -109,6 +110,11 @@ export default function AdminTeam() {
       setLocation(`/login?returnTo=${encodeURIComponent("/admin/team")}`);
       return;
     }
+    // Redirect to password change if required
+    if (me.mustChangePassword) {
+      setLocation("/change-password");
+      return;
+    }
     if (me.role !== "admin") {
       setLocation("/dashboard");
       toast({
@@ -130,6 +136,7 @@ export default function AdminTeam() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<TeamMember | null>(null);
   const [copiedPassword, setCopiedPassword] = useState<string | null>(null);
+  const [emailSent, setEmailSent] = useState(false);
 
   const canSubmit = useMemo(() => {
     return email.trim().length > 3 && email.includes("@") && (role === "admin" || role === "support");
@@ -141,16 +148,19 @@ export default function AdminTeam() {
         email,
         role,
       });
-      return (await res.json()) as { user: TeamMember; tempPassword: string };
+      return (await res.json()) as { user: TeamMember; tempPassword: string; emailSent?: boolean };
     },
     onSuccess: async (payload) => {
       setEmail("");
       setRole("support");
       setCopiedPassword(payload.tempPassword);
+      setEmailSent(payload.emailSent ?? false);
       await queryClient.invalidateQueries({ queryKey: ["/api/admin/team-members"] });
       toast({
         title: "✅ Team member created!",
-        description: "Copy the temporary password and share it securely.",
+        description: payload.emailSent 
+          ? "A welcome email with login details has been sent to the team member."
+          : "Copy the temporary password and share it securely.",
       });
     },
     onError: (err: any) => {
@@ -373,15 +383,26 @@ export default function AdminTeam() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
               >
-                <Card className="border-green-500/30 bg-green-500/10">
+                <Card className={emailSent ? "border-green-500/30 bg-green-500/10" : "border-amber-500/30 bg-amber-500/10"}>
                   <CardContent className="pt-4">
                     <div className="flex items-start gap-3">
-                      <Key className="h-5 w-5 text-green-400 mt-0.5" />
+                      <Key className={`h-5 w-5 mt-0.5 ${emailSent ? "text-green-400" : "text-amber-400"}`} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-green-400 mb-1">Temporary Password</p>
-                        <p className="text-xs text-muted-foreground mb-2">
-                          Share this securely with the team member. They should change it after first login.
-                        </p>
+                        {emailSent ? (
+                          <>
+                            <p className="text-sm font-medium text-green-400 mb-1">✉️ Welcome Email Sent!</p>
+                            <p className="text-xs text-muted-foreground mb-2">
+                              The team member has received an email with login instructions. They will be prompted to change their password on first login.
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-sm font-medium text-amber-400 mb-1">⚠️ Share Password Manually</p>
+                            <p className="text-xs text-muted-foreground mb-2">
+                              Email is not configured. Please share this password securely with the team member. They will be prompted to change it on first login.
+                            </p>
+                          </>
+                        )}
                         <div className="flex items-center gap-2">
                           <code className="px-2 py-1 rounded bg-black/30 text-white text-sm font-mono truncate flex-1">
                             {copiedPassword}
@@ -390,7 +411,7 @@ export default function AdminTeam() {
                             size="sm"
                             variant="ghost"
                             onClick={handleCopyPassword}
-                            className="text-green-400 hover:text-green-300"
+                            className={emailSent ? "text-green-400 hover:text-green-300" : "text-amber-400 hover:text-amber-300"}
                           >
                             <Copy className="h-4 w-4" />
                           </Button>
@@ -399,7 +420,7 @@ export default function AdminTeam() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setCopiedPassword(null)}
+                        onClick={() => { setCopiedPassword(null); setEmailSent(false); }}
                         className="text-muted-foreground hover:text-white"
                       >
                         ×

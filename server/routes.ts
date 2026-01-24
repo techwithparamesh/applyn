@@ -20,7 +20,7 @@ import {
 import { getPlan, PLANS, type PlanId } from "@shared/pricing";
 import { storage } from "./storage";
 import { hashPassword, sanitizeUser, verifyPassword } from "./auth";
-import { sendPasswordResetEmail, isEmailConfigured } from "./email";
+import { sendPasswordResetEmail, isEmailConfigured, sendTeamMemberWelcomeEmail } from "./email";
 import crypto from "crypto";
 import {
   isLLMConfigured,
@@ -804,6 +804,7 @@ export async function registerRoutes(
     requireRole(["admin"]),
     async (req, res, next) => {
       try {
+        const currentUser = getAuthedUser(req);
         const payload = adminCreateTeamMemberSchema.parse(req.body);
         if (payload.role === "user") {
           return res.status(400).json({ message: "Team member role must be admin or support" });
@@ -814,17 +815,37 @@ export async function registerRoutes(
           return res.status(409).json({ message: "User already exists" });
         }
 
-        // MVP: create with a random temporary password (admin shares it out-of-band).
+        // Generate a secure temporary password
         const tempPassword = `Temp-${Math.random().toString(36).slice(2, 10)}-${Math.random().toString(36).slice(2, 10)}`;
         const passwordHash = await hashPassword(tempPassword);
 
+        // Create user with mustChangePassword flag set to true
         const user = await storage.createUser({
           username: payload.email,
           password: passwordHash,
           role: payload.role,
+          mustChangePassword: true, // Force password change on first login
         });
 
-        return res.status(201).json({ user: sanitizeUser(user), tempPassword });
+        // Send welcome email with credentials (async, don't block response)
+        const invitedBy = currentUser?.username || currentUser?.name || undefined;
+        sendTeamMemberWelcomeEmail(payload.email, tempPassword, payload.role as "admin" | "support", invitedBy)
+          .then((sent) => {
+            if (sent) {
+              console.log(`[TEAM] Welcome email sent to ${payload.email}`);
+            } else {
+              console.warn(`[TEAM] Failed to send welcome email to ${payload.email}`);
+            }
+          })
+          .catch((err) => {
+            console.error(`[TEAM] Error sending welcome email:`, err);
+          });
+
+        return res.status(201).json({ 
+          user: sanitizeUser(user), 
+          tempPassword,
+          emailSent: isEmailConfigured(), // Let frontend know if email was sent
+        });
       } catch (err) {
         return next(err);
       }
@@ -928,6 +949,42 @@ export async function registerRoutes(
 
       const updated = await storage.updateUser(user.id, updates);
       return res.json(sanitizeUser(updated!));
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Change password (for forced password change on first login) ---
+  const changePasswordSchema = z.object({
+    currentPassword: z.string().min(8).max(200),
+    newPassword: z.string().min(8).max(200),
+  }).strict();
+
+  app.post("/api/change-password", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
+
+      // Verify current password
+      const ok = await verifyPassword(currentPassword, user.password);
+      if (!ok) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+
+      // Hash new password and clear the mustChangePassword flag
+      const newPasswordHash = await hashPassword(newPassword);
+      const updated = await storage.updateUser(user.id, { 
+        password: newPasswordHash,
+        mustChangePassword: false, // Clear the flag after password change
+      });
+
+      return res.json({ 
+        ok: true, 
+        message: "Password changed successfully",
+        user: sanitizeUser(updated!),
+      });
     } catch (err) {
       return next(err);
     }

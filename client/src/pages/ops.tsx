@@ -1,4 +1,5 @@
 import { Navbar } from "@/components/layout/navbar";
+import { Footer } from "@/components/layout/footer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,9 +27,28 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
-import { Clock, Download, MoreVertical, RefreshCw } from "lucide-react";
+import { motion } from "framer-motion";
+import { 
+  Clock, 
+  Download, 
+  MoreVertical, 
+  RefreshCw, 
+  Smartphone, 
+  AlertCircle, 
+  CheckCircle2, 
+  Loader2,
+  Ticket,
+  Eye,
+  Copy,
+  XCircle,
+  RefreshCcw,
+  FileText,
+  Settings,
+  TrendingUp,
+  Activity
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 
 type Role = "admin" | "support" | "user" | string;
@@ -38,6 +58,7 @@ type Me = {
   username: string;
   name: string | null;
   role: Role;
+  mustChangePassword?: boolean;
 };
 
 type AppItem = {
@@ -85,6 +106,11 @@ export default function Ops() {
     if (meLoading) return;
     if (!me) {
       setLocation(`/login?returnTo=${encodeURIComponent("/ops")}`);
+      return;
+    }
+    // Redirect to password change if required
+    if (me.mustChangePassword) {
+      setLocation("/change-password");
       return;
     }
     if (!isStaff) {
@@ -217,179 +243,429 @@ export default function Ops() {
 
   if (meLoading) {
     return (
-      <div className="min-h-screen bg-slate-50">
-        <Navbar />
-        <main className="container mx-auto px-4 py-8">Loading...</main>
+      <div className="min-h-screen bg-background bg-mesh-subtle flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
       </div>
     );
   }
 
+  // Calculate stats
+  const stats = useMemo(() => {
+    const appList = apps || [];
+    const ticketList = tickets || [];
+    return {
+      totalApps: appList.length,
+      liveApps: appList.filter(a => a.status === "live").length,
+      processingApps: appList.filter(a => a.status === "processing").length,
+      failedApps: appList.filter(a => a.status === "failed").length,
+      openTickets: ticketList.filter(t => t.status === "open").length,
+      closedTickets: ticketList.filter(t => t.status === "closed").length,
+    };
+  }, [apps, tickets]);
+
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-background bg-mesh-subtle">
       <Navbar />
       <main className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Ops</h1>
-            <p className="text-muted-foreground">Staff view across all apps</p>
-          </div>
-        </div>
-
-        <Card className="mb-6">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Support tickets</CardTitle>
-            <CardDescription>New requests from end users (staff only)</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {ticketsLoading && (
-              <div className="text-sm text-muted-foreground">Loading tickets...</div>
-            )}
-
-            {!ticketsLoading && (tickets || []).length === 0 && (
-              <div className="text-sm text-muted-foreground">No tickets yet.</div>
-            )}
-
-            <div className="space-y-3">
-              {(tickets || []).slice(0, 10).map((t) => (
-                <div
-                  key={t.id}
-                  className="flex items-start justify-between gap-3 rounded-md border bg-white p-3"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">{t.status}</Badge>
-                      <div className="text-sm font-medium text-slate-900 truncate">
-                        {t.subject}
-                      </div>
-                    </div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      Updated {formatDistanceToNow(new Date(t.updatedAt), { addSuffix: true })}
-                      {t.appId ? ` • App ${t.appId}` : ""}
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 shrink-0">
-                    <Button variant="outline" size="sm" onClick={() => handleViewTicket(t)}>
-                      View
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleCopyTicket(t)}>
-                      Copy
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleToggleTicketStatus(t)}
-                    >
-                      {t.status === "closed" ? "Reopen" : "Close"}
-                    </Button>
-                  </div>
-                </div>
-              ))}
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center">
+                <Settings className="h-6 w-6 text-cyan-400" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-white">Operations Center</h1>
+                <p className="text-muted-foreground">Staff view across all apps and tickets</p>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="border-cyan-500/30 text-cyan-400">
+                <Activity className="h-3 w-3 mr-1" />
+                Staff Access
+              </Badge>
+            </div>
+          </div>
+        </motion.div>
 
-        {appsLoading && (
-          <Card>
-            <CardContent className="p-6 text-sm text-muted-foreground">Loading apps...</CardContent>
-          </Card>
-        )}
-
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {(apps || []).map((app) => (
-            <Card key={app.id} className="hover:shadow-md transition-shadow">
-              <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-2xl">
-                    {app.icon}
-                  </div>
-                  <div className="min-w-0">
-                    <CardTitle className="text-lg truncate">{app.name}</CardTitle>
-                    <CardDescription className="text-xs truncate">{app.url}</CardDescription>
-                    <div className="mt-1 text-[11px] text-muted-foreground truncate">
-                      Owner: {app.ownerId}
-                    </div>
-                  </div>
+        {/* Stats Grid */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8"
+        >
+          <Card className="glass border-white/10">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                  <Smartphone className="h-5 w-5 text-blue-400" />
                 </div>
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {app.status === "live" && (
-                      <DropdownMenuItem onClick={() => handleDownload(app.id)}>
-                        <Download /> Download APK
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem onClick={() => handleBuild(app.id)}>
-                      <RefreshCw /> {app.status === "failed" ? "Rebuild" : "Build"}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        setLogsTitle(`${app.name} • Build logs`);
-                        setLogsText(app.buildLogs || "");
-                        setLogsOpen(true);
-                      }}
-                      disabled={!app.buildLogs}
-                    >
-                      View build logs
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </CardHeader>
-
-              <CardContent>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline">{app.status}</Badge>
-                  <span className="text-xs text-muted-foreground">
-                    • {formatDistanceToNow(new Date(app.updatedAt), { addSuffix: true })}
-                  </span>
+                <div>
+                  <div className="text-2xl font-bold text-white">{stats.totalApps}</div>
+                  <div className="text-xs text-muted-foreground">Total Apps</div>
                 </div>
-
-                {app.status === "processing" && (
-                  <div className="mt-3 text-xs text-muted-foreground flex items-center gap-2">
-                    <Clock className="h-3 w-3" /> Build running
-                  </div>
-                )}
-
-                {app.status === "failed" && app.buildError && (
-                  <div className="mt-3 space-y-3">
-                    <div className="text-xs text-slate-600 break-words">{app.buildError}</div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleBuild(app.id)}
-                      >
-                        Retry build
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleCopyBuildError(app)}
-                      >
-                        Copy build error
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {!appsLoading && (apps || []).length === 0 && (
-          <Card className="border-dashed">
-            <CardContent className="p-8 text-center">
-              <h3 className="font-semibold text-slate-900">No apps</h3>
-              <p className="text-sm text-muted-foreground mt-1">Nothing to show yet.</p>
+              </div>
             </CardContent>
           </Card>
-        )}
+
+          <Card className="glass border-white/10">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-green-500/20 flex items-center justify-center">
+                  <CheckCircle2 className="h-5 w-5 text-green-400" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-green-400">{stats.liveApps}</div>
+                  <div className="text-xs text-muted-foreground">Live</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="glass border-white/10">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                  <Loader2 className="h-5 w-5 text-amber-400 animate-spin" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-amber-400">{stats.processingApps}</div>
+                  <div className="text-xs text-muted-foreground">Building</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="glass border-white/10">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-red-500/20 flex items-center justify-center">
+                  <XCircle className="h-5 w-5 text-red-400" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-red-400">{stats.failedApps}</div>
+                  <div className="text-xs text-muted-foreground">Failed</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="glass border-white/10">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                  <Ticket className="h-5 w-5 text-purple-400" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-purple-400">{stats.openTickets}</div>
+                  <div className="text-xs text-muted-foreground">Open Tickets</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="glass border-white/10">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-gray-500/20 flex items-center justify-center">
+                  <CheckCircle2 className="h-5 w-5 text-gray-400" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-gray-400">{stats.closedTickets}</div>
+                  <div className="text-xs text-muted-foreground">Resolved</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Support Tickets Column */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="lg:col-span-1"
+          >
+            <Card className="glass border-white/10 h-full">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <Ticket className="h-5 w-5 text-purple-400" />
+                    Support Tickets
+                  </CardTitle>
+                  {stats.openTickets > 0 && (
+                    <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
+                      {stats.openTickets} open
+                    </Badge>
+                  )}
+                </div>
+                <CardDescription>Recent requests from users</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {ticketsLoading && (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-cyan-400" />
+                  </div>
+                )}
+
+                {!ticketsLoading && (tickets || []).length === 0 && (
+                  <div className="text-center py-8">
+                    <Ticket className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />
+                    <p className="text-muted-foreground text-sm">No tickets yet</p>
+                  </div>
+                )}
+
+                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+                  {(tickets || []).slice(0, 15).map((t, index) => (
+                    <motion.div
+                      key={t.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.03 }}
+                      className={`p-3 rounded-lg border bg-white/5 hover:bg-white/[0.07] transition-colors ${
+                        t.status === "open" ? "border-purple-500/30" : "border-white/10"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <Badge 
+                          variant="outline" 
+                          className={t.status === "open" 
+                            ? "border-purple-500/30 text-purple-400 text-xs" 
+                            : "border-gray-500/30 text-gray-400 text-xs"
+                          }
+                        >
+                          {t.status}
+                        </Badge>
+                        <span className="text-[10px] text-muted-foreground">
+                          {formatDistanceToNow(new Date(t.updatedAt), { addSuffix: true })}
+                        </span>
+                      </div>
+                      <div className="text-sm font-medium text-white truncate mb-1">
+                        {t.subject}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate mb-2">
+                        {t.appId ? `App: ${t.appId.slice(0, 8)}...` : "General inquiry"}
+                      </div>
+
+                      <div className="flex gap-1.5">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleViewTicket(t)}
+                          className="h-7 px-2 text-xs text-muted-foreground hover:text-white hover:bg-white/10"
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          View
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleCopyTicket(t)}
+                          className="h-7 px-2 text-xs text-muted-foreground hover:text-white hover:bg-white/10"
+                        >
+                          <Copy className="h-3 w-3 mr-1" />
+                          Copy
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleToggleTicketStatus(t)}
+                          className={`h-7 px-2 text-xs hover:bg-white/10 ${
+                            t.status === "closed" 
+                              ? "text-purple-400 hover:text-purple-300" 
+                              : "text-green-400 hover:text-green-300"
+                          }`}
+                        >
+                          {t.status === "closed" ? (
+                            <>
+                              <RefreshCcw className="h-3 w-3 mr-1" />
+                              Reopen
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Close
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Apps Grid Column */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="lg:col-span-2"
+          >
+            <Card className="glass border-white/10">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <Smartphone className="h-5 w-5 text-cyan-400" />
+                    All Apps
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    {stats.processingApps > 0 && (
+                      <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        {stats.processingApps} building
+                      </Badge>
+                    )}
+                    {stats.failedApps > 0 && (
+                      <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
+                        <AlertCircle className="h-3 w-3 mr-1" />
+                        {stats.failedApps} failed
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                <CardDescription>Manage and monitor all user apps</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {appsLoading && (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
+                  </div>
+                )}
+
+                {!appsLoading && (apps || []).length === 0 && (
+                  <div className="text-center py-12">
+                    <Smartphone className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                    <p className="text-muted-foreground">No apps created yet</p>
+                  </div>
+                )}
+
+                <div className="grid sm:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto pr-2">
+                  {(apps || []).map((app, index) => {
+                    const statusConfig = {
+                      live: { color: "text-green-400", bg: "bg-green-500/20", border: "border-green-500/30" },
+                      processing: { color: "text-amber-400", bg: "bg-amber-500/20", border: "border-amber-500/30" },
+                      failed: { color: "text-red-400", bg: "bg-red-500/20", border: "border-red-500/30" },
+                      draft: { color: "text-gray-400", bg: "bg-gray-500/20", border: "border-gray-500/30" },
+                    }[app.status] || { color: "text-gray-400", bg: "bg-gray-500/20", border: "border-gray-500/30" };
+
+                    return (
+                      <motion.div
+                        key={app.id}
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: index * 0.03 }}
+                        className={`p-4 rounded-xl border bg-white/5 hover:bg-white/[0.07] transition-all ${statusConfig.border}`}
+                      >
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div 
+                              className="h-11 w-11 rounded-xl flex items-center justify-center text-xl shrink-0"
+                              style={{ backgroundColor: `${app.primaryColor}20` }}
+                            >
+                              {app.icon}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-medium text-white truncate">{app.name}</div>
+                              <div className="text-xs text-muted-foreground truncate">{app.url}</div>
+                            </div>
+                          </div>
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-white">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-gray-900 border-white/10">
+                              {app.status === "live" && (
+                                <DropdownMenuItem 
+                                  onClick={() => handleDownload(app.id)}
+                                  className="text-white focus:bg-white/10 cursor-pointer"
+                                >
+                                  <Download className="mr-2 h-4 w-4" /> Download APK
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem 
+                                onClick={() => handleBuild(app.id)}
+                                className="text-white focus:bg-white/10 cursor-pointer"
+                              >
+                                <RefreshCw className="mr-2 h-4 w-4" /> 
+                                {app.status === "failed" ? "Rebuild" : "Build"}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setLogsTitle(`${app.name} • Build logs`);
+                                  setLogsText(app.buildLogs || "");
+                                  setLogsOpen(true);
+                                }}
+                                disabled={!app.buildLogs}
+                                className="text-white focus:bg-white/10 cursor-pointer disabled:opacity-50"
+                              >
+                                <FileText className="mr-2 h-4 w-4" /> View build logs
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className={`${statusConfig.bg} ${statusConfig.color} ${statusConfig.border} text-xs`}>
+                              {app.status === "processing" && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                              {app.status}
+                            </Badge>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground">
+                            {formatDistanceToNow(new Date(app.updatedAt), { addSuffix: true })}
+                          </span>
+                        </div>
+
+                        <div className="mt-2 text-[10px] text-muted-foreground truncate">
+                          Owner: {app.ownerId.slice(0, 8)}...
+                        </div>
+
+                        {app.status === "failed" && app.buildError && (
+                          <div className="mt-3 space-y-2">
+                            <div className="text-xs text-red-400/80 line-clamp-2">{app.buildError}</div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleBuild(app.id)}
+                                className="h-7 text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                              >
+                                <RefreshCw className="h-3 w-3 mr-1" />
+                                Retry
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleCopyBuildError(app)}
+                                className="h-7 text-xs text-muted-foreground hover:text-white hover:bg-white/10"
+                              >
+                                <Copy className="h-3 w-3 mr-1" />
+                                Copy error
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
       </main>
+      <Footer />
 
       <BuildLogsDialog
         open={logsOpen}
@@ -400,36 +676,69 @@ export default function Ops() {
       />
 
       <Dialog open={ticketOpen} onOpenChange={setTicketOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl glass border-white/10">
           <DialogHeader>
-            <DialogTitle>{ticketActive?.subject || "Ticket"}</DialogTitle>
+            <DialogTitle className="text-white">{ticketActive?.subject || "Ticket"}</DialogTitle>
             <DialogDescription>
-              {ticketActive ? `Status: ${ticketActive.status} • Ticket: ${ticketActive.id}` : ""}
+              {ticketActive ? `Status: ${ticketActive.status} • Ticket: ${ticketActive.id.slice(0, 8)}...` : ""}
             </DialogDescription>
           </DialogHeader>
 
           {ticketActive && (
             <div className="space-y-3">
-              <div className="text-xs text-muted-foreground">
-                Requester: {ticketActive.requesterId}
-                {ticketActive.appId ? ` • App: ${ticketActive.appId}` : ""}
+              <div className="flex items-center gap-4 text-xs">
+                <Badge 
+                  variant="outline" 
+                  className={ticketActive.status === "open" 
+                    ? "border-purple-500/30 text-purple-400" 
+                    : "border-gray-500/30 text-gray-400"
+                  }
+                >
+                  {ticketActive.status}
+                </Badge>
+                <span className="text-muted-foreground">
+                  Requester: {ticketActive.requesterId.slice(0, 8)}...
+                </span>
+                {ticketActive.appId && (
+                  <span className="text-muted-foreground">
+                    App: {ticketActive.appId.slice(0, 8)}...
+                  </span>
+                )}
               </div>
 
-              <ScrollArea className="h-[320px] rounded-md border bg-slate-50 p-3">
-                <pre className="whitespace-pre-wrap text-sm text-slate-800">
+              <ScrollArea className="h-[320px] rounded-lg border border-white/10 bg-white/5 p-4">
+                <pre className="whitespace-pre-wrap text-sm text-gray-300">
                   {ticketActive.message}
                 </pre>
               </ScrollArea>
 
               <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => handleCopyTicket(ticketActive)}>
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleCopyTicket(ticketActive)}
+                  className="border-white/10 text-white hover:bg-white/10"
+                >
+                  <Copy className="h-4 w-4 mr-2" />
                   Copy
                 </Button>
                 <Button
-                  variant="outline"
                   onClick={() => handleToggleTicketStatus(ticketActive)}
+                  className={ticketActive.status === "closed" 
+                    ? "bg-purple-500 hover:bg-purple-600 text-white"
+                    : "bg-green-500 hover:bg-green-600 text-white"
+                  }
                 >
-                  {ticketActive.status === "closed" ? "Reopen" : "Close"}
+                  {ticketActive.status === "closed" ? (
+                    <>
+                      <RefreshCcw className="h-4 w-4 mr-2" />
+                      Reopen Ticket
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Close Ticket
+                    </>
+                  )}
                 </Button>
               </div>
             </div>

@@ -74,6 +74,7 @@ type Me = {
   username: string;
   name: string | null;
   role: "admin" | "support" | "user" | string;
+  mustChangePassword?: boolean;
 };
 
 type SubscriptionInfo = {
@@ -167,9 +168,17 @@ export default function Dashboard() {
     return (apps || []).filter((a) => a.status === statusFilter);
   }, [apps, statusFilter]);
 
+  // Redirect to login if not authenticated
   useEffect(() => {
     if (!isLoading && !me) {
       setLocation(`/login?returnTo=${encodeURIComponent("/dashboard")}`);
+    }
+  }, [isLoading, me, setLocation]);
+
+  // Redirect to change password if required (team member first login)
+  useEffect(() => {
+    if (!isLoading && me && me.mustChangePassword) {
+      setLocation("/change-password");
     }
   }, [isLoading, me, setLocation]);
 

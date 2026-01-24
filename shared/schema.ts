@@ -28,6 +28,7 @@ export type User = {
   role: UserRole;
   googleId?: string | null;
   password: string;
+  mustChangePassword?: boolean | null; // Force password change on first login (for team members)
   // Subscription fields for yearly renewal model
   plan?: PlanId | null;
   planStatus?: PlanStatus | null;

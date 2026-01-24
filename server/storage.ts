@@ -64,8 +64,8 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByGoogleId(googleId: string): Promise<User | undefined>;
   getUserByResetToken(token: string): Promise<User | undefined>;
-  createUser(user: InsertUser & { role?: UserRole }): Promise<User>;
-  updateUser(id: string, patch: Partial<{ name: string; password: string; role?: UserRole }>): Promise<User | undefined>;
+  createUser(user: InsertUser & { role?: UserRole; mustChangePassword?: boolean }): Promise<User>;
+  updateUser(id: string, patch: Partial<{ name: string; password: string; role?: UserRole; mustChangePassword?: boolean }>): Promise<User | undefined>;
   deleteUser(id: string): Promise<boolean>;
   linkGoogleId(userId: string, googleId: string): Promise<User | undefined>;
   setResetToken(userId: string, token: string, expiresAt: Date): Promise<User | undefined>;
@@ -178,7 +178,7 @@ export class MemStorage implements IStorage {
     return Array.from(this.users.values()).find((u) => (u as any).resetToken === token);
   }
 
-  async createUser(insertUser: InsertUser & { role?: UserRole }): Promise<User> {
+  async createUser(insertUser: InsertUser & { role?: UserRole; mustChangePassword?: boolean }): Promise<User> {
     const id = randomUUID();
     const now = new Date();
     const user: User = {
@@ -188,6 +188,7 @@ export class MemStorage implements IStorage {
       role: insertUser.role ?? "user",
       googleId: (insertUser as any).googleId ?? null,
       password: insertUser.password,
+      mustChangePassword: insertUser.mustChangePassword ?? false,
       createdAt: now,
       updatedAt: now,
     };
@@ -195,7 +196,7 @@ export class MemStorage implements IStorage {
     return user;
   }
 
-  async updateUser(id: string, patch: Partial<{ name: string; password: string }>): Promise<User | undefined> {
+  async updateUser(id: string, patch: Partial<{ name: string; password: string; mustChangePassword?: boolean }>): Promise<User | undefined> {
     const existing = this.users.get(id);
     if (!existing) return undefined;
     const updated: User = {

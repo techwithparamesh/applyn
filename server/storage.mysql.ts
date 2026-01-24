@@ -65,7 +65,7 @@ export class MysqlStorage {
     return rows[0] as unknown as User;
   }
 
-  async createUser(user: InsertUser & { role?: UserRole; googleId?: string | null }): Promise<User> {
+  async createUser(user: InsertUser & { role?: UserRole; googleId?: string | null; mustChangePassword?: boolean }): Promise<User> {
     const id = randomUUID();
     const now = new Date();
 
@@ -76,6 +76,7 @@ export class MysqlStorage {
       googleId: user.googleId ?? null,
       role: user.role ?? "user",
       password: user.password,
+      mustChangePassword: user.mustChangePassword ?? false,
       createdAt: now,
       updatedAt: now,
     });
@@ -83,7 +84,7 @@ export class MysqlStorage {
     return (await this.getUser(id))!;
   }
 
-  async updateUser(id: string, patch: Partial<{ name: string; password: string; role?: string }>): Promise<User | undefined> {
+  async updateUser(id: string, patch: Partial<{ name: string; password: string; role?: string; mustChangePassword?: boolean }>): Promise<User | undefined> {
     await getMysqlDb()
       .update(users)
       .set({

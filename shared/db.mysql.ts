@@ -7,6 +7,7 @@ export const users = mysqlTable("users", {
   googleId: varchar("google_id", { length: 255 }).unique(),
   role: varchar("role", { length: 16 }).notNull().default("user"),
   password: text("password").notNull(),
+  mustChangePassword: boolean("must_change_password").notNull().default(false), // Force password change on first login
   emailVerified: boolean("email_verified").notNull().default(false),
   emailVerifyToken: varchar("email_verify_token", { length: 128 }),
   resetToken: varchar("reset_token", { length: 128 }),
