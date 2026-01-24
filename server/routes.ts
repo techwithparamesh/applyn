@@ -767,6 +767,73 @@ export async function registerRoutes(
     },
   );
 
+  // Delete team member (admin only, cannot delete self)
+  app.delete(
+    "/api/admin/team-members/:id",
+    requireAuth,
+    requireRole(["admin"]),
+    async (req, res, next) => {
+      try {
+        const currentUser = getAuthedUser(req);
+        if (!currentUser) return res.status(401).json({ message: "Unauthorized" });
+
+        const targetId = req.params.id;
+        
+        // Prevent self-deletion
+        if (targetId === currentUser.id) {
+          return res.status(400).json({ message: "You cannot delete your own account" });
+        }
+
+        const targetUser = await storage.getUser(targetId);
+        if (!targetUser) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        // Delete the user
+        await storage.deleteUser(targetId);
+
+        return res.json({ ok: true, message: "User deleted successfully" });
+      } catch (err) {
+        return next(err);
+      }
+    },
+  );
+
+  // Update team member role (admin only)
+  app.patch(
+    "/api/admin/team-members/:id",
+    requireAuth,
+    requireRole(["admin"]),
+    async (req, res, next) => {
+      try {
+        const currentUser = getAuthedUser(req);
+        if (!currentUser) return res.status(401).json({ message: "Unauthorized" });
+
+        const targetId = req.params.id;
+        const { role } = req.body;
+
+        if (!["admin", "support", "user"].includes(role)) {
+          return res.status(400).json({ message: "Invalid role" });
+        }
+
+        // Prevent changing own role
+        if (targetId === currentUser.id) {
+          return res.status(400).json({ message: "You cannot change your own role" });
+        }
+
+        const targetUser = await storage.getUser(targetId);
+        if (!targetUser) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        const updated = await storage.updateUser(targetId, { role });
+        return res.json(sanitizeUser(updated!));
+      } catch (err) {
+        return next(err);
+      }
+    },
+  );
+
   // --- Profile management ---
   app.patch("/api/me", requireAuth, async (req, res, next) => {
     try {

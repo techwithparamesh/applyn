@@ -65,7 +65,8 @@ export interface IStorage {
   getUserByGoogleId(googleId: string): Promise<User | undefined>;
   getUserByResetToken(token: string): Promise<User | undefined>;
   createUser(user: InsertUser & { role?: UserRole }): Promise<User>;
-  updateUser(id: string, patch: Partial<{ name: string; password: string }>): Promise<User | undefined>;
+  updateUser(id: string, patch: Partial<{ name: string; password: string; role?: UserRole }>): Promise<User | undefined>;
+  deleteUser(id: string): Promise<boolean>;
   linkGoogleId(userId: string, googleId: string): Promise<User | undefined>;
   setResetToken(userId: string, token: string, expiresAt: Date): Promise<User | undefined>;
   clearResetToken(userId: string): Promise<User | undefined>;

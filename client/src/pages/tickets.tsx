@@ -28,6 +28,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Plus,
   MessageSquare,
   Clock,
@@ -41,6 +48,7 @@ import {
   Loader2,
   Wand2,
   AlertTriangle,
+  Smartphone,
 } from "lucide-react";
 
 type Role = "admin" | "support" | "user" | string;
@@ -50,6 +58,14 @@ type Me = {
   username: string;
   name: string | null;
   role: Role;
+};
+
+type UserApp = {
+  id: string;
+  name: string;
+  url: string;
+  iconUrl?: string | null;
+  icon?: string;
 };
 
 type SupportTicket = {
@@ -89,6 +105,13 @@ export default function Tickets() {
     queryKey: ["/api/support/tickets"],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!me,
+  });
+
+  // Fetch user's apps for the dropdown (only for non-staff users)
+  const { data: userApps } = useQuery<UserApp[]>({
+    queryKey: ["/api/apps"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: !!me && !isStaffRole(me.role),
   });
 
   const [viewOpen, setViewOpen] = useState(false);
@@ -217,7 +240,10 @@ export default function Tickets() {
         subject: newSubject,
         message: newMessage,
       };
-      if (newAppId.trim()) payload.appId = newAppId.trim();
+      // Only add appId if it's not empty and not "none"
+      if (newAppId.trim() && newAppId !== "none") {
+        payload.appId = newAppId.trim();
+      }
 
       await apiRequest("POST", "/api/support/tickets", payload);
       await queryClient.invalidateQueries({ queryKey: ["/api/support/tickets"] });
@@ -615,13 +641,40 @@ export default function Tickets() {
 
           <div className="space-y-4 pt-2">
             <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">App ID (optional)</Label>
-              <Input
-                value={newAppId}
-                onChange={(e) => setNewAppId(e.target.value)}
-                placeholder="e.g. 4f7b7b0c-..."
-                className="bg-white/5 border-white/10 focus:border-cyan-500/50 text-white placeholder:text-muted-foreground"
-              />
+              <Label className="text-sm text-muted-foreground">Related App (optional)</Label>
+              {userApps && userApps.length > 0 ? (
+                <Select value={newAppId} onValueChange={setNewAppId}>
+                  <SelectTrigger className="bg-white/5 border-white/10 focus:border-cyan-500/50 text-white">
+                    <SelectValue placeholder="Select an app (optional)" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-900 border-white/10">
+                    <SelectItem value="none" className="text-muted-foreground">
+                      No specific app
+                    </SelectItem>
+                    {userApps.map((app) => (
+                      <SelectItem key={app.id} value={app.id} className="text-white">
+                        <div className="flex items-center gap-2">
+                          {app.iconUrl ? (
+                            <img src={app.iconUrl} alt="" className="h-4 w-4 rounded" />
+                          ) : app.icon ? (
+                            <span className="text-sm">{app.icon}</span>
+                          ) : (
+                            <Smartphone className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          <span>{app.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  value={newAppId}
+                  onChange={(e) => setNewAppId(e.target.value)}
+                  placeholder="e.g. 4f7b7b0c-... (or leave empty)"
+                  className="bg-white/5 border-white/10 focus:border-cyan-500/50 text-white placeholder:text-muted-foreground"
+                />
+              )}
             </div>
 
             <div className="space-y-2">
