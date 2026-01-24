@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { MobilePreview } from "@/components/mobile-preview";
 import { DevicePreview } from "@/components/device-preview";
-import { ArrowRight, ArrowLeft, Loader2, Smartphone, Check, Palette, Globe, CreditCard, Upload, Image, Trash2, Sun, Moon, Sparkles, Lock, Crown, Zap, Download, X, Wand2, CheckCircle2, AlertCircle } from "lucide-react";
+import { ArrowRight, ArrowLeft, Loader2, Smartphone, Check, Palette, Globe, CreditCard, Upload, Image, Trash2, Sun, Moon, Sparkles, Lock, Crown, Zap, Download, X, Wand2, CheckCircle2, AlertCircle, PartyPopper } from "lucide-react";
 import { useLocation, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -15,6 +15,7 @@ import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { AppNameGenerator, useAIStatus } from "@/components/ai-features";
+import { Confetti, SuccessCelebration } from "@/components/ui/confetti";
 
 declare global {
   interface Window {
@@ -381,69 +382,94 @@ export default function CreateApp() {
   
   // State for plan selection modal
   const [showPlanModal, setShowPlanModal] = useState(false);
+  
+  // Success celebration state
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [celebrationMessage, setCelebrationMessage] = useState({ title: "", message: "" });
 
   // AI Status check
   const { data: aiStatus } = useAIStatus();
 
-  // Auto-analysis state
+  // Auto-analysis state - includes scraped data (logo, colors)
   const [websiteAnalysis, setWebsiteAnalysis] = useState<{
     appName: string;
     primaryColor: string;
+    logoUrl?: string;
+    logoSource?: string;
+    colorSource?: string;
     isAppReady: boolean;
     issues: string[];
   } | null>(null);
   const [analyzedUrl, setAnalyzedUrl] = useState<string>("");
   const [showAnalysisDetails, setShowAnalysisDetails] = useState(false);
 
-  // Auto-analyze mutation
-  const autoAnalyzeMutation = useMutation({
+  // Website scraper mutation (NO LLM - fast & free)
+  const scrapeWebsiteMutation = useMutation({
     mutationFn: async (url: string) => {
-      const res = await apiRequest("POST", "/api/ai/analyze-website", { url });
+      const res = await apiRequest("POST", "/api/scrape-website", { url });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.message || "Analysis failed");
+        throw new Error(err.message || "Could not fetch website");
       }
       return res.json();
     },
     onSuccess: (data) => {
-      setWebsiteAnalysis(data);
-      // Auto-apply detected values
+      // Build analysis object from scraped data
+      const analysis = {
+        appName: data.appName || "",
+        primaryColor: data.colors?.primary || "",
+        logoUrl: data.logo?.url || null,
+        logoSource: data.logo?.source || "",
+        colorSource: data.colors?.source || "",
+        isAppReady: !!(data.appName && (data.colors?.primary || data.logo?.url)),
+        issues: [],
+      };
+      setWebsiteAnalysis(analysis);
+      
+      // Auto-apply all detected values
       setFormData(prev => ({
         ...prev,
         appName: data.appName || prev.appName,
-        primaryColor: data.primaryColor || prev.primaryColor,
+        primaryColor: data.colors?.primary || prev.primaryColor,
+        // Auto-apply logo if detected (not og-image which is usually a banner)
+        customLogo: (data.logo?.url && data.logo?.source !== "og-image") ? data.logo.url : prev.customLogo,
       }));
-      if (data.isAppReady) {
+      
+      // Show success toast with what was detected
+      const detected = [];
+      if (data.appName) detected.push("name");
+      if (data.colors?.primary) detected.push("colors");
+      if (data.logo?.url && data.logo?.source !== "og-image") detected.push("logo");
+      
+      if (detected.length > 0) {
         toast({
           title: "✨ Website analyzed!",
-          description: "Colors and app name auto-detected.",
+          description: `Auto-detected: ${detected.join(", ")}`,
         });
       }
     },
     onError: () => {
-      // Silent fail for auto-analysis - don't annoy users
+      // Silent fail - website might block scraping
       setWebsiteAnalysis(null);
     },
   });
 
-  // Debounced auto-analysis when URL changes
+  // Debounced auto-scrape when URL changes (no AI required!)
   useEffect(() => {
-    if (!aiStatus?.available) return;
-    
     const url = formData.url;
     // Check if it's a valid URL and different from what we've analyzed
     const isValidUrl = url.length > 10 && url.includes(".") && url.startsWith("http") && !url.endsWith("https://");
     
     if (!isValidUrl || url === analyzedUrl) return;
 
-    // Debounce: wait 1.5 seconds after user stops typing
+    // Debounce: wait 1 second after user stops typing
     const timeoutId = setTimeout(() => {
       setAnalyzedUrl(url);
-      autoAnalyzeMutation.mutate(url);
-    }, 1500);
+      scrapeWebsiteMutation.mutate(url);
+    }, 1000);
 
     return () => clearTimeout(timeoutId);
-  }, [formData.url, aiStatus?.available, analyzedUrl]);
+  }, [formData.url, analyzedUrl]);
 
   // Check if resuming after login
   const isResuming = params.get("resume") === "true";
@@ -583,11 +609,15 @@ export default function CreateApp() {
       if (selectedPlan === "preview") {
         clearDraft();
         await queryClient.invalidateQueries({ queryKey: ["/api/apps"] });
-        toast({
-          title: "Preview app created! 🎉",
-          description: "You can now preview your app. Upgrade anytime to download.",
+        // Show celebration then redirect
+        setCelebrationMessage({ 
+          title: "🎉 Preview Ready!", 
+          message: "Your app preview is being prepared..." 
         });
-        setLocation(`/preview-app?appId=${app.id}`);
+        setShowCelebration(true);
+        setTimeout(() => {
+          setLocation(`/preview-app?appId=${app.id}`);
+        }, 2000);
         return;
       }
 
@@ -604,11 +634,15 @@ export default function CreateApp() {
 
         clearDraft(); // Clear saved draft after successful creation
         await queryClient.invalidateQueries({ queryKey: ["/api/apps"] });
-        toast({
-          title: "App created successfully!",
-          description: "Your app is now being built (Admin - no payment required).",
+        // Show celebration then redirect
+        setCelebrationMessage({ 
+          title: "🎉 Building Started!", 
+          message: "Your app is being compiled..." 
         });
-        setLocation("/dashboard");
+        setShowCelebration(true);
+        setTimeout(() => {
+          setLocation("/dashboard");
+        }, 2000);
         return;
       }
 
@@ -646,11 +680,15 @@ export default function CreateApp() {
 
             clearDraft(); // Clear saved draft after successful creation
             await queryClient.invalidateQueries({ queryKey: ["/api/apps"] });
-            toast({
-              title: "Payment successful!",
-              description: "Your app is now being built.",
+            // Show celebration then redirect
+            setCelebrationMessage({ 
+              title: "🎉 Payment Successful!", 
+              message: "Your app is now being built..." 
             });
-            setLocation("/dashboard");
+            setShowCelebration(true);
+            setTimeout(() => {
+              setLocation("/dashboard");
+            }, 2500);
           } catch (err: any) {
             toast({
               title: "Payment verification failed",
@@ -698,9 +736,26 @@ export default function CreateApp() {
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
 
-      {/* Progress Bar - Clean AppMySite Style */}
+      {/* Progress Bar - Enhanced with percentage */}
       <div className="w-full bg-[#0d1117] border-b border-white/[0.06] sticky top-16 z-40">
-        <div className="container mx-auto px-4 py-5">
+        <div className="container mx-auto px-4 py-4 sm:py-5">
+          {/* Progress percentage bar - Mobile friendly */}
+          <div className="max-w-md mx-auto mb-4">
+            <div className="flex justify-between items-center mb-1.5">
+              <span className="text-xs font-medium text-white/60">Progress</span>
+              <span className="text-xs font-bold text-cyan-400">
+                {Math.round((step / STEPS.length) * 100)}%
+              </span>
+            </div>
+            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-cyan-500 to-purple-500 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${(step / STEPS.length) * 100}%` }}
+              />
+            </div>
+          </div>
+          
+          {/* Step indicators */}
           <div className="flex items-center justify-center max-w-2xl mx-auto">
             {STEPS.map((s, i) => {
               const Icon = s.icon;
@@ -710,31 +765,43 @@ export default function CreateApp() {
               return (
                 <div key={s.id} className="flex items-center">
                   <div className="flex flex-col items-center relative z-10 group">
-                    <div
-                      className={`w-11 h-11 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
-                        isActive
-                          ? "border-cyan-400 bg-cyan-400/10 text-cyan-400 scale-105"
-                          : isCompleted
-                          ? "border-cyan-500 bg-cyan-500 text-white"
-                          : "border-white/20 bg-transparent text-white/40"
-                      }`}
-                    >
-                      {isCompleted ? <Check className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
+                    {/* Step circle with pulse animation when active */}
+                    <div className="relative">
+                      {isActive && (
+                        <div className="absolute inset-0 w-11 h-11 rounded-full bg-cyan-400/20 animate-ping" />
+                      )}
+                      <div
+                        className={`relative w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+                          isActive
+                            ? "border-cyan-400 bg-cyan-400/10 text-cyan-400 scale-110 shadow-lg shadow-cyan-500/25"
+                            : isCompleted
+                            ? "border-green-500 bg-green-500 text-white"
+                            : "border-white/20 bg-transparent text-white/40"
+                        }`}
+                      >
+                        {isCompleted ? (
+                          <Check className="h-4 w-4 sm:h-5 sm:w-5" />
+                        ) : (
+                          <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                        )}
+                      </div>
                     </div>
                     <span
-                      className={`text-xs font-medium mt-2.5 transition-colors duration-300 ${
-                        isActive ? "text-cyan-400" : isCompleted ? "text-white" : "text-white/40"
+                      className={`text-[10px] sm:text-xs font-medium mt-2 transition-colors duration-300 ${
+                        isActive ? "text-cyan-400" : isCompleted ? "text-green-400" : "text-white/40"
                       }`}
                     >
                       {s.name}
                     </span>
                   </div>
                   
-                  {/* Connector Line */}
+                  {/* Connector Line with gradient */}
                   {i !== STEPS.length - 1 && (
-                    <div className="w-24 sm:w-32 h-[2px] mx-4 mt-[-20px]">
+                    <div className="w-16 sm:w-24 md:w-32 h-[2px] mx-2 sm:mx-4 mt-[-20px]">
                       <div className={`h-full rounded-full transition-all duration-500 ${
-                        s.id < step ? "bg-cyan-500" : "bg-white/10"
+                        s.id < step 
+                          ? "bg-gradient-to-r from-green-500 to-cyan-500" 
+                          : "bg-white/10"
                       }`} />
                     </div>
                   )}
@@ -745,11 +812,11 @@ export default function CreateApp() {
         </div>
       </div>
 
-      <main className="flex-1 container mx-auto px-4 py-8 flex flex-col lg:flex-row gap-8 max-w-6xl">
+      <main className="flex-1 container mx-auto px-4 py-6 sm:py-8 flex flex-col lg:flex-row gap-6 lg:gap-8 max-w-6xl">
         {/* Left Panel: Form */}
         <div className="flex-1 order-2 lg:order-1">
           <Card className="border-white/[0.06] bg-[#0d1117] shadow-2xl h-full rounded-2xl overflow-hidden">
-            <CardContent className="p-8">
+            <CardContent className="p-4 sm:p-6 md:p-8">
               {step === 1 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-500">
                   <div>
@@ -766,14 +833,14 @@ export default function CreateApp() {
                         placeholder="https://yourwebsite.com"
                         className="h-12 text-lg bg-white/5 border-white/10 focus:border-cyan-500/50 text-white rounded-lg"
                       />
-                      {/* Auto-detection status */}
-                      {aiStatus?.available && formData.url.length > 10 && formData.url.includes(".") && (
+                      {/* Auto-detection status - now uses lightweight scraper (no AI required) */}
+                      {formData.url.length > 10 && formData.url.includes(".") && (
                         <div className="mt-2 space-y-2">
                           <div className="flex items-center gap-2 text-sm">
-                            {autoAnalyzeMutation.isPending ? (
+                            {scrapeWebsiteMutation.isPending ? (
                               <>
                                 <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
-                                <span className="text-muted-foreground">Analyzing website colors...</span>
+                                <span className="text-muted-foreground">Detecting logo & colors...</span>
                               </>
                             ) : websiteAnalysis ? (
                               <div className="flex items-center gap-3 flex-wrap">
@@ -781,21 +848,13 @@ export default function CreateApp() {
                                   {websiteAnalysis.isAppReady ? (
                                     <CheckCircle2 className="w-4 h-4 text-green-500" />
                                   ) : (
-                                    <AlertCircle className="w-4 h-4 text-yellow-500" />
+                                    <AlertCircle className="w-4 h-4 text-amber-500" />
                                   )}
                                   <span className="text-muted-foreground">
-                                    {websiteAnalysis.isAppReady ? "Ready for app" : `${websiteAnalysis.issues.length} issue(s) found`}
+                                    {websiteAnalysis.isAppReady 
+                                      ? "Logo & colors detected" 
+                                      : "Couldn't detect all branding"}
                                   </span>
-                                  {/* Show details toggle */}
-                                  {websiteAnalysis.issues.length > 0 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => setShowAnalysisDetails(!showAnalysisDetails)}
-                                      className="text-xs text-cyan-400 hover:text-cyan-300 underline underline-offset-2 transition-colors"
-                                    >
-                                      {showAnalysisDetails ? "Hide" : "Show"}
-                                    </button>
-                                  )}
                                 </div>
                                 {websiteAnalysis.primaryColor && (
                                   <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/5 border border-white/10">
@@ -803,30 +862,18 @@ export default function CreateApp() {
                                       className="w-3 h-3 rounded-full border border-white/20" 
                                       style={{ backgroundColor: websiteAnalysis.primaryColor }}
                                     />
-                                    <span className="text-xs text-muted-foreground">Color detected</span>
+                                    <span className="text-xs text-muted-foreground">Color</span>
+                                  </div>
+                                )}
+                                {websiteAnalysis.logoUrl && (
+                                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/5 border border-white/10">
+                                    <Image className="w-3 h-3 text-green-400" />
+                                    <span className="text-xs text-muted-foreground">Logo</span>
                                   </div>
                                 )}
                               </div>
                             ) : null}
                           </div>
-                          
-                          {/* Expandable issues list */}
-                          {websiteAnalysis && showAnalysisDetails && websiteAnalysis.issues.length > 0 && (
-                            <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                              <p className="text-xs font-medium text-yellow-400">Issues detected:</p>
-                              <ul className="space-y-1">
-                                {websiteAnalysis.issues.map((issue, index) => (
-                                  <li key={index} className="text-xs text-yellow-400/80 flex items-start gap-2">
-                                    <span className="text-yellow-500 mt-0.5">•</span>
-                                    <span>{issue}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                              <p className="text-xs text-muted-foreground mt-2 pt-2 border-t border-yellow-500/20">
-                                💡 These issues may affect app quality but won't block the build.
-                              </p>
-                            </div>
-                          )}
                         </div>
                       )}
                     </div>
@@ -860,12 +907,20 @@ export default function CreateApp() {
                   </div>
 
                   <div className="space-y-6">
-                    {/* App Logo Section */}
+                    {/* App Logo Section - Auto-detected from website */}
                     <div className="space-y-3">
-                      <Label className="text-white font-medium flex items-center gap-2">
-                        <Image className="h-4 w-4 text-cyan-400" />
-                        App Icon / Logo
-                      </Label>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-white font-medium flex items-center gap-2">
+                          <Image className="h-4 w-4 text-cyan-400" />
+                          App Icon / Logo
+                        </Label>
+                        {websiteAnalysis?.logoUrl && !formData.customLogo?.startsWith("data:") && (
+                          <span className="text-xs text-green-400 flex items-center gap-1">
+                            <CheckCircle2 className="h-3 w-3" />
+                            Auto-detected from {websiteAnalysis.logoSource?.replace(/-/g, ' ')}
+                          </span>
+                        )}
+                      </div>
                       
                       {/* Custom Logo Upload - Available for preview */}
                       <div className="flex gap-4 items-start">
@@ -904,8 +959,19 @@ export default function CreateApp() {
                               <div className="flex items-center gap-3">
                                 <img src={formData.customLogo} alt="Logo" className="h-12 w-12 object-contain rounded-lg" />
                                 <div className="text-left">
-                                  <p className="text-sm text-white font-medium">Logo uploaded</p>
-                                  <p className="text-xs text-muted-foreground">Click to change</p>
+                                  <p className="text-sm text-white font-medium flex items-center gap-1">
+                                    {websiteAnalysis?.logoUrl && formData.customLogo === websiteAnalysis.logoUrl ? (
+                                      <>
+                                        <Wand2 className="h-3 w-3 text-cyan-400" />
+                                        Auto-detected logo
+                                      </>
+                                    ) : formData.customLogo.startsWith("data:") ? (
+                                      "Custom logo uploaded"
+                                    ) : (
+                                      "Logo loaded"
+                                    )}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">Click to change or upload custom</p>
                                 </div>
                                 <Button 
                                   variant="ghost" 
@@ -920,16 +986,35 @@ export default function CreateApp() {
                                 </Button>
                               </div>
                             ) : (
-                              <div className="text-center">
-                                <Upload className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-                                <p className="text-sm text-muted-foreground">Upload custom logo (512x512, max 5MB)</p>
+                              <div className="text-center py-2">
+                                {scrapeWebsiteMutation.isPending ? (
+                                  <>
+                                    <Loader2 className="h-5 w-5 mx-auto mb-1 text-cyan-400 animate-spin" />
+                                    <p className="text-sm text-muted-foreground">Detecting logo from website...</p>
+                                  </>
+                                ) : websiteAnalysis && !websiteAnalysis.logoUrl ? (
+                                  <>
+                                    <Upload className="h-5 w-5 mx-auto mb-1 text-amber-400" />
+                                    <p className="text-sm text-muted-foreground">No logo detected - upload your own</p>
+                                    <p className="text-xs text-muted-foreground/70">512x512 recommended, max 5MB</p>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Upload className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                                    <p className="text-sm text-muted-foreground">
+                                      {formData.url === "https://" 
+                                        ? "Enter website URL to auto-detect logo" 
+                                        : "Upload custom logo (512x512, max 5MB)"}
+                                    </p>
+                                  </>
+                                )}
                               </div>
                             )}
                           </div>
                         </div>
                       </div>
                       
-                      {/* Emoji Icons - Always available */}
+                      {/* Emoji Icons - Always available as fallback */}
                       <div className="pt-2">
                         <p className="text-xs text-muted-foreground mb-2">Or choose an emoji icon:</p>
                         <div className="flex gap-2 flex-wrap">
@@ -958,89 +1043,84 @@ export default function CreateApp() {
                       </div>
                     </div>
 
-                    {/* Brand Colors */}
+                    {/* Brand Colors - Auto-detected with minimal override */}
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <Label className="text-white font-medium">Brand Colors</Label>
-                        {websiteAnalysis?.primaryColor && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setFormData(prev => ({
-                                ...prev,
-                                primaryColor: websiteAnalysis.primaryColor,
-                              }));
-                              toast({
-                                title: "🎨 Auto-detected color applied!",
-                                description: `Using ${websiteAnalysis.primaryColor} from your website.`,
-                              });
-                            }}
-                            className="text-xs px-2 py-1 rounded-md bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors flex items-center gap-1"
-                          >
-                            <Wand2 className="h-3 w-3" />
-                            Use Detected Color
-                          </button>
+                        <Label className="text-white font-medium flex items-center gap-2">
+                          <Palette className="h-4 w-4 text-cyan-400" />
+                          Brand Colors
+                        </Label>
+                        {scrapeWebsiteMutation.isPending && (
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            Detecting...
+                          </span>
                         )}
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <p className="text-xs text-muted-foreground">Primary Color {!formData.primaryColor && <span className="text-cyan-400">(auto)</span>}</p>
-                          <div className="flex gap-2 flex-wrap">
-                            {["#00E5FF", "#A855F7", "#10B981", "#F59E0B", "#EF4444", "#3B82F6"].map((color) => (
-                              <div
-                                key={color}
-                                onClick={() => {
-                                  // Toggle: if already selected, clear to auto/empty
-                                  if (formData.primaryColor.toUpperCase() === color.toUpperCase()) {
-                                    setFormData({ ...formData, primaryColor: "" }); // Empty = auto
-                                  } else {
-                                    setFormData({ ...formData, primaryColor: color });
-                                  }
-                                }}
-                                className={`h-8 w-8 rounded-full cursor-pointer border-2 transition-all ${
-                                  formData.primaryColor.toUpperCase() === color.toUpperCase() ? "border-white scale-110 shadow-lg ring-2 ring-cyan-500/50" : "border-transparent hover:scale-105"
-                                }`}
-                                style={{ backgroundColor: color }}
+                      {/* Show detected color status */}
+                      <div className="p-3 rounded-xl border bg-gradient-to-br from-cyan-500/5 to-purple-500/5 border-white/10">
+                        {websiteAnalysis?.primaryColor ? (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div 
+                                className="h-10 w-10 rounded-lg border-2 border-white/20 shadow-lg"
+                                style={{ backgroundColor: websiteAnalysis.primaryColor }}
                               />
-                            ))}
+                              <div>
+                                <p className="text-sm text-white font-medium flex items-center gap-2">
+                                  <CheckCircle2 className="h-4 w-4 text-green-400" />
+                                  Auto-detected from website
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {websiteAnalysis.primaryColor} 
+                                  {websiteAnalysis.colorSource && (
+                                    <span className="ml-1 text-cyan-400/70">
+                                      (from {websiteAnalysis.colorSource.replace(/-/g, ' ')})
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            {/* Custom color picker for override */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">Override:</span>
+                              <Input
+                                type="color"
+                                value={formData.primaryColor || websiteAnalysis.primaryColor || "#00E5FF"}
+                                onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
+                                className="h-8 w-8 p-1 rounded-lg cursor-pointer bg-transparent border-white/20"
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div 
+                                className="h-10 w-10 rounded-lg border-2 border-dashed border-white/20 flex items-center justify-center"
+                                style={{ backgroundColor: formData.primaryColor || "#00E5FF" }}
+                              >
+                                {!formData.primaryColor && <Sparkles className="h-4 w-4 text-white/50" />}
+                              </div>
+                              <div>
+                                <p className="text-sm text-white font-medium">
+                                  {formData.primaryColor ? "Custom color selected" : "Default theme color"}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formData.url && formData.url !== "https://" 
+                                    ? "Enter a complete URL to auto-detect colors" 
+                                    : "Enter your website URL above"}
+                                </p>
+                              </div>
+                            </div>
                             <Input
                               type="color"
                               value={formData.primaryColor || "#00E5FF"}
                               onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
-                              className="h-8 w-8 p-1 rounded-full cursor-pointer bg-transparent border-white/20"
+                              className="h-8 w-8 p-1 rounded-lg cursor-pointer bg-transparent border-white/20"
                             />
                           </div>
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <p className="text-xs text-muted-foreground">Secondary Color {!formData.secondaryColor && <span className="text-purple-400">(auto)</span>}</p>
-                          <div className="flex gap-2 flex-wrap">
-                            {["#A855F7", "#00E5FF", "#F97316", "#22C55E", "#6366F1", "#14B8A6"].map((color) => (
-                              <div
-                                key={color}
-                                onClick={() => {
-                                  // Toggle: if already selected, clear to auto/empty
-                                  if (formData.secondaryColor.toUpperCase() === color.toUpperCase()) {
-                                    setFormData({ ...formData, secondaryColor: "" }); // Empty = auto
-                                  } else {
-                                    setFormData({ ...formData, secondaryColor: color });
-                                  }
-                                }}
-                                className={`h-8 w-8 rounded-full cursor-pointer border-2 transition-all ${
-                                  formData.secondaryColor.toUpperCase() === color.toUpperCase() ? "border-white scale-110 shadow-lg ring-2 ring-purple-500/50" : "border-transparent hover:scale-105"
-                                }`}
-                                style={{ backgroundColor: color }}
-                              />
-                            ))}
-                            <Input
-                              type="color"
-                              value={formData.secondaryColor || "#A855F7"}
-                              onChange={(e) => setFormData({ ...formData, secondaryColor: e.target.value })}
-                              className="h-8 w-8 p-1 rounded-full cursor-pointer bg-transparent border-white/20"
-                            />
-                          </div>
-                        </div>
+                        )}
                       </div>
                     </div>
 
@@ -1633,6 +1713,13 @@ export default function CreateApp() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Success Celebration Overlay */}
+      <SuccessCelebration 
+        show={showCelebration}
+        title={celebrationMessage.title}
+        message={celebrationMessage.message}
+      />
     </div>
   );
 }

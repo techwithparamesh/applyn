@@ -1948,6 +1948,256 @@ export async function registerRoutes(
   });
 
   // ==========================================
+  // Website Scraper (No LLM Required)
+  // ==========================================
+  
+  // Lightweight website scraper - extracts logo, colors, and metadata
+  // This works WITHOUT AI/LLM - pure HTML parsing
+  app.post("/api/scrape-website", rateLimit({
+    windowMs: 60 * 1000,
+    max: 30, // Allow more requests since it's lightweight
+    message: { message: "Too many requests, please slow down" },
+  }), async (req, res, next) => {
+    try {
+      const schema = z.object({
+        url: z.string().url(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid URL" });
+      }
+
+      const { url } = parsed.data;
+      const baseUrl = new URL(url);
+
+      // Fetch the website HTML
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      
+      try {
+        const response = await fetch(url, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          },
+        });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          return res.status(400).json({ message: `Could not fetch website: ${response.status}` });
+        }
+
+        const html = await response.text();
+        
+        // ===== EXTRACT LOGO =====
+        let logoUrl: string | null = null;
+        let logoSource: string = "";
+        
+        // Priority order for logo extraction:
+        // 1. Apple touch icon (best quality, designed for apps)
+        const appleTouchIcon = html.match(/<link[^>]*rel=["']apple-touch-icon["'][^>]*href=["']([^"']+)["']/i) ||
+                               html.match(/<link[^>]*href=["']([^"']+)["'][^>]*rel=["']apple-touch-icon["']/i);
+        if (appleTouchIcon) {
+          logoUrl = appleTouchIcon[1];
+          logoSource = "apple-touch-icon";
+        }
+        
+        // 2. Apple touch icon precomposed
+        if (!logoUrl) {
+          const appleTouchPrecomposed = html.match(/<link[^>]*rel=["']apple-touch-icon-precomposed["'][^>]*href=["']([^"']+)["']/i);
+          if (appleTouchPrecomposed) {
+            logoUrl = appleTouchPrecomposed[1];
+            logoSource = "apple-touch-icon-precomposed";
+          }
+        }
+        
+        // 3. Large favicon (192x192 or higher)
+        if (!logoUrl) {
+          const largeFavicon = html.match(/<link[^>]*rel=["']icon["'][^>]*sizes=["'](192x192|512x512|384x384|256x256)["'][^>]*href=["']([^"']+)["']/i) ||
+                              html.match(/<link[^>]*href=["']([^"']+)["'][^>]*rel=["']icon["'][^>]*sizes=["'](192x192|512x512|384x384|256x256)["']/i);
+          if (largeFavicon) {
+            logoUrl = largeFavicon[2] || largeFavicon[1];
+            logoSource = "large-favicon";
+          }
+        }
+        
+        // 4. OG image (social sharing image)
+        if (!logoUrl) {
+          const ogImage = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
+                         html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+          if (ogImage) {
+            logoUrl = ogImage[1];
+            logoSource = "og-image";
+          }
+        }
+        
+        // 5. Any favicon
+        if (!logoUrl) {
+          const favicon = html.match(/<link[^>]*rel=["'](?:shortcut )?icon["'][^>]*href=["']([^"']+)["']/i) ||
+                         html.match(/<link[^>]*href=["']([^"']+)["'][^>]*rel=["'](?:shortcut )?icon["']/i);
+          if (favicon) {
+            logoUrl = favicon[1];
+            logoSource = "favicon";
+          }
+        }
+        
+        // 6. Default favicon.ico
+        if (!logoUrl) {
+          logoUrl = "/favicon.ico";
+          logoSource = "default-favicon";
+        }
+        
+        // Make logo URL absolute
+        if (logoUrl && !logoUrl.startsWith("http")) {
+          if (logoUrl.startsWith("//")) {
+            logoUrl = `${baseUrl.protocol}${logoUrl}`;
+          } else if (logoUrl.startsWith("/")) {
+            logoUrl = `${baseUrl.origin}${logoUrl}`;
+          } else {
+            logoUrl = `${baseUrl.origin}/${logoUrl}`;
+          }
+        }
+        
+        // ===== EXTRACT COLORS =====
+        let primaryColor: string | null = null;
+        let colorSource: string = "";
+        
+        // Priority order for color extraction:
+        // 1. theme-color meta tag (most reliable)
+        const themeColor = html.match(/<meta[^>]*name=["']theme-color["'][^>]*content=["']([^"']+)["']/i) ||
+                          html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']theme-color["']/i);
+        if (themeColor && /^#[0-9A-Fa-f]{3,6}$|^rgb/i.test(themeColor[1])) {
+          primaryColor = themeColor[1];
+          colorSource = "theme-color";
+        }
+        
+        // 2. msapplication-TileColor
+        if (!primaryColor) {
+          const tileColor = html.match(/<meta[^>]*name=["']msapplication-TileColor["'][^>]*content=["']([^"']+)["']/i);
+          if (tileColor && /^#[0-9A-Fa-f]{3,6}$/i.test(tileColor[1])) {
+            primaryColor = tileColor[1];
+            colorSource = "tile-color";
+          }
+        }
+        
+        // 3. CSS custom properties (--primary, --brand, --main-color, etc.)
+        if (!primaryColor) {
+          const cssVarPatterns = [
+            /--primary(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/i,
+            /--brand(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/i,
+            /--main(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/i,
+            /--accent(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/i,
+            /--theme(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/i,
+          ];
+          for (const pattern of cssVarPatterns) {
+            const match = html.match(pattern);
+            if (match) {
+              primaryColor = match[1];
+              colorSource = "css-variable";
+              break;
+            }
+          }
+        }
+        
+        // 4. Look for common brand-colored elements in inline styles
+        if (!primaryColor) {
+          // Look for header/nav background colors
+          const bgColorMatch = html.match(/(?:header|nav|\.navbar|\.header|\.nav)[^{]*{[^}]*background(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/i);
+          if (bgColorMatch) {
+            primaryColor = bgColorMatch[1];
+            colorSource = "header-bg";
+          }
+        }
+        
+        // 5. Link color (often brand color)
+        if (!primaryColor) {
+          const linkColor = html.match(/\ba\s*{[^}]*color:\s*([#][0-9A-Fa-f]{3,6})/i);
+          if (linkColor) {
+            primaryColor = linkColor[1];
+            colorSource = "link-color";
+          }
+        }
+        
+        // Normalize color format
+        if (primaryColor) {
+          // Convert 3-digit hex to 6-digit
+          if (/^#[0-9A-Fa-f]{3}$/i.test(primaryColor)) {
+            primaryColor = `#${primaryColor[1]}${primaryColor[1]}${primaryColor[2]}${primaryColor[2]}${primaryColor[3]}${primaryColor[3]}`;
+          }
+          primaryColor = primaryColor.toUpperCase();
+        }
+        
+        // ===== EXTRACT APP NAME =====
+        let appName: string | null = null;
+        
+        // 1. og:site_name
+        const ogSiteName = html.match(/<meta[^>]*property=["']og:site_name["'][^>]*content=["']([^"']+)["']/i);
+        if (ogSiteName) {
+          appName = ogSiteName[1].trim();
+        }
+        
+        // 2. og:title
+        if (!appName) {
+          const ogTitle = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
+          if (ogTitle) {
+            appName = ogTitle[1].trim();
+          }
+        }
+        
+        // 3. Title tag
+        if (!appName) {
+          const title = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+          if (title) {
+            // Clean up title - remove common suffixes
+            appName = title[1]
+              .split(/[|\-–—]/)[0] // Take first part before separators
+              .replace(/home|homepage|welcome/gi, "")
+              .trim();
+          }
+        }
+        
+        // 4. Domain name as fallback
+        if (!appName || appName.length < 2) {
+          appName = baseUrl.hostname
+            .replace(/^www\./, "")
+            .split(".")[0]
+            .replace(/-/g, " ")
+            .replace(/\b\w/g, c => c.toUpperCase());
+        }
+        
+        // Limit app name length
+        if (appName && appName.length > 30) {
+          appName = appName.substring(0, 30).trim();
+        }
+        
+        return res.json({
+          success: true,
+          url,
+          appName,
+          logo: {
+            url: logoUrl,
+            source: logoSource,
+          },
+          colors: {
+            primary: primaryColor,
+            source: colorSource,
+          },
+        });
+        
+      } catch (fetchErr: any) {
+        if (fetchErr.name === 'AbortError') {
+          return res.status(408).json({ message: "Website took too long to respond" });
+        }
+        console.error("Website scrape error:", fetchErr);
+        return res.status(400).json({ message: "Could not access website" });
+      }
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // ==========================================
   // LLM-Powered Features
   // ==========================================
 
