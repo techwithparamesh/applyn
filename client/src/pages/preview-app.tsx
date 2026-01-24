@@ -210,7 +210,7 @@ export default function PreviewApp() {
               variant="outline" 
               size="sm"
               onClick={() => setShowQRModal(true)}
-              className="border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400"
+              className="border-cyan-500/20 bg-cyan-500/5 hover:bg-cyan-500/10 text-cyan-400 rounded-xl"
             >
               <QrCode className="mr-2 h-4 w-4" /> QR Preview
             </Button>
@@ -219,7 +219,7 @@ export default function PreviewApp() {
               variant="outline" 
               size="sm"
               onClick={() => setLocation(`/apps/${app.id}/edit`)}
-              className="border-white/20 bg-white/5 hover:bg-white/10"
+              className="border-white/10 bg-white/5 hover:bg-white/10 rounded-xl"
             >
               <Edit className="mr-2 h-4 w-4" /> Edit
             </Button>
@@ -231,7 +231,7 @@ export default function PreviewApp() {
                   <Button 
                     size="sm"
                     onClick={() => handleDownload("android")}
-                    className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400"
+                    className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 rounded-xl"
                   >
                     <Download className="mr-2 h-4 w-4" /> APK
                   </Button>
@@ -240,7 +240,7 @@ export default function PreviewApp() {
                   <Button 
                     size="sm"
                     onClick={() => handleDownload("ios")}
-                    className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400"
+                    className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 rounded-xl"
                   >
                     <Download className="mr-2 h-4 w-4" /> iOS
                   </Button>
@@ -272,54 +272,59 @@ export default function PreviewApp() {
 
           {/* App Details Sidebar */}
           <div className="w-full lg:w-80 space-y-4">
-            <div className="glass rounded-xl p-5 border border-white/10">
-              <h3 className="text-sm font-semibold text-white mb-4">App Details</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Platform</span>
-                  <span className="text-white capitalize">{app.platform}</span>
+            {/* App Details Card - Clean Design */}
+            <div className="rounded-2xl border border-white/[0.06] bg-[#0d1117] overflow-hidden">
+              <div className="px-5 py-3 border-b border-white/[0.06]">
+                <h3 className="text-sm font-semibold text-white">App Details</h3>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Platform</span>
+                  <span className="text-sm text-white capitalize px-2.5 py-1 rounded-full bg-white/5 border border-white/10">{app.platform}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Status</span>
-                  <span className="text-white capitalize">{app.status}</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Status</span>
+                  <span className="text-sm text-white capitalize">{app.status}</span>
                 </div>
                 {app.packageName && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Package</span>
-                    <span className="text-white text-xs truncate max-w-[150px]">{app.packageName}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Package</span>
+                    <span className="text-white text-xs truncate max-w-[150px] font-mono bg-white/5 px-2 py-0.5 rounded">{app.packageName}</span>
                   </div>
                 )}
                 {app.versionCode && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Version</span>
-                    <span className="text-white">{app.versionCode}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Version</span>
+                    <span className="text-sm text-white">{app.versionCode}</span>
                   </div>
                 )}
                 {app.artifactSize && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Size</span>
-                    <span className="text-white">{(app.artifactSize / 1024 / 1024).toFixed(1)} MB</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Size</span>
+                    <span className="text-sm text-white">{(app.artifactSize / 1024 / 1024).toFixed(1)} MB</span>
                   </div>
                 )}
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Created</span>
-                  <span className="text-white">{new Date(app.createdAt).toLocaleDateString()}</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Created</span>
+                  <span className="text-sm text-white">{new Date(app.createdAt).toLocaleDateString()}</span>
                 </div>
               </div>
             </div>
 
-            {/* Color Info */}
-            <div className="glass rounded-xl p-5 border border-white/10">
-              <h3 className="text-sm font-semibold text-white mb-4">Theme Colors</h3>
-              <div className="space-y-3">
+            {/* Color Info - Clean Design */}
+            <div className="rounded-2xl border border-white/[0.06] bg-[#0d1117] overflow-hidden">
+              <div className="px-5 py-3 border-b border-white/[0.06]">
+                <h3 className="text-sm font-semibold text-white">Theme Colors</h3>
+              </div>
+              <div className="p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Primary</span>
                   <div className="flex items-center gap-2">
                     <div 
-                      className="h-6 w-6 rounded-md border border-white/20"
+                      className="h-7 w-7 rounded-full border-2 border-white/20 shadow-lg"
                       style={{ backgroundColor: app.primaryColor }}
                     />
-                    <span className="text-xs text-white font-mono">{app.primaryColor}</span>
+                    <span className="text-xs text-white font-mono bg-white/5 px-2 py-0.5 rounded">{app.primaryColor}</span>
                   </div>
                 </div>
                 {app.splashColor && (
@@ -327,40 +332,42 @@ export default function PreviewApp() {
                     <span className="text-sm text-muted-foreground">Splash</span>
                     <div className="flex items-center gap-2">
                       <div 
-                        className="h-6 w-6 rounded-md border border-white/20"
+                        className="h-7 w-7 rounded-lg border-2 border-white/20 shadow-lg"
                         style={{ backgroundColor: app.splashColor }}
                       />
-                      <span className="text-xs text-white font-mono">{app.splashColor}</span>
+                      <span className="text-xs text-white font-mono bg-white/5 px-2 py-0.5 rounded">{app.splashColor}</span>
                     </div>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Quick Actions */}
-            <div className="glass rounded-xl p-5 border border-white/10">
-              <h3 className="text-sm font-semibold text-white mb-4">Quick Actions</h3>
-              <div className="space-y-2">
+            {/* Quick Actions - Clean Design */}
+            <div className="rounded-2xl border border-white/[0.06] bg-[#0d1117] overflow-hidden">
+              <div className="px-5 py-3 border-b border-white/[0.06]">
+                <h3 className="text-sm font-semibold text-white">Quick Actions</h3>
+              </div>
+              <div className="p-3 space-y-1">
                 <Button 
                   variant="ghost" 
-                  className="w-full justify-start text-muted-foreground hover:text-white"
+                  className="w-full justify-start text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl"
                   onClick={() => setLocation(`/apps/${app.id}/edit`)}
                 >
-                  <Edit className="mr-2 h-4 w-4" /> Edit App Settings
+                  <Edit className="mr-3 h-4 w-4" /> Edit App Settings
                 </Button>
                 <Button 
                   variant="ghost" 
-                  className="w-full justify-start text-muted-foreground hover:text-white"
+                  className="w-full justify-start text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl"
                   onClick={() => setLocation(`/apps/${app.id}/push`)}
                 >
-                  <RefreshCw className="mr-2 h-4 w-4" /> Push Notifications
+                  <RefreshCw className="mr-3 h-4 w-4" /> Push Notifications
                 </Button>
                 <Button 
                   variant="ghost" 
-                  className="w-full justify-start text-muted-foreground hover:text-white"
+                  className="w-full justify-start text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl"
                   onClick={() => window.open(app.url, "_blank")}
                 >
-                  <ExternalLink className="mr-2 h-4 w-4" /> Visit Website
+                  <ExternalLink className="mr-3 h-4 w-4" /> Visit Website
                 </Button>
               </div>
             </div>
@@ -371,48 +378,54 @@ export default function PreviewApp() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="glass rounded-xl p-5 border border-cyan-500/30 bg-gradient-to-br from-cyan-500/10 to-purple-500/5"
+                className="rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/5 via-transparent to-purple-500/5 overflow-hidden"
               >
-                <div className="flex items-center gap-2 mb-3">
-                  <Crown className="h-5 w-5 text-cyan-400" />
-                  <h3 className="text-sm font-semibold text-white">Upgrade to Download</h3>
+                <div className="p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="h-9 w-9 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+                      <Crown className="h-5 w-5 text-cyan-400" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-white">Upgrade to Download</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    You're on the free preview tier. Upgrade to download your app and publish to app stores.
+                  </p>
+                  <Button 
+                    className="w-full bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 rounded-xl"
+                    onClick={() => setLocation(`/pricing?upgrade=${app.id}`)}
+                  >
+                    <Sparkles className="mr-2 h-4 w-4" /> View Plans & Upgrade
+                  </Button>
                 </div>
-                <p className="text-xs text-muted-foreground mb-4">
-                  You're on the free preview tier. Upgrade to download your app and publish to app stores.
-                </p>
-                <Button 
-                  className="w-full bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400"
-                  onClick={() => setLocation(`/pricing?upgrade=${app.id}`)}
-                >
-                  <Sparkles className="mr-2 h-4 w-4" /> View Plans & Upgrade
-                </Button>
               </motion.div>
             )}
           </div>
         </motion.div>
       </main>
       
-      {/* QR Code Modal */}
+      {/* QR Code Modal - Clean Design */}
       <Dialog open={showQRModal} onOpenChange={setShowQRModal}>
-        <DialogContent className="sm:max-w-md bg-slate-900/95 border-white/10">
+        <DialogContent className="sm:max-w-md bg-[#0d1117] border-white/[0.06] rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-white flex items-center gap-2">
-              <QrCode className="h-5 w-5 text-cyan-400" />
+            <DialogTitle className="text-white flex items-center gap-3">
+              <div className="h-9 w-9 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+                <QrCode className="h-5 w-5 text-cyan-400" />
+              </div>
               Preview on Your Phone
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-muted-foreground">
               Scan this QR code with your phone to preview the app experience
             </DialogDescription>
           </DialogHeader>
           
-          <div className="flex flex-col items-center space-y-4 py-4">
+          <div className="flex flex-col items-center space-y-5 py-4">
             {/* QR Code */}
-            <div className="p-4 bg-white rounded-xl">
+            <div className="p-5 bg-white rounded-2xl shadow-xl">
               <QRCodeSVG 
                 value={getPreviewUrl()} 
-                size={200}
+                size={180}
                 level="H"
-                includeMargin={true}
+                includeMargin={false}
                 bgColor="#FFFFFF"
                 fgColor="#0a0a0a"
               />
@@ -420,16 +433,16 @@ export default function PreviewApp() {
             
             {/* Preview URL */}
             <div className="w-full">
-              <label className="text-xs text-muted-foreground mb-2 block">Preview Link</label>
+              <label className="text-xs text-muted-foreground mb-2 block font-medium">Preview Link</label>
               <div className="flex items-center gap-2">
-                <div className="flex-1 p-2 rounded-lg bg-white/5 border border-white/10 text-xs text-muted-foreground truncate">
+                <div className="flex-1 px-3 py-2.5 rounded-xl bg-white/5 border border-white/[0.06] text-sm text-muted-foreground truncate font-mono">
                   {getPreviewUrl()}
                 </div>
                 <Button 
                   size="sm" 
                   variant="outline"
                   onClick={copyPreviewUrl}
-                  className="border-white/20"
+                  className="border-white/10 bg-white/5 hover:bg-white/10 rounded-xl h-10 w-10 p-0"
                 >
                   {copied ? <CheckCircle2 className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
                 </Button>
@@ -437,12 +450,14 @@ export default function PreviewApp() {
             </div>
             
             {/* Instructions */}
-            <div className="w-full p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
-              <div className="flex items-start gap-2">
-                <Smartphone className="h-4 w-4 text-cyan-400 mt-0.5" />
-                <div className="text-xs text-muted-foreground">
-                  <p className="font-medium text-cyan-400 mb-1">How to preview:</p>
-                  <ol className="list-decimal list-inside space-y-1">
+            <div className="w-full p-4 rounded-xl bg-cyan-500/5 border border-cyan-500/10">
+              <div className="flex items-start gap-3">
+                <div className="h-8 w-8 rounded-lg bg-cyan-500/10 flex items-center justify-center shrink-0">
+                  <Smartphone className="h-4 w-4 text-cyan-400" />
+                </div>
+                <div className="text-sm">
+                  <p className="font-medium text-cyan-400 mb-2">How to preview:</p>
+                  <ol className="list-decimal list-inside space-y-1.5 text-muted-foreground">
                     <li>Open camera app on your phone</li>
                     <li>Point at the QR code</li>
                     <li>Tap the notification to open</li>
@@ -453,16 +468,16 @@ export default function PreviewApp() {
             </div>
             
             {/* Share buttons */}
-            <div className="flex gap-2 w-full">
+            <div className="flex gap-3 w-full">
               <Button 
                 variant="outline" 
-                className="flex-1 border-white/20"
+                className="flex-1 border-white/10 bg-white/5 hover:bg-white/10 rounded-xl h-11"
                 onClick={copyPreviewUrl}
               >
                 <Share2 className="mr-2 h-4 w-4" /> Share Link
               </Button>
               <Button 
-                className="flex-1 bg-gradient-to-r from-cyan-500 to-purple-500"
+                className="flex-1 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-xl h-11"
                 onClick={() => {
                   setShowQRModal(false);
                   window.open(getPreviewUrl(), "_blank");

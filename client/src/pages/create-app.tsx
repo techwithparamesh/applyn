@@ -698,43 +698,45 @@ export default function CreateApp() {
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
 
-      {/* Progress Bar */}
-      <div className="w-full glass border-b border-white/[0.08] sticky top-16 z-40">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between max-w-4xl mx-auto">
+      {/* Progress Bar - Clean AppMySite Style */}
+      <div className="w-full bg-[#0d1117] border-b border-white/[0.06] sticky top-16 z-40">
+        <div className="container mx-auto px-4 py-5">
+          <div className="flex items-center justify-center max-w-2xl mx-auto">
             {STEPS.map((s, i) => {
               const Icon = s.icon;
               const isActive = s.id === step;
               const isCompleted = s.id < step;
 
               return (
-                <div key={s.id} className="flex flex-col items-center relative z-10 group">
-                  <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center border-2 transition-all duration-300 ${
-                      isActive
-                        ? "border-cyan-500/50 bg-gradient-to-br from-cyan-500/20 to-purple-500/20 text-cyan-400 scale-110 shadow-lg shadow-cyan-500/20"
-                        : isCompleted
-                        ? "border-green-500/50 bg-green-500/20 text-green-400"
-                        : "border-white/10 bg-white/5 text-muted-foreground"
-                    }`}
-                  >
-                    {isCompleted ? <Check className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
-                  </div>
-                  <span
-                    className={`text-xs font-medium mt-2 transition-colors duration-300 ${
-                      isActive ? "text-cyan-400" : "text-muted-foreground"
-                    }`}
-                  >
-                    {s.name}
-                  </span>
-
-                  {i !== STEPS.length - 1 && (
+                <div key={s.id} className="flex items-center">
+                  <div className="flex flex-col items-center relative z-10 group">
                     <div
-                      className={`absolute top-5 left-1/2 w-full h-[2px] -z-10 ${
-                        s.id < step ? "bg-green-500/50" : "bg-white/10"
+                      className={`w-11 h-11 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+                        isActive
+                          ? "border-cyan-400 bg-cyan-400/10 text-cyan-400 scale-105"
+                          : isCompleted
+                          ? "border-cyan-500 bg-cyan-500 text-white"
+                          : "border-white/20 bg-transparent text-white/40"
                       }`}
-                      style={{ width: "calc(100% * 6)" }}
-                    ></div>
+                    >
+                      {isCompleted ? <Check className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
+                    </div>
+                    <span
+                      className={`text-xs font-medium mt-2.5 transition-colors duration-300 ${
+                        isActive ? "text-cyan-400" : isCompleted ? "text-white" : "text-white/40"
+                      }`}
+                    >
+                      {s.name}
+                    </span>
+                  </div>
+                  
+                  {/* Connector Line */}
+                  {i !== STEPS.length - 1 && (
+                    <div className="w-24 sm:w-32 h-[2px] mx-4 mt-[-20px]">
+                      <div className={`h-full rounded-full transition-all duration-500 ${
+                        s.id < step ? "bg-cyan-500" : "bg-white/10"
+                      }`} />
+                    </div>
                   )}
                 </div>
               );
@@ -746,7 +748,7 @@ export default function CreateApp() {
       <main className="flex-1 container mx-auto px-4 py-8 flex flex-col lg:flex-row gap-8 max-w-6xl">
         {/* Left Panel: Form */}
         <div className="flex-1 order-2 lg:order-1">
-          <Card className="border-white/[0.08] glass shadow-2xl h-full">
+          <Card className="border-white/[0.06] bg-[#0d1117] shadow-2xl h-full rounded-2xl overflow-hidden">
             <CardContent className="p-8">
               {step === 1 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-500">
@@ -1249,92 +1251,113 @@ export default function CreateApp() {
                   </div>
 
                   <div className="space-y-4">
-                    {/* Basic Info */}
-                    <div className="p-4 bg-white/5 rounded-xl border border-white/10">
-                      <h3 className="text-sm font-medium text-cyan-400 mb-3 flex items-center gap-2">
-                        <Globe className="h-4 w-4" /> Basic Information
-                      </h3>
-                      <div className="text-sm space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Website URL:</span>
-                          <span className="font-medium text-white truncate max-w-[200px]">{formData.url}</span>
+                    {/* Basic Information - Clean Card Design */}
+                    <div className="rounded-2xl border border-white/[0.08] bg-[#0d1117] overflow-hidden">
+                      <div className="px-5 py-3 border-b border-white/[0.08] flex items-center gap-2">
+                        <Globe className="h-4 w-4 text-cyan-400" />
+                        <h3 className="text-sm font-semibold text-cyan-400">Basic Information</h3>
+                      </div>
+                      <div className="p-5 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Website URL:</span>
+                          <span className="text-sm font-medium text-white truncate max-w-[220px]">{formData.url}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">App Name:</span>
-                          <span className="font-medium text-white">{formData.appName}</span>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">App Name:</span>
+                          <span className="text-sm font-medium text-white">{formData.appName}</span>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">App Icon:</span>
-                          {formData.customLogo ? (
-                            <img src={formData.customLogo} alt="Logo" className="h-8 w-8 rounded-lg object-contain" />
-                          ) : (
-                            <span className="text-xl">{formData.icon}</span>
-                          )}
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">App Icon:</span>
+                          <div className="h-10 w-10 rounded-xl flex items-center justify-center bg-white/5 border border-white/10">
+                            {formData.customLogo ? (
+                              <img src={formData.customLogo} alt="Logo" className="h-8 w-8 rounded-lg object-contain" />
+                            ) : (
+                              <span className="text-xl">{formData.icon}</span>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Platform:</span>
-                          <span className="font-medium text-white capitalize">
-                            {formData.platform === "both" ? "Android & iOS" : formData.platform}
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Platform:</span>
+                          <span className="text-sm font-medium text-white capitalize px-3 py-1 rounded-full bg-white/5 border border-white/10">
+                            {formData.platform === "both" ? "Android & iOS" : formData.platform === "android" ? "🤖 Android" : "🍎 iOS"}
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Branding */}
-                    <div className="p-4 bg-white/5 rounded-xl border border-white/10">
-                      <h3 className="text-sm font-medium text-purple-400 mb-3 flex items-center gap-2">
-                        <Palette className="h-4 w-4" /> Branding & Colors
-                      </h3>
-                      <div className="text-sm space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Primary Color:</span>
-                          <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 rounded-full border border-white/20" style={{ backgroundColor: formData.primaryColor || websiteAnalysis?.primaryColor || "#00E5FF" }} />
-                            <span className="font-mono text-xs text-muted-foreground">
-                              {formData.primaryColor || (websiteAnalysis?.primaryColor ? `${websiteAnalysis.primaryColor} (detected)` : "#00E5FF (auto)")}
+                    {/* Branding & Colors - Clean Card Design */}
+                    <div className="rounded-2xl border border-white/[0.08] bg-[#0d1117] overflow-hidden">
+                      <div className="px-5 py-3 border-b border-white/[0.08] flex items-center gap-2">
+                        <Palette className="h-4 w-4 text-purple-400" />
+                        <h3 className="text-sm font-semibold text-purple-400">Branding & Colors</h3>
+                      </div>
+                      <div className="p-5 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Primary Color:</span>
+                          <div className="flex items-center gap-3">
+                            <div 
+                              className="w-8 h-8 rounded-full border-2 border-white/20 shadow-lg" 
+                              style={{ backgroundColor: formData.primaryColor || websiteAnalysis?.primaryColor || "#00E5FF" }} 
+                            />
+                            <span className="font-mono text-xs text-white bg-white/5 px-2 py-1 rounded">
+                              {(formData.primaryColor || websiteAnalysis?.primaryColor || "#00E5FF").toUpperCase()}
                             </span>
+                            {!formData.primaryColor && websiteAnalysis?.primaryColor && (
+                              <span className="text-xs text-cyan-400">(auto)</span>
+                            )}
                           </div>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Secondary Color:</span>
-                          <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 rounded-full border border-white/20" style={{ backgroundColor: formData.secondaryColor || "#A855F7" }} />
-                            <span className="font-mono text-xs text-muted-foreground">
-                              {formData.secondaryColor || "#A855F7 (auto)"}
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Secondary Color:</span>
+                          <div className="flex items-center gap-3">
+                            <div 
+                              className="w-8 h-8 rounded-full border-2 border-white/20 shadow-lg" 
+                              style={{ backgroundColor: formData.secondaryColor || "#A855F7" }} 
+                            />
+                            <span className="font-mono text-xs text-white bg-white/5 px-2 py-1 rounded">
+                              {(formData.secondaryColor || "#A855F7").toUpperCase()}
                             </span>
+                            {!formData.secondaryColor && (
+                              <span className="text-xs text-purple-400">(auto)</span>
+                            )}
                           </div>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Splash Background:</span>
-                          <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 rounded border border-white/20" style={{ backgroundColor: formData.splashBgColor }} />
-                            <span className="font-mono text-xs text-muted-foreground">{formData.splashBgColor}</span>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Splash Background:</span>
+                          <div className="flex items-center gap-3">
+                            <div 
+                              className="w-8 h-8 rounded-lg border-2 border-white/20 shadow-lg" 
+                              style={{ backgroundColor: formData.splashBgColor }} 
+                            />
+                            <span className="font-mono text-xs text-white bg-white/5 px-2 py-1 rounded">
+                              {formData.splashBgColor.toUpperCase()}
+                            </span>
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* Download CTA */}
-                    <div className="p-4 bg-gradient-to-r from-cyan-500/10 to-purple-500/10 rounded-xl border border-cyan-500/20">
-                      <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center">
-                          <Smartphone className="h-6 w-6 text-white" />
+                    {/* App Ready CTA - Premium Design */}
+                    <div className="rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/5 via-transparent to-purple-500/5 overflow-hidden">
+                      <div className="p-6 flex items-center gap-4">
+                        <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 flex items-center justify-center shrink-0">
+                          <Smartphone className="h-7 w-7 text-cyan-400" />
                         </div>
-                        <div>
-                          <h3 className="font-semibold text-white">Your App is Ready!</h3>
-                          <p className="text-sm text-muted-foreground">Click download to choose your plan and get your app.</p>
+                        <div className="flex-1">
+                          <h3 className="text-lg font-bold text-white">Your App is Ready!</h3>
+                          <p className="text-sm text-muted-foreground mt-0.5">Click download to choose your plan and get your app.</p>
                         </div>
                       </div>
                     </div>
 
                     {/* Starter Plan Warning Banner */}
                     {selectedPlan === "starter" && (
-                      <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
-                        <div className="flex items-start gap-3">
-                          <div className="p-2 rounded-lg bg-yellow-500/20 shrink-0">
+                      <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 overflow-hidden">
+                        <div className="p-5 flex items-start gap-4">
+                          <div className="h-10 w-10 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center shrink-0">
                             <AlertCircle className="h-5 w-5 text-yellow-400" />
                           </div>
-                          <div>
+                          <div className="flex-1">
                             <h4 className="font-semibold text-yellow-400">Preview Build Only</h4>
                             <p className="text-sm text-yellow-400/80 mt-1">
                               Starter plan builds are for preview and testing only. 
@@ -1357,10 +1380,10 @@ export default function CreateApp() {
                       </div>
                     )}
 
-                    {/* Features Reminder */}
-                    <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-                      <p className="text-xs text-green-400 flex items-center gap-2">
-                        <Sparkles className="h-3 w-3" />
+                    {/* Build Time Notice */}
+                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-green-500/5 border border-green-500/20">
+                      <Sparkles className="h-4 w-4 text-green-400 shrink-0" />
+                      <p className="text-sm text-green-400">
                         Your app will be ready to download within 10-15 minutes after selecting a plan.
                       </p>
                     </div>

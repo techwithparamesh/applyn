@@ -887,12 +887,12 @@ export default function Dashboard() {
               )}
 
               {filteredApps.map((app) => (
-                <Card key={app.id} className="glass glass-hover overflow-hidden group">
+                <Card key={app.id} className="border-white/[0.06] bg-[#0d1117] rounded-2xl overflow-hidden group hover:border-white/[0.12] transition-all">
                   <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
                     <div className="flex items-center gap-3">
                       <div 
-                        className="h-12 w-12 rounded-xl flex items-center justify-center text-2xl overflow-hidden"
-                        style={{ backgroundColor: `${app.primaryColor}20` }}
+                        className="h-12 w-12 rounded-xl flex items-center justify-center text-2xl overflow-hidden border border-white/[0.06]"
+                        style={{ backgroundColor: `${app.primaryColor}15` }}
                       >
                         {app.iconUrl ? (
                           <img src={app.iconUrl} alt={app.name} className="h-full w-full object-cover" />
@@ -910,11 +910,11 @@ export default function Dashboard() {
 
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
                           <MoreVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="glass border-white/10">
+                      <DropdownMenuContent align="end" className="bg-[#0d1117] border-white/[0.06] rounded-xl">
                         {app.status === "live" && (app.platform === "android" || app.platform === "both") && (
                           <DropdownMenuItem onClick={() => handleDownload(app.id, "android")}>
                             <Download className="mr-2 h-4 w-4" /> Download APK
@@ -959,7 +959,7 @@ export default function Dashboard() {
                             <Clock className="mr-2 h-4 w-4" /> Building...
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuSeparator className="bg-white/10" />
+                        <DropdownMenuSeparator className="bg-white/[0.06]" />
                         <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/preview`)}>
                           <Eye className="mr-2 h-4 w-4" /> Preview App
                         </DropdownMenuItem>
@@ -986,7 +986,7 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <StatusBadge status={app.status} />
                       {app.plan === "preview" && (
-                        <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-[10px]">
+                        <Badge className="bg-green-500/10 text-green-400 border-green-500/20 text-[10px] rounded-full">
                           Free Preview
                         </Badge>
                       )}
@@ -997,7 +997,7 @@ export default function Dashboard() {
 
                     {/* Upgrade prompt for preview apps */}
                     {app.plan === "preview" && (
-                      <div className="mt-3 p-3 rounded-lg border border-cyan-500/20 bg-gradient-to-r from-cyan-500/10 to-purple-500/5">
+                      <div className="mt-3 p-3 rounded-xl border border-cyan-500/10 bg-gradient-to-r from-cyan-500/5 to-purple-500/5">
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-xs font-medium text-white">Preview Only</p>
@@ -1005,7 +1005,7 @@ export default function Dashboard() {
                           </div>
                           <Button 
                             size="sm" 
-                            className="h-7 text-xs bg-gradient-to-r from-cyan-500 to-purple-500"
+                            className="h-7 text-xs bg-gradient-to-r from-cyan-500 to-purple-500 rounded-lg"
                             onClick={() => setLocation(`/pricing?upgrade=${app.id}`)}
                           >
                             <Crown className="h-3 w-3 mr-1" /> Upgrade
@@ -1022,7 +1022,7 @@ export default function Dashboard() {
                     )}
 
                     {app.status === "failed" && (app.buildError || app.lastBuildAt) && (
-                      <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/5 p-3">
+                      <div className="mt-3 rounded-xl border border-red-500/15 bg-red-500/5 p-3">
                         <div className="text-xs font-medium text-red-400">Build failed</div>
                         {app.buildError && (
                           <div className="mt-1 text-xs text-muted-foreground break-words line-clamp-2">
@@ -1039,7 +1039,7 @@ export default function Dashboard() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="mt-2 h-7 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                            className="mt-2 h-7 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg"
                             onClick={() => handleContactSupport(app)}
                           >
                             Contact support
@@ -1049,7 +1049,7 @@ export default function Dashboard() {
                     )}
                   </CardContent>
 
-                  <CardFooter className="bg-white/[0.02] border-t border-white/5 p-4 flex justify-between items-center">
+                  <CardFooter className="bg-white/[0.02] border-t border-white/[0.04] p-4 flex justify-between items-center">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Smartphone className="h-3.5 w-3.5" />
                       {app.platform === "both" ? "Android & iOS" : app.platform === "ios" ? "iOS" : "Android"}
@@ -1060,7 +1060,7 @@ export default function Dashboard() {
                         {(app.platform === "android" || app.platform === "both") && (
                           <Button
                             size="sm"
-                            className="h-7 text-xs bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/20"
+                            className="h-7 text-xs bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/15 rounded-lg"
                             onClick={() => handleDownload(app.id, "android")}
                           >
                             <Download className="mr-1 h-3 w-3" /> APK
@@ -1069,7 +1069,7 @@ export default function Dashboard() {
                         {(app.platform === "ios" || app.platform === "both") && (
                           <Button
                             size="sm"
-                            className="h-7 text-xs bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border border-purple-500/20"
+                            className="h-7 text-xs bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border border-purple-500/15 rounded-lg"
                             onClick={() => handleDownload(app.id, "ios")}
                           >
                             <Download className="mr-1 h-3 w-3" /> iOS
@@ -1079,7 +1079,7 @@ export default function Dashboard() {
                     )}
 
                     {app.status === "processing" && (
-                      <Badge variant="secondary" className="bg-purple-500/10 text-purple-400 border-purple-500/20">
+                      <Badge variant="secondary" className="bg-purple-500/10 text-purple-400 border-purple-500/15 rounded-full">
                         <Clock className="mr-1 h-3 w-3" /> Building...
                       </Badge>
                     )}
