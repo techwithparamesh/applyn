@@ -2063,69 +2063,206 @@ export async function registerRoutes(
         let primaryColor: string | null = null;
         let colorSource: string = "";
         
+        // Helper to validate and normalize hex color
+        const normalizeHexColor = (color: string): string | null => {
+          if (!color) return null;
+          color = color.trim();
+          // Handle 3-digit hex
+          if (/^#[0-9A-Fa-f]{3}$/i.test(color)) {
+            color = `#${color[1]}${color[1]}${color[2]}${color[2]}${color[3]}${color[3]}`;
+          }
+          // Validate 6-digit hex
+          if (/^#[0-9A-Fa-f]{6}$/i.test(color)) {
+            return color.toUpperCase();
+          }
+          return null;
+        };
+        
+        // Helper to check if color is too generic (white, black, gray)
+        const isGenericColor = (hex: string): boolean => {
+          if (!hex) return true;
+          hex = hex.toUpperCase().replace('#', '');
+          // Check for white/near-white
+          if (hex === 'FFFFFF' || hex === 'FFF' || hex === 'FAFAFA' || hex === 'F5F5F5' || hex === 'EEEEEE') return true;
+          // Check for black/near-black
+          if (hex === '000000' || hex === '000' || hex === '111111' || hex === '1A1A1A' || hex === '0A0A0A') return true;
+          // Check for grays
+          const r = parseInt(hex.slice(0, 2), 16);
+          const g = parseInt(hex.slice(2, 4), 16);
+          const b = parseInt(hex.slice(4, 6), 16);
+          const isGray = Math.abs(r - g) < 15 && Math.abs(g - b) < 15 && Math.abs(r - b) < 15;
+          const isTooLight = r > 240 && g > 240 && b > 240;
+          const isTooDark = r < 25 && g < 25 && b < 25;
+          return isGray || isTooLight || isTooDark;
+        };
+        
         // Priority order for color extraction:
         // 1. theme-color meta tag (most reliable)
         const themeColor = html.match(/<meta[^>]*name=["']theme-color["'][^>]*content=["']([^"']+)["']/i) ||
                           html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']theme-color["']/i);
-        if (themeColor && /^#[0-9A-Fa-f]{3,6}$|^rgb/i.test(themeColor[1])) {
-          primaryColor = themeColor[1];
-          colorSource = "theme-color";
+        if (themeColor) {
+          const normalized = normalizeHexColor(themeColor[1]);
+          if (normalized && !isGenericColor(normalized)) {
+            primaryColor = normalized;
+            colorSource = "theme-color";
+          }
         }
         
         // 2. msapplication-TileColor
         if (!primaryColor) {
           const tileColor = html.match(/<meta[^>]*name=["']msapplication-TileColor["'][^>]*content=["']([^"']+)["']/i);
-          if (tileColor && /^#[0-9A-Fa-f]{3,6}$/i.test(tileColor[1])) {
-            primaryColor = tileColor[1];
-            colorSource = "tile-color";
-          }
-        }
-        
-        // 3. CSS custom properties (--primary, --brand, --main-color, etc.)
-        if (!primaryColor) {
-          const cssVarPatterns = [
-            /--primary(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/i,
-            /--brand(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/i,
-            /--main(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/i,
-            /--accent(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/i,
-            /--theme(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/i,
-          ];
-          for (const pattern of cssVarPatterns) {
-            const match = html.match(pattern);
-            if (match) {
-              primaryColor = match[1];
-              colorSource = "css-variable";
-              break;
+          if (tileColor) {
+            const normalized = normalizeHexColor(tileColor[1]);
+            if (normalized && !isGenericColor(normalized)) {
+              primaryColor = normalized;
+              colorSource = "tile-color";
             }
           }
         }
         
-        // 4. Look for common brand-colored elements in inline styles
+        // 3. CSS custom properties from inline styles and style tags
         if (!primaryColor) {
-          // Look for header/nav background colors
-          const bgColorMatch = html.match(/(?:header|nav|\.navbar|\.header|\.nav)[^{]*{[^}]*background(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/i);
-          if (bgColorMatch) {
-            primaryColor = bgColorMatch[1];
-            colorSource = "header-bg";
+          const cssVarPatterns = [
+            /--primary(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/gi,
+            /--brand(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/gi,
+            /--main(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/gi,
+            /--accent(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/gi,
+            /--theme(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/gi,
+            /--color-primary:\s*([#][0-9A-Fa-f]{3,6})/gi,
+            /--wp--preset--color--primary:\s*([#][0-9A-Fa-f]{3,6})/gi,
+          ];
+          for (const pattern of cssVarPatterns) {
+            const matches = html.matchAll(pattern);
+            for (const match of matches) {
+              const normalized = normalizeHexColor(match[1]);
+              if (normalized && !isGenericColor(normalized)) {
+                primaryColor = normalized;
+                colorSource = "css-variable";
+                break;
+              }
+            }
+            if (primaryColor) break;
           }
         }
         
-        // 5. Link color (often brand color)
+        // 4. Look for colors in inline style attributes on key elements
         if (!primaryColor) {
-          const linkColor = html.match(/\ba\s*{[^}]*color:\s*([#][0-9A-Fa-f]{3,6})/i);
-          if (linkColor) {
-            primaryColor = linkColor[1];
-            colorSource = "link-color";
+          // Extract all inline style colors
+          const inlineStyleColors: string[] = [];
+          const styleMatches = html.matchAll(/style=["'][^"']*(?:background(?:-color)?|color|border-color):\s*([#][0-9A-Fa-f]{3,6})[^"']*["']/gi);
+          for (const match of styleMatches) {
+            const normalized = normalizeHexColor(match[1]);
+            if (normalized && !isGenericColor(normalized)) {
+              inlineStyleColors.push(normalized);
+            }
+          }
+          if (inlineStyleColors.length > 0) {
+            // Use the most common non-generic color
+            const colorCounts: Record<string, number> = {};
+            inlineStyleColors.forEach(c => { colorCounts[c] = (colorCounts[c] || 0) + 1; });
+            const sorted = Object.entries(colorCounts).sort((a, b) => b[1] - a[1]);
+            if (sorted.length > 0) {
+              primaryColor = sorted[0][0];
+              colorSource = "inline-style";
+            }
           }
         }
         
-        // Normalize color format
-        if (primaryColor) {
-          // Convert 3-digit hex to 6-digit
-          if (/^#[0-9A-Fa-f]{3}$/i.test(primaryColor)) {
-            primaryColor = `#${primaryColor[1]}${primaryColor[1]}${primaryColor[2]}${primaryColor[2]}${primaryColor[3]}${primaryColor[3]}`;
+        // 5. Extract from CSS in <style> tags - look for button, .btn, header, nav backgrounds
+        if (!primaryColor) {
+          const styleTagContent = html.match(/<style[^>]*>([\s\S]*?)<\/style>/gi)?.join(' ') || '';
+          const bgColorPatterns = [
+            /\.btn[^{]*{[^}]*background(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/gi,
+            /button[^{]*{[^}]*background(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/gi,
+            /\.primary[^{]*{[^}]*(?:background(?:-color)?|color):\s*([#][0-9A-Fa-f]{3,6})/gi,
+            /\.brand[^{]*{[^}]*(?:background(?:-color)?|color):\s*([#][0-9A-Fa-f]{3,6})/gi,
+            /header[^{]*{[^}]*background(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/gi,
+            /nav[^{]*{[^}]*background(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/gi,
+            /\.cta[^{]*{[^}]*background(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/gi,
+          ];
+          for (const pattern of bgColorPatterns) {
+            const matches = styleTagContent.matchAll(pattern);
+            for (const match of matches) {
+              const normalized = normalizeHexColor(match[1]);
+              if (normalized && !isGenericColor(normalized)) {
+                primaryColor = normalized;
+                colorSource = "css-button";
+                break;
+              }
+            }
+            if (primaryColor) break;
           }
-          primaryColor = primaryColor.toUpperCase();
+        }
+        
+        // 6. Try to fetch primary CSS file and extract colors
+        if (!primaryColor) {
+          try {
+            // Find main CSS file
+            const cssLinkMatch = html.match(/<link[^>]*href=["']([^"']+\.css(?:\?[^"']*)?)[^"']*["'][^>]*rel=["']stylesheet["']/i) ||
+                                html.match(/<link[^>]*rel=["']stylesheet["'][^>]*href=["']([^"']+\.css(?:\?[^"']*)?)/i);
+            if (cssLinkMatch) {
+              let cssUrl = cssLinkMatch[1];
+              if (!cssUrl.startsWith('http')) {
+                cssUrl = cssUrl.startsWith('/') ? `${baseUrl.origin}${cssUrl}` : `${baseUrl.origin}/${cssUrl}`;
+              }
+              
+              // Fetch CSS with short timeout
+              const cssController = new AbortController();
+              const cssTimeout = setTimeout(() => cssController.abort(), 5000);
+              const cssRes = await fetch(cssUrl, { 
+                signal: cssController.signal,
+                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AppScraper/1.0)' }
+              });
+              clearTimeout(cssTimeout);
+              
+              if (cssRes.ok) {
+                const cssText = await cssRes.text();
+                // Look for brand colors in CSS
+                const cssBrandPatterns = [
+                  /--primary(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/i,
+                  /--brand(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/i,
+                  /--accent(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/i,
+                  /\.btn-primary[^{]*{[^}]*background(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/i,
+                  /\.btn[^{]*{[^}]*background(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/i,
+                  /a\s*{[^}]*color:\s*([#][0-9A-Fa-f]{3,6})/i,
+                  /a:hover[^{]*{[^}]*color:\s*([#][0-9A-Fa-f]{3,6})/i,
+                ];
+                for (const pattern of cssBrandPatterns) {
+                  const match = cssText.match(pattern);
+                  if (match) {
+                    const normalized = normalizeHexColor(match[1]);
+                    if (normalized && !isGenericColor(normalized)) {
+                      primaryColor = normalized;
+                      colorSource = "external-css";
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+          } catch (cssErr) {
+            // Ignore CSS fetch errors
+          }
+        }
+        
+        // 7. Last resort: Extract any prominent color from the page
+        if (!primaryColor) {
+          // Look for any hex colors that appear multiple times
+          const allHexColors = html.matchAll(/#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})\b/g);
+          const colorCounts: Record<string, number> = {};
+          for (const match of allHexColors) {
+            const normalized = normalizeHexColor(`#${match[1]}`);
+            if (normalized && !isGenericColor(normalized)) {
+              colorCounts[normalized] = (colorCounts[normalized] || 0) + 1;
+            }
+          }
+          const sortedColors = Object.entries(colorCounts)
+            .filter(([_, count]) => count >= 2) // Must appear at least twice
+            .sort((a, b) => b[1] - a[1]);
+          if (sortedColors.length > 0) {
+            primaryColor = sortedColors[0][0];
+            colorSource = "frequent-color";
+          }
         }
         
         // ===== EXTRACT APP NAME =====
