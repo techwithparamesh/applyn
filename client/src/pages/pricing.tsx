@@ -28,7 +28,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import pricingImg from "@assets/generated_images/saas_pricing_plans_illustration.png";
-import { PLANS_LIST, ADDONS, type PlanDefinition } from "@shared/pricing";
+import { PLANS_LIST, PAID_PLANS_LIST, PLANS, ADDONS, type PlanDefinition } from "@shared/pricing";
 
 // Android icon component
 function AndroidIcon({ className }: { className?: string }) {
@@ -116,9 +116,40 @@ export default function Pricing() {
         {/* Pricing Cards Section */}
         <section className="pb-16">
           <div className="container mx-auto px-6 max-w-7xl">
-            {/* 4-Column Grid for Plans */}
+            {/* Free Preview Tier Banner */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-8 p-6 rounded-2xl border border-green-500/30 bg-gradient-to-r from-green-500/10 to-cyan-500/5 relative overflow-hidden"
+            >
+              <div className="absolute -top-10 -right-10 w-40 h-40 bg-green-500/10 rounded-full blur-[80px]" />
+              <div className="flex flex-col md:flex-row items-center justify-between gap-4 relative z-10">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-xl bg-green-500/20 border border-green-500/30">
+                    <Sparkles className="w-6 h-6 text-green-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xl font-bold text-white">Free Preview</h3>
+                      <Badge className="bg-green-500/20 text-green-400 border-green-500/30">No Credit Card</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Build and preview your app for FREE. Test on real devices with QR code. Upgrade anytime to download.
+                    </p>
+                  </div>
+                </div>
+                <Button 
+                  onClick={() => handleSelectPlan("preview")}
+                  className="bg-gradient-to-r from-green-500 to-cyan-500 hover:from-green-400 hover:to-cyan-400 text-white font-semibold px-8 whitespace-nowrap"
+                >
+                  Start Free Preview →
+                </Button>
+              </div>
+            </motion.div>
+            
+            {/* 4-Column Grid for Paid Plans */}
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5 items-stretch">
-              {PLANS_LIST.map((plan, index) => (
+              {PAID_PLANS_LIST.map((plan, index) => (
                 <PricingCard 
                   key={plan.id}
                   plan={plan}

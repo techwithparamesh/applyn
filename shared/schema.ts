@@ -17,7 +17,7 @@ export type UserRole = z.infer<typeof userRoleSchema>;
 export const planStatusSchema = z.enum(["active", "expired", "cancelled"]);
 export type PlanStatus = z.infer<typeof planStatusSchema>;
 
-export const planIdSchema = z.enum(["starter", "standard", "pro", "agency"]);
+export const planIdSchema = z.enum(["preview", "starter", "standard", "pro", "agency"]);
 export type PlanId = z.infer<typeof planIdSchema>;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

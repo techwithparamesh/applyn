@@ -25,6 +25,8 @@ import Tickets from "@/pages/tickets";
 import EditApp from "@/pages/edit-app";
 import PushNotifications from "@/pages/push-notifications";
 import PreviewApp from "@/pages/preview-app";
+import LivePreview from "@/pages/live-preview";
+import AppAnalytics from "@/pages/app-analytics";
 import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
 
@@ -53,6 +55,9 @@ function Router() {
       <Route path="/apps/:id/edit" component={EditApp} />
       <Route path="/apps/:id/push" component={PushNotifications} />
       <Route path="/apps/:id/preview" component={PreviewApp} />
+      <Route path="/apps/:id/analytics" component={AppAnalytics} />
+      <Route path="/preview-app" component={PreviewApp} />
+      <Route path="/live-preview/:id" component={LivePreview} />
       <Route component={NotFound} />
     </Switch>
   );

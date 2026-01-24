@@ -20,7 +20,7 @@
 // PLAN TYPES & DEFINITIONS
 // ============================================
 
-export type PlanId = "starter" | "standard" | "pro" | "agency";
+export type PlanId = "preview" | "starter" | "standard" | "pro" | "agency";
 export type PlanStatus = "active" | "expired" | "cancelled";
 
 export interface PlanDefinition {
@@ -98,6 +98,84 @@ export interface PlanDefinition {
 // ============================================
 
 export const PLANS: Record<PlanId, PlanDefinition> = {
+  /**
+   * PREVIEW - FREE
+   * Positioning: Try before you buy
+   * Users can build and preview their app, but cannot download or publish
+   */
+  preview: {
+    id: "preview",
+    name: "Preview",
+    tagline: "Try Before You Buy",
+    price: 0,
+    originalPrice: 0,
+    monthlyEquivalent: 0,
+    currency: "INR",
+    
+    maxApps: 1,
+    maxTeamMembers: 1,
+    
+    outputs: {
+      androidApk: false,      // Cannot download APK
+      androidAab: false,      // Cannot download AAB
+      iosIpa: false,
+      iosAppStore: false,
+    },
+    
+    features: {
+      playStoreReady: false,
+      appStoreReady: false,
+      // Native features - Basic preview only
+      nativeHeader: true,
+      pullToRefresh: true,
+      offlineScreen: true,
+      smartBackButton: true,
+      nativeLoadingProgress: false,
+      bottomNavigation: false,
+      deepLinking: false,
+      customNativeMenu: false,
+      // Push notifications - Not included
+      pushNotifications: false,
+      pushNotificationsIos: false,
+      // Branding - Shows Applyn watermark
+      whiteLabel: false,
+      customBranding: false,
+      customSplash: true,
+      customColors: true,
+      customLogo: true,
+      storeComplianceUpdates: false,
+      // Agency features - Not included
+      multiAppDashboard: false,
+      teamAccess: false,
+      priorityBuildQueue: false,
+    },
+    
+    support: {
+      type: "email",
+      responseTime: "Best effort",
+      whatsappSupport: false,
+      fasterBuildQueue: false,
+    },
+    rebuildsPerYear: 0,
+    
+    cta: "Start Free Preview",
+    popular: false,
+    featureList: [
+      "Preview on any device",
+      "Real-time app preview",
+      "QR code sharing",
+      "Test all features",
+      "No credit card required",
+    ],
+    restrictions: [
+      "❌ Cannot download APK/AAB",
+      "❌ Cannot publish to stores",
+      "❌ Applyn watermark",
+      "❌ No push notifications",
+    ],
+    label: "Free Preview",
+  },
+
   /**
    * STARTER - ₹1,999/year
    * Positioning: Entry-level Android businesses
@@ -412,6 +490,15 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
 };
 
 export const PLANS_LIST: PlanDefinition[] = [
+  PLANS.preview,
+  PLANS.starter,
+  PLANS.standard,
+  PLANS.pro,
+  PLANS.agency,
+];
+
+// Plans available for purchase (excludes free preview)
+export const PAID_PLANS_LIST: PlanDefinition[] = [
   PLANS.starter,
   PLANS.standard,
   PLANS.pro,

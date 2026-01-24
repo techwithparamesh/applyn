@@ -527,6 +527,28 @@ export async function registerRoutes(
     }
   });
 
+  // Public preview endpoint - no auth required (for QR code sharing)
+  app.get("/api/apps/:id/public-preview", async (req, res, next) => {
+    try {
+      const appItem = await storage.getApp(req.params.id);
+      if (!appItem) {
+        return res.status(404).json({ message: "App not found" });
+      }
+      // Return only public-safe data for preview
+      return res.json({
+        id: appItem.id,
+        name: appItem.name,
+        url: appItem.url,
+        icon: appItem.icon,
+        iconUrl: appItem.iconUrl,
+        primaryColor: appItem.primaryColor,
+        status: appItem.status,
+      });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
   app.post("/api/apps", requireAuth, async (req, res, next) => {
     try {
       const user = getAuthedUser(req);

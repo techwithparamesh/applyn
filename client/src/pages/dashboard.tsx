@@ -968,6 +968,9 @@ export default function Dashboard() {
                         <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/push`)}>
                           Push Notifications
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/analytics`)}>
+                          📊 Analytics
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-red-400 focus:text-red-400"
                           onClick={() => handleDelete(app.id)}
