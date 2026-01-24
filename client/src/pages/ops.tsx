@@ -241,15 +241,7 @@ export default function Ops() {
     }
   };
 
-  if (meLoading) {
-    return (
-      <div className="min-h-screen bg-background bg-mesh-subtle flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
-      </div>
-    );
-  }
-
-  // Calculate stats
+  // Calculate stats - MUST be before any early returns
   const stats = useMemo(() => {
     const appList = apps || [];
     const ticketList = tickets || [];
@@ -262,6 +254,14 @@ export default function Ops() {
       closedTickets: ticketList.filter(t => t.status === "closed").length,
     };
   }, [apps, tickets]);
+
+  if (meLoading) {
+    return (
+      <div className="min-h-screen bg-background bg-mesh-subtle flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle">
