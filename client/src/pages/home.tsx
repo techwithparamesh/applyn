@@ -13,9 +13,11 @@ export default function Home() {
   const [websiteUrl, setWebsiteUrl] = useState("");
 
   const handleGetStarted = () => {
+    // Pass plan=preview for free preview flow from homepage
+    const baseParams = "plan=preview";
     const createPath = websiteUrl.trim()
-      ? `/create?url=${encodeURIComponent(websiteUrl.trim())}`
-      : "/create";
+      ? `/create?${baseParams}&url=${encodeURIComponent(websiteUrl.trim())}`
+      : `/create?${baseParams}`;
     
     // Direct access - no login required to try the app builder
     setLocation(createPath);

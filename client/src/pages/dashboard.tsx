@@ -56,6 +56,7 @@ type AppItem = {
   url: string;
   status: "draft" | "processing" | "live" | "failed" | string;
   platform: "android" | "ios" | "both" | string;
+  plan?: "preview" | "starter" | "standard" | "pro" | "agency" | string;
   icon: string;
   iconUrl?: string | null;
   primaryColor: string;
@@ -982,12 +983,36 @@ export default function Dashboard() {
                   </CardHeader>
 
                   <CardContent className="pb-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <StatusBadge status={app.status} />
+                      {app.plan === "preview" && (
+                        <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-[10px]">
+                          Free Preview
+                        </Badge>
+                      )}
                       <span className="text-xs text-muted-foreground">
                         • {formatDistanceToNow(new Date(app.updatedAt), { addSuffix: true })}
                       </span>
                     </div>
+
+                    {/* Upgrade prompt for preview apps */}
+                    {app.plan === "preview" && (
+                      <div className="mt-3 p-3 rounded-lg border border-cyan-500/20 bg-gradient-to-r from-cyan-500/10 to-purple-500/5">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs font-medium text-white">Preview Only</p>
+                            <p className="text-[10px] text-muted-foreground">Upgrade to download & publish</p>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            className="h-7 text-xs bg-gradient-to-r from-cyan-500 to-purple-500"
+                            onClick={() => setLocation(`/pricing?upgrade=${app.id}`)}
+                          >
+                            <Crown className="h-3 w-3 mr-1" /> Upgrade
+                          </Button>
+                        </div>
+                      </div>
+                    )}
 
                     {app.status === "processing" && (
                       <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">

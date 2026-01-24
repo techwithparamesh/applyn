@@ -1453,7 +1453,7 @@ export default function CreateApp() {
             </div>
           )}
 
-          <div className="grid md:grid-cols-4 gap-3 mt-4">
+          <div className="grid md:grid-cols-5 gap-3 mt-4">
             {PLANS.map((plan) => (
               <div
                 key={plan.id}
@@ -1462,7 +1462,7 @@ export default function CreateApp() {
                   selectedPlan === plan.id
                     ? "border-cyan-500/50 bg-gradient-to-br from-cyan-500/10 to-purple-500/5 shadow-lg shadow-cyan-500/10"
                     : "border-white/10 bg-white/5 hover:border-white/20"
-                } ${(plan as any).isAgency ? "border-amber-500/30" : ""}`}
+                } ${(plan as any).isAgency ? "border-amber-500/30" : ""} ${(plan as any).isPreview ? "border-green-500/30" : ""}`}
               >
                 {plan.recommended && (
                   <div className="absolute top-0 right-0 bg-gradient-to-r from-cyan-500 to-purple-500 text-white text-[10px] px-2 py-1 rounded-bl-xl font-semibold flex items-center gap-1">
@@ -1474,6 +1474,11 @@ export default function CreateApp() {
                     <Zap className="h-3 w-3" /> AGENCY
                   </div>
                 )}
+                {(plan as any).isPreview && (
+                  <div className="absolute top-0 right-0 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-[10px] px-2 py-1 rounded-bl-xl font-semibold flex items-center gap-1">
+                    <Sparkles className="h-3 w-3" /> FREE
+                  </div>
+                )}
                 
                 {/* Header */}
                 <div className="text-center mb-3">
@@ -1482,9 +1487,10 @@ export default function CreateApp() {
                     {selectedPlan === plan.id && <Check className="h-4 w-4 text-cyan-400" />}
                   </h3>
                   <p className="text-xs text-muted-foreground mt-1">
+                    {plan.id === "preview" && "Preview only"}
                     {plan.id === "starter" && "Android only"}
-                    {plan.id === "standard" && "Android + iOS (Ad-Hoc)"}
-                    {plan.id === "pro" && "Android + iOS (App Store Ready)"}
+                    {plan.id === "standard" && "Android + Push"}
+                    {plan.id === "pro" && "Android + iOS"}
                     {plan.id === "agency" && "Multi-App & Team"}
                   </p>
                   <div className="mt-3">
@@ -1493,10 +1499,15 @@ export default function CreateApp() {
                         <span className="text-3xl font-bold text-green-400">FREE</span>
                         <p className="text-xs text-muted-foreground line-through">₹{plan.price.toLocaleString()}</p>
                       </>
+                    ) : plan.price === 0 ? (
+                      <>
+                        <span className="text-3xl font-bold text-green-400">FREE</span>
+                        <p className="text-xs text-muted-foreground">no card required</p>
+                      </>
                     ) : (
                       <>
                         <span className="text-3xl font-bold text-gradient">₹{plan.price.toLocaleString()}</span>
-                        <p className="text-xs text-muted-foreground">one-time payment</p>
+                        <p className="text-xs text-muted-foreground">per year</p>
                       </>
                     )}
                   </div>
@@ -1575,15 +1586,26 @@ export default function CreateApp() {
                 setShowPlanModal(false);
                 handlePayment();
               }}
-              className="flex-1 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold"
+              className={`flex-1 font-semibold ${
+                selectedPlan === "preview" 
+                  ? "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400" 
+                  : "bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400"
+              } text-white`}
               disabled={loading}
             >
               {loading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : selectedPlan === "preview" ? (
+                <Sparkles className="mr-2 h-4 w-4" />
               ) : (
                 <Download className="mr-2 h-4 w-4" />
               )}
-              {isAdmin ? "Build App (Free)" : `Pay ₹${PLANS.find((p) => p.id === selectedPlan)?.price.toLocaleString()}`}
+              {isAdmin 
+                ? "Build App (Free)" 
+                : selectedPlan === "preview"
+                ? "Start Free Preview"
+                : `Pay ₹${PLANS.find((p) => p.id === selectedPlan)?.price.toLocaleString()}/year`
+              }
             </Button>
           </div>
         </DialogContent>

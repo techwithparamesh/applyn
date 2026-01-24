@@ -61,6 +61,8 @@ export const appFeaturesSchema = z.object({
   bottomNav: z.boolean().optional().default(false),
   pullToRefresh: z.boolean().optional().default(true),
   offlineScreen: z.boolean().optional().default(true),
+  whatsappButton: z.boolean().optional().default(false),
+  whatsappNumber: z.string().optional().default(""),
 }).optional();
 
 export type AppFeatures = z.infer<typeof appFeaturesSchema>;
@@ -75,6 +77,7 @@ export const insertAppSchema = z.object({
   platform: appPlatformSchema.default("android"),
   status: appStatusSchema.default("draft"),
   features: appFeaturesSchema.optional(), // Native enhancement features
+  plan: planIdSchema.optional(), // Plan tier (preview, starter, standard, pro, agency)
 });
 
 export type InsertApp = z.infer<typeof insertAppSchema>;
@@ -90,6 +93,7 @@ export type App = {
   platform: z.infer<typeof appPlatformSchema>;
   status: z.infer<typeof appStatusSchema>;
   features?: AppFeatures | null; // Native enhancement features
+  plan?: PlanId | null; // Plan tier for this app
   packageName?: string | null;
   versionCode?: number | null;
   artifactPath?: string | null;

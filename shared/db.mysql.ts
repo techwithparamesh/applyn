@@ -45,7 +45,8 @@ export const apps = mysqlTable("apps", {
   primaryColor: varchar("primary_color", { length: 16 }).notNull().default("#2563EB"),
   platform: varchar("platform", { length: 16 }).notNull().default("android"),
   status: varchar("status", { length: 16 }).notNull().default("draft"),
-  // Native enhancement features as JSON: { bottomNav: boolean, pullToRefresh: boolean, offlineScreen: boolean }
+  plan: varchar("plan", { length: 16 }), // Plan tier: preview, starter, standard, pro, agency
+  // Native enhancement features as JSON: { bottomNav: boolean, pullToRefresh: boolean, offlineScreen: boolean, whatsappButton: boolean, whatsappNumber: string }
   features: text("features"), // JSON string for feature toggles
   packageName: varchar("package_name", { length: 200 }),
   versionCode: int("version_code"),
