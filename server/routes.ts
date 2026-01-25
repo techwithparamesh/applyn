@@ -2582,7 +2582,12 @@ export async function registerRoutes(
         
         // ===== EXTRACT COLORS =====
         let primaryColor: string | null = null;
+        let secondaryColor: string | null = null;
+        let backgroundColor: string | null = null;
         let colorSource: string = "";
+        let secondaryColorSource: string = "";
+        let backgroundColorSource: string = "";
+        const allExtractedColors: string[] = []; // Collect all colors for secondary fallback
         
         // Helper to validate and normalize hex color
         const normalizeHexColor = (color: string): string | null => {
@@ -2626,6 +2631,7 @@ export async function registerRoutes(
           if (normalized && !isGenericColor(normalized)) {
             primaryColor = normalized;
             colorSource = "theme-color";
+            allExtractedColors.push(normalized);
           }
         }
         
@@ -2637,6 +2643,31 @@ export async function registerRoutes(
             if (normalized && !isGenericColor(normalized)) {
               primaryColor = normalized;
               colorSource = "tile-color";
+              allExtractedColors.push(normalized);
+            }
+          }
+        }
+        
+        // === EXTRACT BACKGROUND COLOR ===
+        // Look for body/html background colors
+        const bodyBgMatch = html.match(/<body[^>]*style=["'][^"']*background(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})[^"']*["']/i);
+        if (bodyBgMatch) {
+          const normalized = normalizeHexColor(bodyBgMatch[1]);
+          if (normalized) {
+            backgroundColor = normalized;
+            backgroundColorSource = "body-style";
+          }
+        }
+        
+        // Also check CSS for body background
+        if (!backgroundColor) {
+          const styleTagContent = html.match(/<style[^>]*>([\s\S]*?)<\/style>/gi)?.join(' ') || '';
+          const bodyBgCss = styleTagContent.match(/body\s*{[^}]*background(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/i);
+          if (bodyBgCss) {
+            const normalized = normalizeHexColor(bodyBgCss[1]);
+            if (normalized) {
+              backgroundColor = normalized;
+              backgroundColorSource = "body-css";
             }
           }
         }
@@ -2652,32 +2683,55 @@ export async function registerRoutes(
             /--color-primary:\s*([#][0-9A-Fa-f]{3,6})/gi,
             /--wp--preset--color--primary:\s*([#][0-9A-Fa-f]{3,6})/gi,
           ];
+          // Also look for secondary/accent CSS variables
+          const secondaryCssPatterns = [
+            /--secondary(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/gi,
+            /--accent(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/gi,
+            /--color-secondary:\s*([#][0-9A-Fa-f]{3,6})/gi,
+            /--wp--preset--color--secondary:\s*([#][0-9A-Fa-f]{3,6})/gi,
+          ];
           for (const pattern of cssVarPatterns) {
             const matches = html.matchAll(pattern);
             for (const match of matches) {
               const normalized = normalizeHexColor(match[1]);
               if (normalized && !isGenericColor(normalized)) {
-                primaryColor = normalized;
-                colorSource = "css-variable";
-                break;
+                if (!primaryColor) {
+                  primaryColor = normalized;
+                  colorSource = "css-variable";
+                }
+                allExtractedColors.push(normalized);
               }
             }
-            if (primaryColor) break;
+          }
+          // Extract secondary colors
+          for (const pattern of secondaryCssPatterns) {
+            const matches = html.matchAll(pattern);
+            for (const match of matches) {
+              const normalized = normalizeHexColor(match[1]);
+              if (normalized && !isGenericColor(normalized) && normalized !== primaryColor) {
+                if (!secondaryColor) {
+                  secondaryColor = normalized;
+                  secondaryColorSource = "css-variable";
+                }
+                allExtractedColors.push(normalized);
+              }
+            }
           }
         }
         
         // 4. Look for colors in inline style attributes on key elements
-        if (!primaryColor) {
-          // Extract all inline style colors
+        {
+          // Extract all inline style colors (always, to build color palette)
           const inlineStyleColors: string[] = [];
           const styleMatches = html.matchAll(/style=["'][^"']*(?:background(?:-color)?|color|border-color):\s*([#][0-9A-Fa-f]{3,6})[^"']*["']/gi);
           for (const match of styleMatches) {
             const normalized = normalizeHexColor(match[1]);
             if (normalized && !isGenericColor(normalized)) {
               inlineStyleColors.push(normalized);
+              allExtractedColors.push(normalized);
             }
           }
-          if (inlineStyleColors.length > 0) {
+          if (!primaryColor && inlineStyleColors.length > 0) {
             // Use the most common non-generic color
             const colorCounts: Record<string, number> = {};
             inlineStyleColors.forEach(c => { colorCounts[c] = (colorCounts[c] || 0) + 1; });
@@ -2928,6 +2982,59 @@ export async function registerRoutes(
           appName = appName.substring(0, 30).trim();
         }
         
+        // ===== DERIVE SECONDARY COLOR =====
+        // If we didn't find a specific secondary color, pick from extracted colors
+        if (!secondaryColor && allExtractedColors.length > 1) {
+          // Get unique colors that aren't the primary
+          const uniqueColors = [...new Set(allExtractedColors)].filter(c => c !== primaryColor);
+          if (uniqueColors.length > 0) {
+            secondaryColor = uniqueColors[0];
+            secondaryColorSource = "derived";
+          }
+        }
+        
+        // If still no secondary, try to derive a complementary color from primary
+        if (!secondaryColor && primaryColor) {
+          // Simple complementary: shift hue by 180 degrees
+          const hex = primaryColor.replace('#', '');
+          const r = parseInt(hex.substring(0, 2), 16);
+          const g = parseInt(hex.substring(2, 4), 16);
+          const b = parseInt(hex.substring(4, 6), 16);
+          // Simple color shift (not true complementary but creates contrast)
+          const newR = (r + 128) % 256;
+          const newG = (g + 64) % 256;
+          const newB = (b + 192) % 256;
+          secondaryColor = `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`.toUpperCase();
+          secondaryColorSource = "generated";
+        }
+        
+        // ===== DERIVE BACKGROUND COLOR =====
+        // If we couldn't extract background, try to infer based on site theme
+        if (!backgroundColor) {
+          // Check if site uses dark mode CSS
+          const hasDarkMode = html.includes('prefers-color-scheme: dark') || 
+                             html.includes('dark-mode') || 
+                             html.includes('theme-dark') ||
+                             html.includes('bg-black') ||
+                             html.includes('bg-gray-900') ||
+                             html.includes('bg-slate-900');
+          const hasLightMode = html.includes('bg-white') ||
+                              html.includes('bg-gray-50') ||
+                              html.includes('bg-slate-50');
+          
+          if (hasDarkMode && !hasLightMode) {
+            backgroundColor = "#0A0A0A";
+            backgroundColorSource = "dark-mode-detected";
+          } else if (hasLightMode) {
+            backgroundColor = "#FFFFFF";
+            backgroundColorSource = "light-mode-detected";
+          } else {
+            // Default to dark for modern app feel
+            backgroundColor = "#0A0A0A";
+            backgroundColorSource = "default";
+          }
+        }
+        
         return res.json({
           success: true,
           url,
@@ -2938,7 +3045,11 @@ export async function registerRoutes(
           },
           colors: {
             primary: primaryColor,
-            source: colorSource,
+            primarySource: colorSource,
+            secondary: secondaryColor,
+            secondarySource: secondaryColorSource,
+            background: backgroundColor,
+            backgroundSource: backgroundColorSource,
           },
         });
         

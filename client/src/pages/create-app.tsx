@@ -399,6 +399,8 @@ export default function CreateApp() {
     colorSource?: string;
     isAppReady: boolean;
     issues: string[];
+    secondaryColor?: string;
+    backgroundColor?: string;
   } | null>(null);
   const [analyzedUrl, setAnalyzedUrl] = useState<string>("");
   const [showAnalysisDetails, setShowAnalysisDetails] = useState(false);
@@ -418,19 +420,23 @@ export default function CreateApp() {
       const analysis = {
         appName: data.appName || "",
         primaryColor: data.colors?.primary || "",
+        secondaryColor: data.colors?.secondary || "",
+        backgroundColor: data.colors?.background || "",
         logoUrl: data.logo?.url || null,
         logoSource: data.logo?.source || "",
-        colorSource: data.colors?.source || "",
+        colorSource: data.colors?.primarySource || "",
         isAppReady: !!(data.appName && (data.colors?.primary || data.logo?.url)),
         issues: [],
       };
       setWebsiteAnalysis(analysis);
       
-      // Auto-apply all detected values
+      // Auto-apply all detected values including secondary and splash background
       setFormData(prev => ({
         ...prev,
         appName: data.appName || prev.appName,
         primaryColor: data.colors?.primary || prev.primaryColor,
+        secondaryColor: data.colors?.secondary || prev.secondaryColor,
+        splashBgColor: data.colors?.background || prev.splashBgColor,
         // Auto-apply logo if detected (not og-image which is usually a banner)
         customLogo: (data.logo?.url && data.logo?.source !== "og-image") ? data.logo.url : prev.customLogo,
       }));
@@ -438,7 +444,7 @@ export default function CreateApp() {
       // Show success toast with what was detected
       const detected = [];
       if (data.appName) detected.push("name");
-      if (data.colors?.primary) detected.push("colors");
+      if (data.colors?.primary || data.colors?.secondary) detected.push("colors");
       if (data.logo?.url && data.logo?.source !== "og-image") detected.push("logo");
       
       if (detected.length > 0) {
@@ -1422,8 +1428,8 @@ export default function CreateApp() {
                             <span className="font-mono text-xs text-white bg-white/5 px-2 py-1 rounded">
                               {(formData.primaryColor || websiteAnalysis?.primaryColor || "#00E5FF").toUpperCase()}
                             </span>
-                            {!formData.primaryColor && websiteAnalysis?.primaryColor && (
-                              <span className="text-xs text-cyan-400">(auto)</span>
+                            {websiteAnalysis?.primaryColor && (
+                              <span className="text-xs text-cyan-400" title="Detected from your website">(from site)</span>
                             )}
                           </div>
                         </div>
@@ -1432,13 +1438,13 @@ export default function CreateApp() {
                           <div className="flex items-center gap-3">
                             <div 
                               className="w-8 h-8 rounded-full border-2 border-white/20 shadow-lg" 
-                              style={{ backgroundColor: formData.secondaryColor || "#A855F7" }} 
+                              style={{ backgroundColor: formData.secondaryColor || websiteAnalysis?.secondaryColor || "#A855F7" }} 
                             />
                             <span className="font-mono text-xs text-white bg-white/5 px-2 py-1 rounded">
-                              {(formData.secondaryColor || "#A855F7").toUpperCase()}
+                              {(formData.secondaryColor || websiteAnalysis?.secondaryColor || "#A855F7").toUpperCase()}
                             </span>
-                            {!formData.secondaryColor && (
-                              <span className="text-xs text-purple-400">(auto)</span>
+                            {websiteAnalysis?.secondaryColor && (
+                              <span className="text-xs text-purple-400" title="Detected from your website">(from site)</span>
                             )}
                           </div>
                         </div>
@@ -1452,6 +1458,9 @@ export default function CreateApp() {
                             <span className="font-mono text-xs text-white bg-white/5 px-2 py-1 rounded">
                               {formData.splashBgColor.toUpperCase()}
                             </span>
+                            {websiteAnalysis?.backgroundColor && (
+                              <span className="text-xs text-green-400" title="Detected from your website">(from site)</span>
+                            )}
                           </div>
                         </div>
                       </div>

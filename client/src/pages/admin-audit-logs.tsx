@@ -169,12 +169,12 @@ export default function AdminAuditLogs() {
               </div>
               <div className="flex-1">
                 <label className="text-sm text-muted-foreground mb-1 block">Action</label>
-                <Select value={actionFilter} onValueChange={setActionFilter}>
+                <Select value={actionFilter || "all"} onValueChange={(val) => setActionFilter(val === "all" ? "" : val)}>
                   <SelectTrigger className="bg-white/5 border-white/10">
                     <SelectValue placeholder="All actions" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All actions</SelectItem>
+                    <SelectItem value="all">All actions</SelectItem>
                     {Object.entries(actionCategories).map(([category, actions]) => (
                       <div key={category}>
                         <div className="px-2 py-1 text-xs text-muted-foreground uppercase font-semibold">
