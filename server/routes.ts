@@ -3517,6 +3517,66 @@ export async function registerRoutes(
     }
   });
 
+  // 8. Parse App Prompt (AI App Builder)
+  app.post("/api/ai/parse-prompt", aiRateLimit, async (req, res, next) => {
+    try {
+      if (!isLLMConfigured()) {
+        return res.status(503).json({ message: "AI features not available" });
+      }
+
+      const schema = z.object({
+        prompt: z.string().min(10).max(2000),
+        industryHint: z.string().optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid input. Prompt must be 10-2000 characters." });
+      }
+
+      const { parseAppPrompt } = await import("./llm");
+      const result = await parseAppPrompt(parsed.data.prompt, parsed.data.industryHint);
+      return res.json(result);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // 9. Generate Screen Content (for native screens)
+  app.post("/api/ai/generate-screen", aiRateLimit, async (req, res, next) => {
+    try {
+      if (!isLLMConfigured()) {
+        return res.status(503).json({ message: "AI features not available" });
+      }
+
+      const schema = z.object({
+        screenType: z.string(),
+        appName: z.string(),
+        appDescription: z.string(),
+        businessInfo: z.object({
+          name: z.string().optional(),
+          email: z.string().optional(),
+          phone: z.string().optional(),
+          address: z.string().optional(),
+        }).optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid input" });
+      }
+
+      const { generateScreenContent } = await import("./llm");
+      const result = await generateScreenContent(
+        parsed.data.screenType,
+        parsed.data.appName,
+        parsed.data.appDescription,
+        parsed.data.businessInfo
+      );
+      return res.json(result);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
   return httpServer;
 
 }

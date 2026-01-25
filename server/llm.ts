@@ -404,3 +404,158 @@ Message: ${message}`
 
   return JSON.parse(content) as TicketCategorization;
 }
+
+// =====================
+// 8. App Prompt Parser (AI App Builder)
+// =====================
+export interface ParsedAppPrompt {
+  appName: string;
+  appDescription: string;
+  industry: string;
+  suggestedScreens: Array<{
+    name: string;
+    type: "webview" | "native";
+    purpose: string;
+    icon: string;
+  }>;
+  suggestedFeatures: string[];
+  primaryColor: string;
+  secondaryColor: string;
+  icon: string;
+  monetization?: string[];
+  targetAudience?: string;
+}
+
+export async function parseAppPrompt(prompt: string, industryHint?: string): Promise<ParsedAppPrompt> {
+  const content = await complete({
+    messages: [
+      {
+        role: "system",
+        content: `You are an expert app architect. Parse user prompts and generate complete app configurations.
+
+Based on the user's description, create a comprehensive app configuration.
+
+Return a JSON object with:
+- appName: A catchy, memorable app name (max 20 chars, no special characters)
+- appDescription: Compelling app store description (80-120 chars)
+- industry: The industry category (ecommerce, food, health, education, entertainment, business, social, news, lifestyle, utilities, other)
+- suggestedScreens: Array of 4-6 screens, each with:
+  - name: Screen name (e.g., "Home", "Shop", "Cart")
+  - type: "webview" (content from website) or "native" (pre-built template)
+  - purpose: Brief description of what this screen does
+  - icon: Single emoji representing this screen
+- suggestedFeatures: Array of feature keys to enable. Choose from:
+  ["bottomNav", "pullToRefresh", "offlineScreen", "pushNotifications", "deepLinking", "whatsappButton", "customMenu", "nativeLoadingProgress"]
+  Select features that make sense for this type of app.
+- primaryColor: Hex color that fits the industry/brand (e.g., "#FF6B35" for food, "#4CAF50" for health)
+- secondaryColor: Complementary hex color
+- icon: Single emoji that represents the app
+- monetization: Optional array of monetization strategies (e.g., ["subscriptions", "in-app purchases", "ads"])
+- targetAudience: Optional brief description of target users
+
+Be creative but practical. Choose colors and features that match the industry.`
+      },
+      {
+        role: "user",
+        content: `Parse this app idea and generate a complete configuration:
+
+User Prompt: "${prompt}"
+${industryHint ? `Industry Hint: ${industryHint}` : ""}
+
+Generate a well-structured app configuration.`
+      }
+    ],
+    maxTokens: 1200,
+  });
+
+  try {
+    return JSON.parse(content) as ParsedAppPrompt;
+  } catch {
+    // Fallback if JSON parsing fails
+    return {
+      appName: "My App",
+      appDescription: prompt.substring(0, 120),
+      industry: industryHint || "other",
+      suggestedScreens: [
+        { name: "Home", type: "webview", purpose: "Main landing page", icon: "🏠" },
+        { name: "About", type: "native", purpose: "About the business", icon: "ℹ️" },
+        { name: "Contact", type: "native", purpose: "Contact information", icon: "📞" },
+      ],
+      suggestedFeatures: ["pullToRefresh", "offlineScreen"],
+      primaryColor: "#00E5FF",
+      secondaryColor: "#A855F7",
+      icon: "🚀",
+    };
+  }
+}
+
+// =====================
+// 9. Screen Content Generator (for Native Screens)
+// =====================
+export interface GeneratedScreenContent {
+  title: string;
+  subtitle?: string;
+  sections: Array<{
+    type: "hero" | "text" | "features" | "team" | "gallery" | "contact" | "faq" | "cta";
+    content: any;
+  }>;
+}
+
+export async function generateScreenContent(
+  screenType: string,
+  appName: string,
+  appDescription: string,
+  businessInfo?: { name?: string; email?: string; phone?: string; address?: string }
+): Promise<GeneratedScreenContent> {
+  const content = await complete({
+    messages: [
+      {
+        role: "system",
+        content: `You are a mobile app content generator. Create compelling content for native app screens.
+
+Return a JSON object with:
+- title: Screen title (max 30 chars)
+- subtitle: Optional subtitle (max 60 chars)
+- sections: Array of content sections appropriate for the screen type
+
+Section types and their content structure:
+- "hero": { headline: string, subheadline: string, ctaText: string }
+- "text": { heading: string, body: string }
+- "features": { items: [{ icon: emoji, title: string, description: string }] }
+- "team": { members: [{ name: string, role: string, avatar: emoji }] }
+- "gallery": { images: [{ caption: string, placeholder: emoji }] }
+- "contact": { email: string, phone: string, address: string, mapEnabled: boolean }
+- "faq": { items: [{ question: string, answer: string }] }
+- "cta": { headline: string, buttonText: string, buttonAction: string }
+
+Create realistic, professional content that matches the app's purpose.`
+      },
+      {
+        role: "user",
+        content: `Generate content for a "${screenType}" screen:
+
+App Name: ${appName}
+App Description: ${appDescription}
+${businessInfo ? `Business Info: ${JSON.stringify(businessInfo)}` : ""}
+
+Create engaging, relevant content for this screen.`
+      }
+    ],
+    maxTokens: 1000,
+  });
+
+  try {
+    return JSON.parse(content) as GeneratedScreenContent;
+  } catch {
+    return {
+      title: screenType.charAt(0).toUpperCase() + screenType.slice(1),
+      sections: [
+        {
+          type: "text",
+          content: { heading: "Welcome", body: "Content coming soon..." }
+        }
+      ]
+    };
+  }
+}
+

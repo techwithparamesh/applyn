@@ -3,7 +3,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowRight, Zap, Globe, ShieldCheck, Smartphone, Star } from "lucide-react";
+import { ArrowRight, Zap, Globe, ShieldCheck, Smartphone, Star, Sparkles, MessageSquare } from "lucide-react";
 import { useLocation } from "wouter";
 import heroImg from "@assets/generated_images/website_to_mobile_app_conversion_isometric_illustration.png";
 import { motion } from "framer-motion";
@@ -21,6 +21,10 @@ export default function Home() {
     
     // Direct access - no login required to try the app builder
     setLocation(createPath);
+  };
+
+  const handlePromptCreate = () => {
+    setLocation("/prompt-create");
   };
 
   return (
@@ -83,6 +87,19 @@ export default function Home() {
                       {item.label}
                     </div>
                   ))}
+                </div>
+
+                {/* Or use AI prompt */}
+                <div className="flex items-center gap-4 pt-4 border-t border-white/10 mt-4">
+                  <span className="text-sm text-muted-foreground">Or</span>
+                  <Button 
+                    onClick={handlePromptCreate}
+                    variant="outline"
+                    className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/50"
+                  >
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Describe your app with AI
+                  </Button>
                 </div>
               </motion.div>
 

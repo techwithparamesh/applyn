@@ -1071,8 +1071,11 @@ export default function Dashboard() {
                         <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/preview`)}>
                           <Eye className="mr-2 h-4 w-4" /> Preview App
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/editor`)}>
+                          <Settings className="mr-2 h-4 w-4" /> Visual Editor
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/edit`)}>
-                          Edit App
+                          Quick Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/push`)}>
                           Push Notifications

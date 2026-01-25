@@ -8,6 +8,8 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Dashboard from "@/pages/dashboard";
 import CreateApp from "@/pages/create-app";
+import PromptCreate from "@/pages/prompt-create";
+import AppEditor from "@/pages/app-editor";
 import Login from "@/pages/login";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
@@ -58,6 +60,8 @@ function Router() {
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/change-password" component={ChangePassword} />
       <Route path="/verify-email" component={VerifyEmail} />
+      <Route path="/prompt-create" component={PromptCreate} />
+      <Route path="/apps/:id/editor" component={AppEditor} />
       <Route path="/apps/:id/edit" component={EditApp} />
       <Route path="/apps/:id/push" component={PushNotifications} />
       <Route path="/apps/:id/preview" component={PreviewApp} />
