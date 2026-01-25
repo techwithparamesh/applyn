@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import passport from "passport";
 import rateLimit from "express-rate-limit";
+import sharp from "sharp";
 import { z } from "zod";
 import {
   insertAppSchema,
@@ -2262,6 +2263,105 @@ export async function registerRoutes(
           if (sortedColors.length > 0) {
             primaryColor = sortedColors[0][0];
             colorSource = "frequent-color";
+          }
+        }
+        
+        // 8. BEST FALLBACK: Extract dominant color from logo image
+        // The logo colors ARE the brand colors - most reliable method
+        if (!primaryColor && logoUrl) {
+          try {
+            // Fetch the logo image
+            const logoController = new AbortController();
+            const logoTimeout = setTimeout(() => logoController.abort(), 5000);
+            const logoRes = await fetch(logoUrl, {
+              signal: logoController.signal,
+              headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AppScraper/1.0)' }
+            });
+            clearTimeout(logoTimeout);
+            
+            if (logoRes.ok) {
+              const contentType = logoRes.headers.get('content-type') || '';
+              
+              // For SVG, extract colors from the SVG code
+              if (contentType.includes('svg') || logoUrl.endsWith('.svg')) {
+                const svgText = await logoRes.text();
+                // Extract colors from fill and stroke attributes
+                const svgColors: string[] = [];
+                const fillMatches = svgText.matchAll(/(?:fill|stroke)=["']#([0-9A-Fa-f]{3,6})["']/gi);
+                for (const match of fillMatches) {
+                  const normalized = normalizeHexColor(`#${match[1]}`);
+                  if (normalized && !isGenericColor(normalized)) {
+                    svgColors.push(normalized);
+                  }
+                }
+                // Also check style attributes
+                const styleMatches = svgText.matchAll(/(?:fill|stroke):\s*#([0-9A-Fa-f]{3,6})/gi);
+                for (const match of styleMatches) {
+                  const normalized = normalizeHexColor(`#${match[1]}`);
+                  if (normalized && !isGenericColor(normalized)) {
+                    svgColors.push(normalized);
+                  }
+                }
+                if (svgColors.length > 0) {
+                  // Count occurrences and pick most common
+                  const counts: Record<string, number> = {};
+                  svgColors.forEach(c => { counts[c] = (counts[c] || 0) + 1; });
+                  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+                  primaryColor = sorted[0][0];
+                  colorSource = "logo-svg";
+                }
+              }
+              // For PNG/JPG/ICO, use sharp to extract dominant colors
+              const imageBuffer = Buffer.from(await logoResponse.arrayBuffer());
+              try {
+                // Get raw pixel data from the image
+                const { data, info } = await sharp(imageBuffer)
+                  .resize(100, 100, { fit: 'inside' }) // Resize for faster processing
+                  .removeAlpha() // Remove alpha channel
+                  .raw()
+                  .toBuffer({ resolveWithObject: true });
+                
+                // Count color frequencies
+                const colorCounts: Record<string, number> = {};
+                for (let i = 0; i < data.length; i += 3) {
+                  const r = data[i];
+                  const g = data[i + 1];
+                  const b = data[i + 2];
+                  
+                  // Skip very light (white-ish) and very dark (black-ish) colors
+                  const brightness = (r + g + b) / 3;
+                  if (brightness > 240 || brightness < 15) continue;
+                  
+                  // Skip grayscale colors (where R, G, B are too similar)
+                  const maxDiff = Math.max(Math.abs(r - g), Math.abs(g - b), Math.abs(r - b));
+                  if (maxDiff < 20) continue;
+                  
+                  // Quantize colors to reduce noise (round to nearest 16)
+                  const qr = Math.round(r / 16) * 16;
+                  const qg = Math.round(g / 16) * 16;
+                  const qb = Math.round(b / 16) * 16;
+                  
+                  const hex = `#${qr.toString(16).padStart(2, '0')}${qg.toString(16).padStart(2, '0')}${qb.toString(16).padStart(2, '0')}`.toUpperCase();
+                  colorCounts[hex] = (colorCounts[hex] || 0) + 1;
+                }
+                
+                // Get the most frequent non-generic color
+                const sortedColors = Object.entries(colorCounts)
+                  .sort((a, b) => b[1] - a[1])
+                  .filter(([color]) => !isGenericColor(color));
+                
+                if (sortedColors.length > 0) {
+                  primaryColor = sortedColors[0][0];
+                  colorSource = "logo-image";
+                  console.log(`Extracted color ${primaryColor} from logo image`);
+                }
+              } catch (sharpErr) {
+                console.log("Sharp image processing failed:", sharpErr);
+              }
+            }
+          } catch (logoErr) {
+            // Ignore logo color extraction errors
+            console.log("Logo color extraction failed:", logoErr);
           }
         }
         
