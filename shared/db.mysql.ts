@@ -90,12 +90,19 @@ export const supportTickets = mysqlTable("support_tickets", {
   appId: varchar("app_id", { length: 36 }),
   subject: varchar("subject", { length: 200 }).notNull(),
   message: text("message").notNull(),
-  status: varchar("status", { length: 16 }).notNull().default("open"),
+  status: varchar("status", { length: 20 }).notNull().default("open"),
+  priority: varchar("priority", { length: 10 }).notNull().default("medium"),
+  assignedTo: varchar("assigned_to", { length: 36 }), // Staff member ID
+  resolutionNotes: text("resolution_notes"), // Internal staff notes
+  resolvedAt: timestamp("resolved_at", { mode: "date" }),
+  closedAt: timestamp("closed_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 }, (table) => ({
   requesterIdIdx: index("support_tickets_requester_id_idx").on(table.requesterId),
   statusIdx: index("support_tickets_status_idx").on(table.status),
+  assignedToIdx: index("support_tickets_assigned_to_idx").on(table.assignedTo),
+  priorityIdx: index("support_tickets_priority_idx").on(table.priority),
 }));
 
 export const payments = mysqlTable("payments", {

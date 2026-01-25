@@ -120,14 +120,26 @@ export type ContactSubmission = InsertContactSubmission & {
   createdAt: Date;
 };
 
-export const supportTicketStatusSchema = z.enum(["open", "closed"]);
+// Enhanced ticket statuses for proper workflow
+export const supportTicketStatusSchema = z.enum([
+  "open",           // New ticket, unassigned
+  "in_progress",    // Assigned and being worked on
+  "waiting_user",   // Waiting for user response
+  "resolved",       // Staff marked as resolved, awaiting user confirmation
+  "closed",         // Fully closed (user confirmed or auto-closed after 7 days)
+]);
 export type SupportTicketStatus = z.infer<typeof supportTicketStatusSchema>;
+
+// Ticket priority for triage
+export const supportTicketPrioritySchema = z.enum(["low", "medium", "high", "urgent"]);
+export type SupportTicketPriority = z.infer<typeof supportTicketPrioritySchema>;
 
 export const insertSupportTicketSchema = z
   .object({
     appId: z.string().uuid().optional().nullable(),
     subject: z.string().min(2).max(200),
     message: z.string().min(10).max(5000),
+    priority: supportTicketPrioritySchema.optional().default("medium"),
   })
   .strict();
 
@@ -139,6 +151,11 @@ export type SupportTicket = {
   subject: string;
   message: string;
   status: SupportTicketStatus;
+  priority: SupportTicketPriority;
+  assignedTo: string | null;      // Staff member ID
+  resolutionNotes: string | null; // Internal notes from staff
+  resolvedAt: Date | null;        // When marked resolved
+  closedAt: Date | null;          // When finally closed
   createdAt: Date;
   updatedAt: Date;
 };

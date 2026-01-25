@@ -40,6 +40,11 @@ export class MysqlStorage {
     return rows[0] as unknown as User;
   }
 
+  async getAllUsers(): Promise<User[]> {
+    const rows = await getMysqlDb().select().from(users);
+    return rows as unknown as User[];
+  }
+
   async getUserByUsername(username: string): Promise<User | undefined> {
     const rows = await getMysqlDb()
       .select()
@@ -468,6 +473,11 @@ export class MysqlStorage {
       subject: payload.subject,
       message: payload.message,
       status: "open",
+      priority: payload.priority ?? "medium",
+      assignedTo: null,
+      resolutionNotes: null,
+      resolvedAt: null,
+      closedAt: null,
       createdAt: now,
       updatedAt: now,
     });
@@ -495,6 +505,15 @@ export class MysqlStorage {
     return rows as unknown as SupportTicket[];
   }
 
+  async listSupportTicketsByAssignee(assigneeId: string): Promise<SupportTicket[]> {
+    const rows = await getMysqlDb()
+      .select()
+      .from(supportTickets)
+      .where(eq(supportTickets.assignedTo, assigneeId))
+      .orderBy(desc(supportTickets.updatedAt));
+    return rows as unknown as SupportTicket[];
+  }
+
   async updateSupportTicketStatus(id: string, status: SupportTicketStatus): Promise<SupportTicket | undefined> {
     await getMysqlDb()
       .update(supportTickets)
@@ -506,6 +525,122 @@ export class MysqlStorage {
 
     const rows = await getMysqlDb().select().from(supportTickets).where(eq(supportTickets.id, id)).limit(1);
     return rows[0] as unknown as SupportTicket | undefined;
+  }
+
+  async assignSupportTicket(id: string, assigneeId: string | null): Promise<SupportTicket | undefined> {
+    await getMysqlDb()
+      .update(supportTickets)
+      .set({
+        assignedTo: assigneeId,
+        status: assigneeId ? "in_progress" : "open",
+        updatedAt: new Date(),
+      })
+      .where(eq(supportTickets.id, id));
+
+    const rows = await getMysqlDb().select().from(supportTickets).where(eq(supportTickets.id, id)).limit(1);
+    return rows[0] as unknown as SupportTicket | undefined;
+  }
+
+  async resolveTicket(id: string, resolutionNotes: string): Promise<SupportTicket | undefined> {
+    const now = new Date();
+    await getMysqlDb()
+      .update(supportTickets)
+      .set({
+        status: "resolved",
+        resolutionNotes,
+        resolvedAt: now,
+        updatedAt: now,
+      })
+      .where(eq(supportTickets.id, id));
+
+    const rows = await getMysqlDb().select().from(supportTickets).where(eq(supportTickets.id, id)).limit(1);
+    return rows[0] as unknown as SupportTicket | undefined;
+  }
+
+  async closeTicket(id: string): Promise<SupportTicket | undefined> {
+    const now = new Date();
+    await getMysqlDb()
+      .update(supportTickets)
+      .set({
+        status: "closed",
+        closedAt: now,
+        updatedAt: now,
+      })
+      .where(eq(supportTickets.id, id));
+
+    const rows = await getMysqlDb().select().from(supportTickets).where(eq(supportTickets.id, id)).limit(1);
+    return rows[0] as unknown as SupportTicket | undefined;
+  }
+
+  async reopenTicket(id: string): Promise<SupportTicket | undefined> {
+    await getMysqlDb()
+      .update(supportTickets)
+      .set({
+        status: "open",
+        resolvedAt: null,
+        closedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(supportTickets.id, id));
+
+    const rows = await getMysqlDb().select().from(supportTickets).where(eq(supportTickets.id, id)).limit(1);
+    return rows[0] as unknown as SupportTicket | undefined;
+  }
+
+  async updateTicketPriority(id: string, priority: string): Promise<SupportTicket | undefined> {
+    await getMysqlDb()
+      .update(supportTickets)
+      .set({
+        priority,
+        updatedAt: new Date(),
+      })
+      .where(eq(supportTickets.id, id));
+
+    const rows = await getMysqlDb().select().from(supportTickets).where(eq(supportTickets.id, id)).limit(1);
+    return rows[0] as unknown as SupportTicket | undefined;
+  }
+
+  async getTicketStats(): Promise<{ open: number; inProgress: number; waitingUser: number; resolved: number; closed: number }> {
+    const result = await getMysqlDb()
+      .select({
+        status: supportTickets.status,
+        count: sql<number>`count(*)`,
+      })
+      .from(supportTickets)
+      .groupBy(supportTickets.status);
+    
+    const stats = { open: 0, inProgress: 0, waitingUser: 0, resolved: 0, closed: 0 };
+    for (const row of result) {
+      if (row.status === "open") stats.open = Number(row.count);
+      else if (row.status === "in_progress") stats.inProgress = Number(row.count);
+      else if (row.status === "waiting_user") stats.waitingUser = Number(row.count);
+      else if (row.status === "resolved") stats.resolved = Number(row.count);
+      else if (row.status === "closed") stats.closed = Number(row.count);
+    }
+    return stats;
+  }
+
+  async getStaffTicketStats(staffId: string): Promise<{ assigned: number; resolved: number }> {
+    const assignedResult = await getMysqlDb()
+      .select({ count: sql<number>`count(*)` })
+      .from(supportTickets)
+      .where(and(
+        eq(supportTickets.assignedTo, staffId),
+        sql`${supportTickets.status} NOT IN ('closed')`
+      ));
+    
+    const resolvedResult = await getMysqlDb()
+      .select({ count: sql<number>`count(*)` })
+      .from(supportTickets)
+      .where(and(
+        eq(supportTickets.assignedTo, staffId),
+        sql`${supportTickets.status} IN ('resolved', 'closed')`
+      ));
+
+    return {
+      assigned: Number(assignedResult[0]?.count || 0),
+      resolved: Number(resolvedResult[0]?.count || 0),
+    };
   }
 
   async enqueueBuildJob(ownerId: string, appId: string): Promise<BuildJob> {

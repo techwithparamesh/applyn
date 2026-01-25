@@ -63,6 +63,7 @@ export type AppBuildPatch = {
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByGoogleId(googleId: string): Promise<User | undefined>;
   getUserByResetToken(token: string): Promise<User | undefined>;
@@ -112,12 +113,20 @@ export interface IStorage {
 
   createContactSubmission(payload: InsertContactSubmission): Promise<ContactSubmission>;
 
-  // Support ticketing (MVP)
+  // Support ticketing (Enhanced)
   createSupportTicket(requesterId: string, payload: InsertSupportTicket): Promise<SupportTicket>;
   getSupportTicket(id: string): Promise<SupportTicket | undefined>;
   listSupportTicketsByRequester(requesterId: string): Promise<SupportTicket[]>;
   listSupportTicketsAll(): Promise<SupportTicket[]>;
+  listSupportTicketsByAssignee(assigneeId: string): Promise<SupportTicket[]>;
   updateSupportTicketStatus(id: string, status: SupportTicketStatus): Promise<SupportTicket | undefined>;
+  assignSupportTicket(id: string, assigneeId: string | null): Promise<SupportTicket | undefined>;
+  resolveTicket(id: string, resolutionNotes: string): Promise<SupportTicket | undefined>;
+  closeTicket(id: string): Promise<SupportTicket | undefined>;
+  reopenTicket(id: string): Promise<SupportTicket | undefined>;
+  updateTicketPriority(id: string, priority: string): Promise<SupportTicket | undefined>;
+  getTicketStats(): Promise<{ open: number; inProgress: number; waitingUser: number; resolved: number; closed: number }>;
+  getStaffTicketStats(staffId: string): Promise<{ assigned: number; resolved: number }>;
 
   // Payments
   createPayment(userId: string, payment: InsertPayment): Promise<Payment>;
@@ -212,6 +221,10 @@ export class MemStorage implements IStorage {
 
   async getUser(id: string): Promise<User | undefined> {
     return this.users.get(id);
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
@@ -533,6 +546,11 @@ export class MemStorage implements IStorage {
       subject: payload.subject,
       message: payload.message,
       status: "open",
+      priority: payload.priority ?? "medium",
+      assignedTo: null,
+      resolutionNotes: null,
+      resolvedAt: null,
+      closedAt: null,
       createdAt: now,
       updatedAt: now,
     };
@@ -554,12 +572,105 @@ export class MemStorage implements IStorage {
     return Array.from(this.tickets.values()).sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
   }
 
+  async listSupportTicketsByAssignee(assigneeId: string): Promise<SupportTicket[]> {
+    return Array.from(this.tickets.values())
+      .filter((t) => t.assignedTo === assigneeId)
+      .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+  }
+
   async updateSupportTicketStatus(id: string, status: SupportTicketStatus): Promise<SupportTicket | undefined> {
     const existing = this.tickets.get(id);
     if (!existing) return undefined;
     const updated: SupportTicket = { ...existing, status, updatedAt: new Date() };
     this.tickets.set(id, updated);
     return updated;
+  }
+
+  async assignSupportTicket(id: string, assigneeId: string | null): Promise<SupportTicket | undefined> {
+    const existing = this.tickets.get(id);
+    if (!existing) return undefined;
+    const updated: SupportTicket = { 
+      ...existing, 
+      assignedTo: assigneeId,
+      status: assigneeId ? "in_progress" : "open",
+      updatedAt: new Date() 
+    };
+    this.tickets.set(id, updated);
+    return updated;
+  }
+
+  async resolveTicket(id: string, resolutionNotes: string): Promise<SupportTicket | undefined> {
+    const existing = this.tickets.get(id);
+    if (!existing) return undefined;
+    const now = new Date();
+    const updated: SupportTicket = { 
+      ...existing, 
+      status: "resolved",
+      resolutionNotes,
+      resolvedAt: now,
+      updatedAt: now,
+    };
+    this.tickets.set(id, updated);
+    return updated;
+  }
+
+  async closeTicket(id: string): Promise<SupportTicket | undefined> {
+    const existing = this.tickets.get(id);
+    if (!existing) return undefined;
+    const now = new Date();
+    const updated: SupportTicket = { 
+      ...existing, 
+      status: "closed",
+      closedAt: now,
+      updatedAt: now,
+    };
+    this.tickets.set(id, updated);
+    return updated;
+  }
+
+  async reopenTicket(id: string): Promise<SupportTicket | undefined> {
+    const existing = this.tickets.get(id);
+    if (!existing) return undefined;
+    const updated: SupportTicket = { 
+      ...existing, 
+      status: "open",
+      resolvedAt: null,
+      closedAt: null,
+      updatedAt: new Date(),
+    };
+    this.tickets.set(id, updated);
+    return updated;
+  }
+
+  async updateTicketPriority(id: string, priority: string): Promise<SupportTicket | undefined> {
+    const existing = this.tickets.get(id);
+    if (!existing) return undefined;
+    const updated: SupportTicket = { 
+      ...existing, 
+      priority: priority as any,
+      updatedAt: new Date(),
+    };
+    this.tickets.set(id, updated);
+    return updated;
+  }
+
+  async getTicketStats(): Promise<{ open: number; inProgress: number; waitingUser: number; resolved: number; closed: number }> {
+    const tickets = Array.from(this.tickets.values());
+    return {
+      open: tickets.filter(t => t.status === "open").length,
+      inProgress: tickets.filter(t => t.status === "in_progress").length,
+      waitingUser: tickets.filter(t => t.status === "waiting_user").length,
+      resolved: tickets.filter(t => t.status === "resolved").length,
+      closed: tickets.filter(t => t.status === "closed").length,
+    };
+  }
+
+  async getStaffTicketStats(staffId: string): Promise<{ assigned: number; resolved: number }> {
+    const tickets = Array.from(this.tickets.values());
+    return {
+      assigned: tickets.filter(t => t.assignedTo === staffId && t.status !== "closed").length,
+      resolved: tickets.filter(t => t.assignedTo === staffId && (t.status === "resolved" || t.status === "closed")).length,
+    };
   }
 
   async enqueueBuildJob(ownerId: string, appId: string): Promise<BuildJob> {

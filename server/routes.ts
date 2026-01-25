@@ -13,6 +13,7 @@ import {
   insertSupportTicketSchema,
   insertUserSchema,
   supportTicketStatusSchema,
+  supportTicketPrioritySchema,
   updateUserSchema,
   insertPushTokenSchema,
   insertPushNotificationSchema,
@@ -372,6 +373,203 @@ export async function registerRoutes(
       }
     },
   );
+
+  // ===== ENHANCED TICKET MANAGEMENT (Staff only) =====
+  
+  // Assign ticket to a staff member
+  app.post("/api/support/tickets/:id/assign", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user || !isStaff(user)) return res.status(403).json({ message: "Staff access required" });
+
+      const { assigneeId } = z.object({ assigneeId: z.string().uuid().nullable() }).parse(req.body);
+      
+      // If assigning to someone, verify they're staff
+      if (assigneeId) {
+        const assignee = await storage.getUser(assigneeId);
+        if (!assignee || !["staff", "admin"].includes(assignee.role)) {
+          return res.status(400).json({ message: "Can only assign to staff members" });
+        }
+      }
+
+      const existing = await storage.getSupportTicket(req.params.id);
+      if (!existing) return res.status(404).json({ message: "Ticket not found" });
+
+      const updated = await storage.assignSupportTicket(existing.id, assigneeId);
+      
+      // Log the assignment
+      await storage.createAuditLog({
+        userId: user.id,
+        action: assigneeId ? "ticket_assigned" : "ticket_unassigned",
+        targetType: "ticket",
+        targetId: existing.id,
+        metadata: JSON.stringify({ 
+          assigneeId, 
+          previousAssignee: existing.assignedTo,
+          ticketSubject: existing.subject 
+        }),
+        ipAddress: req.ip || null,
+        userAgent: req.get("User-Agent") || null,
+      });
+
+      return res.json(updated);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Resolve ticket with notes (staff only)
+  app.post("/api/support/tickets/:id/resolve", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user || !isStaff(user)) return res.status(403).json({ message: "Staff access required" });
+
+      const { resolutionNotes } = z.object({ 
+        resolutionNotes: z.string().min(5).max(5000) 
+      }).parse(req.body);
+
+      const existing = await storage.getSupportTicket(req.params.id);
+      if (!existing) return res.status(404).json({ message: "Ticket not found" });
+
+      const updated = await storage.resolveTicket(existing.id, resolutionNotes);
+      
+      await storage.createAuditLog({
+        userId: user.id,
+        action: "ticket_resolved",
+        targetType: "ticket",
+        targetId: existing.id,
+        metadata: JSON.stringify({ ticketSubject: existing.subject }),
+        ipAddress: req.ip || null,
+        userAgent: req.get("User-Agent") || null,
+      });
+
+      return res.json(updated);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Close ticket (staff or ticket owner)
+  app.post("/api/support/tickets/:id/close", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const existing = await storage.getSupportTicket(req.params.id);
+      if (!existing) return res.status(404).json({ message: "Ticket not found" });
+
+      // User can close their own ticket if resolved, staff can close any
+      const staff = isStaff(user);
+      if (!staff && existing.requesterId !== user.id) {
+        return res.status(403).json({ message: "Not allowed" });
+      }
+      
+      // Non-staff can only close if already resolved
+      if (!staff && existing.status !== "resolved") {
+        return res.status(400).json({ message: "Ticket must be resolved first" });
+      }
+
+      const updated = await storage.closeTicket(existing.id);
+      return res.json(updated);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Reopen a closed/resolved ticket
+  app.post("/api/support/tickets/:id/reopen", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const existing = await storage.getSupportTicket(req.params.id);
+      if (!existing) return res.status(404).json({ message: "Ticket not found" });
+
+      const staff = isStaff(user);
+      if (!staff && existing.requesterId !== user.id) {
+        return res.status(403).json({ message: "Not allowed" });
+      }
+
+      // Can only reopen resolved or closed tickets
+      if (!["resolved", "closed"].includes(existing.status)) {
+        return res.status(400).json({ message: "Ticket is not closed" });
+      }
+
+      const updated = await storage.reopenTicket(existing.id);
+      return res.json(updated);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Update ticket priority (staff only)
+  app.patch("/api/support/tickets/:id/priority", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user || !isStaff(user)) return res.status(403).json({ message: "Staff access required" });
+
+      const { priority } = z.object({ 
+        priority: supportTicketPrioritySchema 
+      }).parse(req.body);
+
+      const existing = await storage.getSupportTicket(req.params.id);
+      if (!existing) return res.status(404).json({ message: "Ticket not found" });
+
+      const updated = await storage.updateTicketPriority(existing.id, priority);
+      return res.json(updated);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Get my assigned tickets (staff)
+  app.get("/api/support/tickets/assigned", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user || !isStaff(user)) return res.status(403).json({ message: "Staff access required" });
+
+      const tickets = await storage.listSupportTicketsByAssignee(user.id);
+      return res.json(tickets);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Get ticket statistics (staff/admin)
+  app.get("/api/support/stats", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user || !isStaff(user)) return res.status(403).json({ message: "Staff access required" });
+
+      const stats = await storage.getTicketStats();
+      const myStats = await storage.getStaffTicketStats(user.id);
+      
+      return res.json({
+        overall: stats,
+        mine: myStats,
+      });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // List all staff members (for assignment dropdown)
+  app.get("/api/support/staff", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user || !isStaff(user)) return res.status(403).json({ message: "Staff access required" });
+
+      // Get all users with staff or admin role
+      const allUsers = await storage.getAllUsers();
+      const staffMembers = allUsers
+        .filter(u => ["staff", "admin"].includes(u.role))
+        .map(u => ({ id: u.id, name: u.name, username: u.username, role: u.role }));
+
+      return res.json(staffMembers);
+    } catch (err) {
+      return next(err);
+    }
+  });
 
   const loginSchema = z
     .object({
