@@ -232,6 +232,45 @@ export function DevicePreview({
   );
 }
 
+// Helper to get app initials for fallback icon
+function getAppInitials(appName: string): string {
+  const words = appName.trim().split(/\s+/);
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return appName.slice(0, 2).toUpperCase();
+}
+
+// App Icon component with fallback to initials
+function AppIcon({ icon, appName, className = "w-6 h-6" }: { icon: string; appName: string; className?: string }) {
+  const [imgError, setImgError] = useState(false);
+  const isUrl = icon && (icon.startsWith("data:") || icon.startsWith("http"));
+  
+  // If it's a URL and loaded successfully, show image
+  if (isUrl && !imgError) {
+    return (
+      <img 
+        src={icon} 
+        alt="App icon" 
+        className={`${className} rounded object-contain`}
+        onError={() => setImgError(true)}
+      />
+    );
+  }
+  
+  // If it's an emoji, show it
+  if (icon && !isUrl) {
+    return <span className="text-base">{icon}</span>;
+  }
+  
+  // Fallback: show app initials in a nice circle
+  return (
+    <div className={`${className} rounded bg-white/20 flex items-center justify-center text-xs font-bold text-white`}>
+      {getAppInitials(appName)}
+    </div>
+  );
+}
+
 // ============================================
 // iOS Device Frame Component
 // ============================================
@@ -312,11 +351,7 @@ function IOSDeviceFrame({
           style={primaryColor ? { backgroundColor: primaryColor } : undefined}
         >
           <div className="text-white font-bold flex items-center gap-2 text-sm">
-            {icon && (icon.startsWith("data:") || icon.startsWith("http")) ? (
-              <img src={icon} alt="App icon" className="w-6 h-6 rounded object-contain" />
-            ) : icon ? (
-              <span className="text-base">{icon}</span>
-            ) : null}
+            <AppIcon icon={icon} appName={appName} className="w-6 h-6" />
             <span className="truncate max-w-[180px]">{appName}</span>
           </div>
           <Menu className="w-5 h-5 text-white/80" />
@@ -425,11 +460,7 @@ function AndroidDeviceFrame({
           <div className="text-white font-bold flex items-center gap-3 text-sm">
             {/* Android back arrow style */}
             <ChevronLeft className="w-5 h-5 text-white/80" />
-            {icon && (icon.startsWith("data:") || icon.startsWith("http")) ? (
-              <img src={icon} alt="App icon" className="w-6 h-6 rounded object-contain" />
-            ) : icon ? (
-              <span className="text-base">{icon}</span>
-            ) : null}
+            <AppIcon icon={icon} appName={appName} className="w-6 h-6" />
             <span className="truncate max-w-[160px]">{appName}</span>
           </div>
           {/* Android three-dot menu */}
