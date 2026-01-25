@@ -31,6 +31,8 @@ import {
   Calendar,
   AlertTriangle,
   Crown,
+  Mail,
+  X,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -76,6 +78,7 @@ type Me = {
   name: string | null;
   role: "admin" | "support" | "user" | string;
   mustChangePassword?: boolean;
+  emailVerified?: boolean;
 };
 
 type SubscriptionInfo = {
@@ -124,9 +127,45 @@ export default function Dashboard() {
   const [logsTitle, setLogsTitle] = useState<string>("Build logs");
   const [logsText, setLogsText] = useState<string | null>(null);
   const [viewingAppId, setViewingAppId] = useState<string | null>(null);
+  const [verificationBannerDismissed, setVerificationBannerDismissed] = useState(false);
+  const [resendingVerification, setResendingVerification] = useState(false);
   
   // Filter state for apps
   const [statusFilter, setStatusFilter] = useState<"all" | "live" | "processing" | "failed" | "draft">("all");
+
+  // Check if email is unverified
+  const showVerificationBanner = me && !me.emailVerified && !verificationBannerDismissed;
+
+  const handleResendVerification = async () => {
+    setResendingVerification(true);
+    try {
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (res.ok) {
+        toast({
+          title: "Verification email sent",
+          description: "Please check your inbox and click the verification link.",
+        });
+      } else {
+        const data = await res.json();
+        toast({
+          title: "Failed to send",
+          description: data.message || "Could not send verification email",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to send verification email",
+        variant: "destructive",
+      });
+    } finally {
+      setResendingVerification(false);
+    }
+  };
 
   const { data: apps, isLoading: appsLoading } = useQuery<AppItem[]>({
     queryKey: ["/api/apps"],
@@ -405,6 +444,29 @@ export default function Dashboard() {
     }
   };
 
+  const [retryingBuild, setRetryingBuild] = useState<string | null>(null);
+  
+  const handleRetryBuild = async (appId: string) => {
+    setRetryingBuild(appId);
+    try {
+      await apiRequest("POST", `/api/apps/${appId}/retry-build`);
+      toast({
+        title: "Build retry started",
+        description: "Your app is being rebuilt. You'll receive an email when it's ready.",
+      });
+      // Refresh apps list
+      queryClient.invalidateQueries({ queryKey: ["/api/apps"] });
+    } catch (err: any) {
+      toast({
+        title: "Retry failed",
+        description: err?.message || "Could not retry build. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setRetryingBuild(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background bg-mesh-subtle">
@@ -464,6 +526,52 @@ export default function Dashboard() {
               </Link>
             )}
           </motion.div>
+
+          {/* Email Verification Banner */}
+          {showVerificationBanner && (
+            <motion.div variants={itemVariants}>
+              <Card className="border-amber-500/30 bg-amber-500/10">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                        <Mail className="h-5 w-5 text-amber-400" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-amber-200">Verify your email address</p>
+                        <p className="text-sm text-amber-300/70">
+                          Please verify your email to access all features and receive important notifications.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        onClick={handleResendVerification}
+                        disabled={resendingVerification}
+                        className="bg-amber-500 hover:bg-amber-600 text-black"
+                      >
+                        {resendingVerification ? (
+                          <RefreshCw className="h-4 w-4 animate-spin mr-1" />
+                        ) : (
+                          <Mail className="h-4 w-4 mr-1" />
+                        )}
+                        Resend Email
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setVerificationBannerDismissed(true)}
+                        className="text-amber-300 hover:text-amber-200 hover:bg-amber-500/20"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
 
           {/* Stats Grid - Role-based */}
           <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1035,16 +1143,37 @@ export default function Dashboard() {
                           <BuildErrorAnalyzer appId={app.id} />
                         </div>
 
-                        {!isStaff && (
+                        <div className="flex gap-2 mt-2">
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="mt-2 h-7 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg"
-                            onClick={() => handleContactSupport(app)}
+                            className="h-7 text-xs text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 rounded-lg"
+                            onClick={() => handleRetryBuild(app.id)}
+                            disabled={retryingBuild === app.id}
                           >
-                            Contact support
+                            {retryingBuild === app.id ? (
+                              <>
+                                <RefreshCw className="mr-1 h-3 w-3 animate-spin" />
+                                Retrying...
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw className="mr-1 h-3 w-3" />
+                                Retry Build
+                              </>
+                            )}
                           </Button>
-                        )}
+                          {!isStaff && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg"
+                              onClick={() => handleContactSupport(app)}
+                            >
+                              Contact support
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     )}
                   </CardContent>

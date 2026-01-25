@@ -5,6 +5,7 @@ import path from "path";
 import passport from "passport";
 import rateLimit from "express-rate-limit";
 import sharp from "sharp";
+import PDFDocument from "pdfkit";
 import { z } from "zod";
 import {
   insertAppSchema,
@@ -21,7 +22,7 @@ import {
 import { getPlan, PLANS, type PlanId } from "@shared/pricing";
 import { storage } from "./storage";
 import { hashPassword, sanitizeUser, verifyPassword } from "./auth";
-import { sendPasswordResetEmail, isEmailConfigured, sendTeamMemberWelcomeEmail } from "./email";
+import { sendPasswordResetEmail, isEmailConfigured, sendTeamMemberWelcomeEmail, sendEmailVerificationEmail, sendBuildCompleteEmail, sendAccountLockedEmail } from "./email";
 import crypto from "crypto";
 import {
   isLLMConfigured,
@@ -409,6 +410,26 @@ export async function registerRoutes(
         role: "user",
       });
 
+      // Generate email verification token and send email
+      const verifyToken = crypto.randomBytes(32).toString("hex");
+      await storage.setEmailVerifyToken(user.id, verifyToken);
+      const appUrl = process.env.APP_URL || "https://applyn.co.in";
+      const verifyUrl = `${appUrl}/verify-email?token=${verifyToken}`;
+      sendEmailVerificationEmail(parsed.username, verifyUrl, parsed.name).catch(err => {
+        console.error("[Register] Failed to send verification email:", err);
+      });
+
+      // Create audit log
+      storage.createAuditLog({
+        userId: user.id,
+        action: "user.register",
+        targetType: "user",
+        targetId: user.id,
+        metadata: { username: parsed.username },
+        ipAddress: req.ip || req.socket?.remoteAddress || null,
+        userAgent: req.headers["user-agent"] || null,
+      }).catch(err => console.error("[Audit] Failed to log registration:", err));
+
       (req as any).login(user, (err: any) => {
         if (err) return next(err);
         // Ensure session is saved to MySQL before responding
@@ -422,23 +443,54 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/auth/login", authLimiter, (req, res, next) => {
+  app.post("/api/auth/login", authLimiter, async (req, res, next) => {
     try {
       const normalized = loginSchemaWithAlias.parse(req.body);
       (req as any).body = normalized;
+
+      // Check if account is locked before attempting login
+      const existingUser = await storage.getUserByUsername(normalized.username);
+      if (existingUser) {
+        const lockStatus = await storage.isAccountLocked(existingUser.id);
+        if (lockStatus.locked) {
+          const minutesLeft = Math.ceil((lockStatus.lockedUntil!.getTime() - Date.now()) / 60000);
+          return res.status(423).json({ 
+            message: `Account temporarily locked. Try again in ${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}.`,
+            lockedUntil: lockStatus.lockedUntil,
+          });
+        }
+      }
     } catch {
       return res.status(400).json({ message: "Invalid request" });
     }
 
     passport.authenticate(
       "local",
-      (err: any, user: User | false, info: any) => {
+      async (err: any, user: User | false, info: any) => {
         if (err) return next(err);
         if (!user) {
+          // Track failed login attempt
+          const existingUser = await storage.getUserByUsername((req.body as any).username);
+          if (existingUser) {
+            const result = await storage.incrementFailedLogin(existingUser.id);
+            if (result.lockedUntil) {
+              // Send email notification about account lock
+              sendAccountLockedEmail(existingUser.username, result.lockedUntil).catch(err => 
+                console.error("[Auth] Failed to send account locked email:", err)
+              );
+              return res.status(423).json({ 
+                message: "Account temporarily locked due to too many failed login attempts. Check your email for details.",
+                lockedUntil: result.lockedUntil,
+              });
+            }
+          }
           return res
             .status(401)
             .json({ message: info?.message || "Unauthorized" });
         }
+
+        // Reset failed login count on successful login
+        await storage.resetFailedLogin(user.id);
 
         (req as any).login(user, (loginErr: any) => {
           if (loginErr) return next(loginErr);
@@ -700,6 +752,70 @@ export async function registerRoutes(
     }
   });
 
+  // Retry a failed build
+  app.post("/api/apps/:id/retry-build", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const appItem = await storage.getApp(req.params.id);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "App not found" });
+      }
+
+      // Only allow retry for failed builds
+      if (appItem.status !== "failed") {
+        return res.status(400).json({ message: "Can only retry failed builds" });
+      }
+
+      // Check if there's already a build in progress
+      const jobs = await storage.listBuildJobsForApp(appItem.id);
+      const activeJob = jobs.find(j => j.status === "queued" || j.status === "running");
+      if (activeJob) {
+        return res.status(400).json({ message: "A build is already in progress" });
+      }
+
+      // Check rebuild limits for paid plans
+      const { plan, paidAt } = await getAppPlanInfo(appItem.id);
+      if (paidAt) {
+        const rebuildCheck = await checkRebuildAllowed(appItem.id);
+        if (!rebuildCheck.allowed) {
+          return res.status(403).json({ 
+            message: `Rebuild limit reached (${rebuildCheck.used}/${rebuildCheck.limit}). Please upgrade your plan or wait for the next billing cycle.`,
+            rebuildsUsed: rebuildCheck.used,
+            rebuildsLimit: rebuildCheck.limit,
+          });
+        }
+      }
+
+      // Reset app status and enqueue new build
+      await storage.updateApp(appItem.id, { 
+        status: "processing" as any,
+        buildError: null,
+      } as any);
+
+      const job = await storage.enqueueBuildJob(user.id, appItem.id);
+
+      // Log the retry action
+      storage.createAuditLog({
+        userId: user.id,
+        action: "app.build.start",
+        targetType: "app",
+        targetId: appItem.id,
+        metadata: { retry: true, jobId: job.id },
+        ipAddress: req.ip || null,
+        userAgent: req.headers["user-agent"] || null,
+      }).catch(err => console.error("[Audit] Failed to log build retry:", err));
+
+      return res.json({ 
+        message: "Build retry queued successfully",
+        jobId: job.id,
+      });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
   app.get("/api/apps/:id/download", requireAuth, async (req, res, next) => {
     try {
       const user = getAuthedUser(req);
@@ -934,6 +1050,17 @@ export async function registerRoutes(
           return res.status(404).json({ message: "User not found" });
         }
 
+        // Create audit log
+        storage.createAuditLog({
+          userId: currentUser.id,
+          action: "user.role_changed",
+          targetType: "user",
+          targetId,
+          metadata: { oldRole: targetUser.role, newRole: role },
+          ipAddress: req.ip || req.socket?.remoteAddress || null,
+          userAgent: req.headers["user-agent"] || null,
+        }).catch(err => console.error("[Audit] Failed to log role change:", err));
+
         const updated = await storage.updateUser(targetId, { role });
         return res.json(sanitizeUser(updated!));
       } catch (err) {
@@ -941,6 +1068,97 @@ export async function registerRoutes(
       }
     },
   );
+
+  // --- Admin Analytics Dashboard ---
+  app.get("/api/admin/analytics", requireAuth, requireRole(["admin"]), async (req, res, next) => {
+    try {
+      const analytics = await storage.getAnalytics();
+      return res.json(analytics);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Audit Logs ---
+  app.get("/api/admin/audit-logs", requireAuth, requireRole(["admin"]), async (req, res, next) => {
+    try {
+      const { userId, action, targetType, targetId, limit, offset } = req.query;
+      const logs = await storage.listAuditLogs({
+        userId: userId as string | undefined,
+        action: action as string | undefined,
+        targetType: targetType as string | undefined,
+        targetId: targetId as string | undefined,
+        limit: limit ? parseInt(limit as string) : 100,
+        offset: offset ? parseInt(offset as string) : 0,
+      });
+      const total = await storage.countAuditLogs({
+        userId: userId as string | undefined,
+        action: action as string | undefined,
+        targetType: targetType as string | undefined,
+      });
+      return res.json({ logs, total });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Subscription Management (Self-Service) ---
+  app.post("/api/subscription/cancel", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const fullUser = await storage.getUser(user.id);
+      if (!fullUser || !fullUser.plan || fullUser.planStatus !== "active") {
+        return res.status(400).json({ message: "No active subscription to cancel" });
+      }
+
+      // Mark subscription as cancelled (it will remain active until expiry)
+      await storage.updateSubscriptionStatus(user.id, "cancelled");
+
+      // Create audit log
+      storage.createAuditLog({
+        userId: user.id,
+        action: "subscription.cancelled",
+        targetType: "user",
+        targetId: user.id,
+        metadata: { plan: fullUser.plan, expiresAt: fullUser.planExpiryDate },
+        ipAddress: req.ip || req.socket?.remoteAddress || null,
+        userAgent: req.headers["user-agent"] || null,
+      }).catch(err => console.error("[Audit] Failed to log subscription cancellation:", err));
+
+      return res.json({ 
+        ok: true, 
+        message: "Subscription cancelled. You can continue using your plan until " + 
+          (fullUser.planExpiryDate ? new Date(fullUser.planExpiryDate).toLocaleDateString() : "the end of your billing period")
+      });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Get subscription status
+  app.get("/api/subscription/status", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const fullUser = await storage.getUser(user.id);
+      if (!fullUser) return res.status(404).json({ message: "User not found" });
+
+      return res.json({
+        plan: fullUser.plan || null,
+        status: fullUser.planStatus || null,
+        startDate: fullUser.planStartDate || null,
+        expiryDate: fullUser.planExpiryDate || null,
+        remainingRebuilds: fullUser.remainingRebuilds || 0,
+        maxAppsAllowed: fullUser.maxAppsAllowed || 1,
+        extraAppSlots: fullUser.extraAppSlots || 0,
+      });
+    } catch (err) {
+      return next(err);
+    }
+  });
 
   // --- Profile management ---
   app.patch("/api/me", requireAuth, async (req, res, next) => {
@@ -1075,7 +1293,78 @@ export async function registerRoutes(
       await storage.updateUser(user.id, { password: passwordHash });
       await storage.clearResetToken(user.id);
 
+      // Create audit log
+      storage.createAuditLog({
+        userId: user.id,
+        action: "user.password_reset",
+        targetType: "user",
+        targetId: user.id,
+        ipAddress: req.ip || req.socket?.remoteAddress || null,
+        userAgent: req.headers["user-agent"] || null,
+      }).catch(err => console.error("[Audit] Failed to log password reset:", err));
+
       return res.json({ ok: true, message: "Password has been reset successfully" });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Email Verification ---
+  app.post("/api/auth/verify-email", async (req, res, next) => {
+    try {
+      const schema = z.object({ token: z.string().min(32).max(128) }).strict();
+      const { token } = schema.parse(req.body);
+
+      const user = await storage.getUserByEmailVerifyToken(token);
+      if (!user) {
+        return res.status(400).json({ message: "Invalid or expired verification token" });
+      }
+
+      // Mark email as verified and clear token
+      await storage.setEmailVerified(user.id, true);
+      await storage.clearEmailVerifyToken(user.id);
+
+      // Create audit log
+      storage.createAuditLog({
+        userId: user.id,
+        action: "user.email_verified",
+        targetType: "user",
+        targetId: user.id,
+        ipAddress: req.ip || req.socket?.remoteAddress || null,
+        userAgent: req.headers["user-agent"] || null,
+      }).catch(err => console.error("[Audit] Failed to log email verification:", err));
+
+      return res.json({ ok: true, message: "Email verified successfully" });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Resend verification email
+  app.post("/api/auth/resend-verification", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const fullUser = await storage.getUser(user.id);
+      if (!fullUser) return res.status(404).json({ message: "User not found" });
+
+      if ((fullUser as any).emailVerified) {
+        return res.status(400).json({ message: "Email already verified" });
+      }
+
+      // Generate new token
+      const verifyToken = crypto.randomBytes(32).toString("hex");
+      await storage.setEmailVerifyToken(user.id, verifyToken);
+      const appUrl = process.env.APP_URL || "https://applyn.co.in";
+      const verifyUrl = `${appUrl}/verify-email?token=${verifyToken}`;
+      
+      const sent = await sendEmailVerificationEmail(fullUser.username, verifyUrl, fullUser.name || undefined);
+      if (!sent) {
+        return res.status(500).json({ message: "Failed to send verification email" });
+      }
+
+      return res.json({ ok: true, message: "Verification email sent" });
     } catch (err) {
       return next(err);
     }
@@ -1212,6 +1501,81 @@ export async function registerRoutes(
     }
   });
 
+  // --- Razorpay Webhook Handler ---
+  // Handles async payment events from Razorpay for reliable payment processing
+  const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET;
+  
+  app.post("/api/webhooks/razorpay", async (req, res) => {
+    try {
+      if (!RAZORPAY_WEBHOOK_SECRET) {
+        console.log("[Razorpay Webhook] Webhook secret not configured, skipping");
+        return res.status(200).json({ ok: true, message: "Webhook not configured" });
+      }
+
+      // Verify webhook signature
+      const signature = req.headers["x-razorpay-signature"] as string;
+      if (!signature) {
+        console.log("[Razorpay Webhook] Missing signature header");
+        return res.status(400).json({ message: "Missing signature" });
+      }
+
+      const rawBody = JSON.stringify(req.body);
+      const expectedSignature = crypto
+        .createHmac("sha256", RAZORPAY_WEBHOOK_SECRET)
+        .update(rawBody)
+        .digest("hex");
+
+      // Timing-safe comparison
+      const sigBuffer = Buffer.from(signature, 'utf8');
+      const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
+      if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
+        console.log("[Razorpay Webhook] Invalid signature");
+        return res.status(400).json({ message: "Invalid signature" });
+      }
+
+      const event = req.body;
+      console.log(`[Razorpay Webhook] Received event: ${event.event}`);
+
+      // Handle payment.captured event
+      if (event.event === "payment.captured") {
+        const payment = event.payload?.payment?.entity;
+        if (payment?.order_id && payment?.id && payment?.status === "captured") {
+          // Find payment by order ID
+          const existingPayments = await storage.listPaymentsByUser("all"); // Get all to find by order
+          const dbPayment = Array.from(existingPayments).find(
+            (p: any) => p.providerOrderId === payment.order_id && p.status === "pending"
+          );
+
+          if (dbPayment) {
+            await storage.updatePaymentStatus(dbPayment.id, "completed", payment.id);
+            console.log(`[Razorpay Webhook] Payment ${dbPayment.id} marked as completed via webhook`);
+          }
+        }
+      }
+
+      // Handle payment.failed event
+      if (event.event === "payment.failed") {
+        const payment = event.payload?.payment?.entity;
+        if (payment?.order_id) {
+          const existingPayments = await storage.listPaymentsByUser("all");
+          const dbPayment = Array.from(existingPayments).find(
+            (p: any) => p.providerOrderId === payment.order_id && p.status === "pending"
+          );
+
+          if (dbPayment) {
+            await storage.updatePaymentStatus(dbPayment.id, "failed");
+            console.log(`[Razorpay Webhook] Payment ${dbPayment.id} marked as failed via webhook`);
+          }
+        }
+      }
+
+      return res.status(200).json({ ok: true });
+    } catch (err) {
+      console.error("[Razorpay Webhook] Error:", err);
+      return res.status(500).json({ message: "Webhook processing error" });
+    }
+  });
+
   // --- Admin Payment Bypass ---
   // Allows admin users to create apps without payment and activates subscription
   const adminBypassSchema = z.object({
@@ -1287,13 +1651,19 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Forbidden" });
       }
 
-      // Verify signature
+      // Verify signature using timing-safe comparison to prevent timing attacks
       const expectedSignature = crypto
         .createHmac("sha256", razorpayKeySecret)
         .update(`${razorpay_order_id}|${razorpay_payment_id}`)
         .digest("hex");
 
-      if (expectedSignature !== razorpay_signature) {
+      // Use timing-safe comparison to prevent timing attacks
+      const signatureBuffer = Buffer.from(razorpay_signature, 'utf8');
+      const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
+      const signaturesMatch = signatureBuffer.length === expectedBuffer.length && 
+        crypto.timingSafeEqual(signatureBuffer, expectedBuffer);
+
+      if (!signaturesMatch) {
         await storage.updatePaymentStatus(paymentId, "failed");
         return res.status(400).json({ message: "Payment verification failed" });
       }
@@ -1367,6 +1737,127 @@ export async function registerRoutes(
 
       const payments = await storage.listPaymentsByUser(user.id);
       return res.json(payments);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Generate invoice PDF for a payment
+  app.get("/api/payments/:id/invoice", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const payments = await storage.listPaymentsByUser(user.id);
+      const payment = payments.find(p => p.id === req.params.id);
+      
+      if (!payment) {
+        return res.status(404).json({ message: "Payment not found" });
+      }
+
+      // Only generate invoice for completed payments
+      if (payment.status !== "completed") {
+        return res.status(400).json({ message: "Invoice only available for completed payments" });
+      }
+
+      // Get app details
+      const appItem = payment.appId ? await storage.getApp(payment.appId) : null;
+
+      // Create PDF document
+      const doc = new PDFDocument({ margin: 50 });
+      
+      // Set response headers
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="invoice-${payment.id}.pdf"`);
+      
+      // Pipe to response
+      doc.pipe(res);
+
+      // Company Header
+      doc.fontSize(24).fillColor('#06b6d4').text('Applyn', { align: 'left' });
+      doc.fontSize(10).fillColor('#666666').text('App Builder Platform', { align: 'left' });
+      doc.moveDown(0.5);
+      
+      // Invoice Title
+      doc.fontSize(20).fillColor('#1a1a1a').text('INVOICE', { align: 'right' });
+      doc.fontSize(10).fillColor('#666666').text(`Invoice #: INV-${String(payment.id).padStart(6, '0')}`, { align: 'right' });
+      doc.text(`Date: ${new Date(payment.createdAt || Date.now()).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}`, { align: 'right' });
+      
+      doc.moveDown(2);
+
+      // Horizontal line
+      doc.strokeColor('#e5e5e5').lineWidth(1).moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+      doc.moveDown(1);
+
+      // Bill To section
+      doc.fontSize(12).fillColor('#1a1a1a').text('Bill To:', { continued: false });
+      doc.fontSize(10).fillColor('#666666');
+      doc.text(user.name || user.username);
+      doc.text(user.username);
+      
+      doc.moveDown(2);
+
+      // Payment Details Table Header
+      const tableTop = doc.y;
+      doc.fontSize(10).fillColor('#ffffff');
+      doc.rect(50, tableTop, 500, 25).fill('#1a1a2e');
+      doc.fillColor('#ffffff');
+      doc.text('Description', 60, tableTop + 8);
+      doc.text('Plan', 280, tableTop + 8);
+      doc.text('Amount', 450, tableTop + 8, { align: 'right', width: 90 });
+
+      // Table Row
+      const rowTop = tableTop + 25;
+      doc.rect(50, rowTop, 500, 30).fill('#f9f9f9');
+      doc.fillColor('#1a1a1a').fontSize(10);
+      
+      const description = appItem ? `App: ${appItem.name || 'Unnamed App'}` : 'App Build Credits';
+      doc.text(description, 60, rowTop + 10);
+      doc.text(payment.plan?.toUpperCase() || 'STANDARD', 280, rowTop + 10);
+      doc.text(`₹${((payment.amountInr || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 450, rowTop + 10, { align: 'right', width: 90 });
+
+      doc.moveDown(4);
+
+      // Subtotal and Total
+      const subtotalY = doc.y;
+      doc.fontSize(10).fillColor('#666666');
+      doc.text('Subtotal:', 350, subtotalY);
+      doc.fillColor('#1a1a1a').text(`₹${((payment.amountInr || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 450, subtotalY, { align: 'right', width: 90 });
+      
+      doc.moveDown(0.5);
+      doc.fillColor('#666666').text('GST (Included):', 350, doc.y);
+      doc.fillColor('#1a1a1a').text('₹0.00', 450, doc.y, { align: 'right', width: 90 });
+      
+      doc.moveDown(0.5);
+      doc.strokeColor('#e5e5e5').lineWidth(1).moveTo(350, doc.y).lineTo(550, doc.y).stroke();
+      doc.moveDown(0.5);
+      
+      doc.fontSize(12).fillColor('#1a1a1a').text('Total:', 350, doc.y, { continued: false });
+      doc.fontSize(12).fillColor('#06b6d4').text(`₹${((payment.amountInr || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 450, doc.y - 14, { align: 'right', width: 90 });
+
+      doc.moveDown(3);
+
+      // Payment Info
+      doc.fontSize(10).fillColor('#666666');
+      doc.text('Payment Information:', { underline: true });
+      doc.moveDown(0.5);
+      doc.text(`Payment ID: ${payment.providerPaymentId || 'N/A'}`);
+      doc.text(`Order ID: ${payment.providerOrderId || 'N/A'}`);
+      doc.text(`Status: ${payment.status?.toUpperCase() || 'COMPLETED'}`);
+
+      doc.moveDown(2);
+
+      // Footer
+      doc.strokeColor('#e5e5e5').lineWidth(1).moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+      doc.moveDown(1);
+      doc.fontSize(9).fillColor('#999999');
+      doc.text('Thank you for your business!', { align: 'center' });
+      doc.text('This is a computer-generated invoice and does not require a signature.', { align: 'center' });
+      doc.moveDown(0.5);
+      doc.text('For support, contact: support@applyn.com', { align: 'center' });
+
+      // Finalize PDF
+      doc.end();
     } catch (err) {
       return next(err);
     }
@@ -1970,6 +2461,35 @@ export async function registerRoutes(
 
       const { url } = parsed.data;
       const baseUrl = new URL(url);
+
+      // SSRF Protection: Block private/internal IP ranges
+      const hostname = baseUrl.hostname.toLowerCase();
+      const blockedPatterns = [
+        /^localhost$/i,
+        /^127\./,
+        /^10\./,
+        /^192\.168\./,
+        /^172\.(1[6-9]|2[0-9]|3[01])\./,
+        /^169\.254\./,
+        /^0\./,
+        /^\[::1\]$/,
+        /^\[fe80:/i,
+        /^\[fc00:/i,
+        /^\[fd00:/i,
+        /^\.internal$/i,
+        /\.local$/i,
+        /^metadata\./i,
+        /^169\.254\.169\.254/,
+      ];
+      
+      if (blockedPatterns.some(pattern => pattern.test(hostname))) {
+        return res.status(400).json({ message: "Invalid URL: private/internal addresses not allowed" });
+      }
+
+      // Block non-HTTP(S) protocols
+      if (!['http:', 'https:'].includes(baseUrl.protocol)) {
+        return res.status(400).json({ message: "Invalid URL: only HTTP/HTTPS allowed" });
+      }
 
       // Fetch the website HTML
       const controller = new AbortController();

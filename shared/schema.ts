@@ -247,3 +247,57 @@ export type PushNotification = {
   createdAt: Date;
   updatedAt: Date;
 };
+
+// --- Audit Logs ---
+export const auditActionSchema = z.enum([
+  "user.register",
+  "user.login",
+  "user.logout",
+  "user.email_verified",
+  "user.password_reset",
+  "user.password_changed",
+  "user.deleted",
+  "user.role_changed",
+  "app.created",
+  "app.updated",
+  "app.deleted",
+  "app.build_started",
+  "app.build_completed",
+  "app.build_failed",
+  "payment.initiated",
+  "payment.completed",
+  "payment.failed",
+  "payment.refunded",
+  "subscription.activated",
+  "subscription.cancelled",
+  "subscription.expired",
+  "admin.bypass_payment",
+  "admin.user_created",
+  "admin.user_deleted",
+  "support.ticket_created",
+  "support.ticket_closed",
+]);
+
+export type AuditAction = z.infer<typeof auditActionSchema>;
+
+export type AuditLog = {
+  id: string;
+  userId: string | null;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  metadata: Record<string, any> | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: Date;
+};
+
+export type InsertAuditLog = {
+  userId?: string | null;
+  action: string;
+  targetType?: string | null;
+  targetId?: string | null;
+  metadata?: Record<string, any> | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+};

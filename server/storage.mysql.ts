@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql, gte, lt, between, count } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import type {
   App,
@@ -19,8 +19,10 @@ import type {
   PushNotification,
   InsertPushNotification,
   PushStatus,
+  AuditLog,
+  InsertAuditLog,
 } from "@shared/schema";
-import { apps, buildJobs, contactSubmissions, supportTickets, users, payments, pushTokens, pushNotifications } from "@shared/db.mysql";
+import { apps, buildJobs, contactSubmissions, supportTickets, users, payments, pushTokens, pushNotifications, auditLogs } from "@shared/db.mysql";
 import { getMysqlDb } from "./db-mysql";
 import type { AppBuildPatch, BuildJob, BuildJobStatus } from "./storage";
 
@@ -836,5 +838,331 @@ export class MysqlStorage {
       .where(eq(pushNotifications.id, id));
 
     return await this.getPushNotification(id);
+  }
+
+  // ============================================
+  // AUDIT LOG METHODS
+  // ============================================
+
+  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
+    const id = randomUUID();
+    const now = new Date();
+
+    await getMysqlDb().insert(auditLogs).values({
+      id,
+      userId: log.userId ?? null,
+      action: log.action,
+      targetType: log.targetType ?? null,
+      targetId: log.targetId ?? null,
+      metadata: log.metadata ? JSON.stringify(log.metadata) : null,
+      ipAddress: log.ipAddress ?? null,
+      userAgent: log.userAgent ?? null,
+      createdAt: now,
+    });
+
+    const rows = await getMysqlDb().select().from(auditLogs).where(eq(auditLogs.id, id)).limit(1);
+    const row = rows[0];
+    return {
+      ...row,
+      metadata: row.metadata ? JSON.parse(row.metadata) : null,
+    } as AuditLog;
+  }
+
+  async listAuditLogs(options?: {
+    userId?: string;
+    action?: string;
+    targetType?: string;
+    targetId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<AuditLog[]> {
+    const conditions = [];
+    if (options?.userId) conditions.push(eq(auditLogs.userId, options.userId));
+    if (options?.action) conditions.push(eq(auditLogs.action, options.action));
+    if (options?.targetType) conditions.push(eq(auditLogs.targetType, options.targetType));
+    if (options?.targetId) conditions.push(eq(auditLogs.targetId, options.targetId));
+
+    const query = getMysqlDb()
+      .select()
+      .from(auditLogs)
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(options?.limit ?? 100)
+      .offset(options?.offset ?? 0);
+
+    const rows = conditions.length > 0 
+      ? await query.where(and(...conditions))
+      : await query;
+
+    return rows.map(row => ({
+      ...row,
+      metadata: row.metadata ? JSON.parse(row.metadata) : null,
+    })) as AuditLog[];
+  }
+
+  async countAuditLogs(options?: { userId?: string; action?: string; targetType?: string; }): Promise<number> {
+    const conditions = [];
+    if (options?.userId) conditions.push(eq(auditLogs.userId, options.userId));
+    if (options?.action) conditions.push(eq(auditLogs.action, options.action));
+    if (options?.targetType) conditions.push(eq(auditLogs.targetType, options.targetType));
+
+    const query = getMysqlDb()
+      .select({ count: count() })
+      .from(auditLogs);
+
+    const result = conditions.length > 0 
+      ? await query.where(and(...conditions))
+      : await query;
+
+    return result[0]?.count ?? 0;
+  }
+
+  // ============================================
+  // EMAIL VERIFICATION METHODS
+  // ============================================
+
+  async setEmailVerifyToken(userId: string, token: string): Promise<User | undefined> {
+    await getMysqlDb()
+      .update(users)
+      .set({
+        emailVerifyToken: token,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+    return await this.getUser(userId);
+  }
+
+  async getUserByEmailVerifyToken(token: string): Promise<User | undefined> {
+    const rows = await getMysqlDb()
+      .select()
+      .from(users)
+      .where(eq(users.emailVerifyToken, token))
+      .limit(1);
+    return rows[0] as unknown as User;
+  }
+
+  async clearEmailVerifyToken(userId: string): Promise<User | undefined> {
+    await getMysqlDb()
+      .update(users)
+      .set({
+        emailVerifyToken: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+    return await this.getUser(userId);
+  }
+
+  // ============================================
+  // ANALYTICS METHODS
+  // ============================================
+
+  async getAnalytics(): Promise<{
+    totalUsers: number;
+    totalApps: number;
+    totalPayments: number;
+    totalRevenue: number;
+    usersToday: number;
+    usersThisWeek: number;
+    usersThisMonth: number;
+    appsToday: number;
+    appsThisWeek: number;
+    appsThisMonth: number;
+    paymentsToday: number;
+    paymentsThisWeek: number;
+    paymentsThisMonth: number;
+    revenueToday: number;
+    revenueThisWeek: number;
+    revenueThisMonth: number;
+    usersByDay: Array<{ date: string; count: number }>;
+    revenueByDay: Array<{ date: string; amount: number }>;
+    appsByPlan: Array<{ plan: string; count: number }>;
+    buildSuccessRate: number;
+  }> {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // Total counts
+    const [totalUsersRes] = await getMysqlDb().select({ count: count() }).from(users);
+    const [totalAppsRes] = await getMysqlDb().select({ count: count() }).from(apps);
+    const [totalPaymentsRes] = await getMysqlDb()
+      .select({ count: count() })
+      .from(payments)
+      .where(and(eq(payments.status, "completed"), sql`${payments.amountInr} > 0`));
+    const [totalRevenueRes] = await getMysqlDb()
+      .select({ total: sql<number>`COALESCE(SUM(${payments.amountInr}), 0)` })
+      .from(payments)
+      .where(and(eq(payments.status, "completed"), sql`${payments.amountInr} > 0`));
+
+    // Users by period
+    const [usersTodayRes] = await getMysqlDb().select({ count: count() }).from(users).where(gte(users.createdAt, today));
+    const [usersWeekRes] = await getMysqlDb().select({ count: count() }).from(users).where(gte(users.createdAt, weekAgo));
+    const [usersMonthRes] = await getMysqlDb().select({ count: count() }).from(users).where(gte(users.createdAt, monthAgo));
+
+    // Apps by period
+    const [appsTodayRes] = await getMysqlDb().select({ count: count() }).from(apps).where(gte(apps.createdAt, today));
+    const [appsWeekRes] = await getMysqlDb().select({ count: count() }).from(apps).where(gte(apps.createdAt, weekAgo));
+    const [appsMonthRes] = await getMysqlDb().select({ count: count() }).from(apps).where(gte(apps.createdAt, monthAgo));
+
+    // Payments by period
+    const paymentConditions = and(eq(payments.status, "completed"), sql`${payments.amountInr} > 0`);
+    const [paymentsTodayRes] = await getMysqlDb().select({ count: count() }).from(payments).where(and(paymentConditions, gte(payments.createdAt, today)));
+    const [paymentsWeekRes] = await getMysqlDb().select({ count: count() }).from(payments).where(and(paymentConditions, gte(payments.createdAt, weekAgo)));
+    const [paymentsMonthRes] = await getMysqlDb().select({ count: count() }).from(payments).where(and(paymentConditions, gte(payments.createdAt, monthAgo)));
+
+    // Revenue by period
+    const [revenueTodayRes] = await getMysqlDb().select({ total: sql<number>`COALESCE(SUM(${payments.amountInr}), 0)` }).from(payments).where(and(paymentConditions, gte(payments.createdAt, today)));
+    const [revenueWeekRes] = await getMysqlDb().select({ total: sql<number>`COALESCE(SUM(${payments.amountInr}), 0)` }).from(payments).where(and(paymentConditions, gte(payments.createdAt, weekAgo)));
+    const [revenueMonthRes] = await getMysqlDb().select({ total: sql<number>`COALESCE(SUM(${payments.amountInr}), 0)` }).from(payments).where(and(paymentConditions, gte(payments.createdAt, monthAgo)));
+
+    // Users by day (last 30 days)
+    const usersByDayRes = await getMysqlDb()
+      .select({
+        date: sql<string>`DATE(${users.createdAt})`,
+        count: count(),
+      })
+      .from(users)
+      .where(gte(users.createdAt, thirtyDaysAgo))
+      .groupBy(sql`DATE(${users.createdAt})`)
+      .orderBy(sql`DATE(${users.createdAt})`);
+
+    // Fill in missing days
+    const usersByDayMap = new Map(usersByDayRes.map(r => [r.date, r.count]));
+    const usersByDay: Array<{ date: string; count: number }> = [];
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+      const dateStr = date.toISOString().split('T')[0];
+      usersByDay.push({ date: dateStr, count: usersByDayMap.get(dateStr) ?? 0 });
+    }
+
+    // Revenue by day (last 30 days)
+    const revenueByDayRes = await getMysqlDb()
+      .select({
+        date: sql<string>`DATE(${payments.createdAt})`,
+        amount: sql<number>`COALESCE(SUM(${payments.amountInr}), 0)`,
+      })
+      .from(payments)
+      .where(and(paymentConditions, gte(payments.createdAt, thirtyDaysAgo)))
+      .groupBy(sql`DATE(${payments.createdAt})`)
+      .orderBy(sql`DATE(${payments.createdAt})`);
+
+    const revenueByDayMap = new Map(revenueByDayRes.map(r => [r.date, Number(r.amount)]));
+    const revenueByDay: Array<{ date: string; amount: number }> = [];
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+      const dateStr = date.toISOString().split('T')[0];
+      revenueByDay.push({ date: dateStr, amount: revenueByDayMap.get(dateStr) ?? 0 });
+    }
+
+    // Apps by plan
+    const appsByPlanRes = await getMysqlDb()
+      .select({
+        plan: sql<string>`COALESCE(${apps.plan}, 'none')`,
+        count: count(),
+      })
+      .from(apps)
+      .groupBy(apps.plan);
+    const appsByPlan = appsByPlanRes.map(r => ({ plan: r.plan || 'none', count: r.count }));
+
+    // Build success rate
+    const [completedBuildsRes] = await getMysqlDb()
+      .select({ count: count() })
+      .from(buildJobs)
+      .where(sql`${buildJobs.status} IN ('succeeded', 'failed')`);
+    const [successfulBuildsRes] = await getMysqlDb()
+      .select({ count: count() })
+      .from(buildJobs)
+      .where(eq(buildJobs.status, "succeeded"));
+    const buildSuccessRate = completedBuildsRes.count > 0 
+      ? (successfulBuildsRes.count / completedBuildsRes.count) * 100 
+      : 100;
+
+    return {
+      totalUsers: totalUsersRes.count,
+      totalApps: totalAppsRes.count,
+      totalPayments: totalPaymentsRes.count,
+      totalRevenue: Number(totalRevenueRes.total) || 0,
+      usersToday: usersTodayRes.count,
+      usersThisWeek: usersWeekRes.count,
+      usersThisMonth: usersMonthRes.count,
+      appsToday: appsTodayRes.count,
+      appsThisWeek: appsWeekRes.count,
+      appsThisMonth: appsMonthRes.count,
+      paymentsToday: paymentsTodayRes.count,
+      paymentsThisWeek: paymentsWeekRes.count,
+      paymentsThisMonth: paymentsMonthRes.count,
+      revenueToday: Number(revenueTodayRes.total) || 0,
+      revenueThisWeek: Number(revenueWeekRes.total) || 0,
+      revenueThisMonth: Number(revenueMonthRes.total) || 0,
+      usersByDay,
+      revenueByDay,
+      appsByPlan,
+      buildSuccessRate,
+    };
+  }
+
+  // Account lockout methods
+  async incrementFailedLogin(userId: string): Promise<{ attempts: number; lockedUntil: Date | null }> {
+    const MAX_ATTEMPTS = 5;
+    const LOCKOUT_MINUTES = 15;
+
+    const [user] = await getMysqlDb()
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!user) return { attempts: 0, lockedUntil: null };
+
+    const attempts = ((user as any).failedLoginAttempts || 0) + 1;
+    let lockedUntil: Date | null = null;
+
+    if (attempts >= MAX_ATTEMPTS) {
+      lockedUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000);
+    }
+
+    await getMysqlDb()
+      .update(users)
+      .set({
+        failedLoginAttempts: attempts,
+        lockedUntil: lockedUntil,
+        updatedAt: new Date(),
+      } as any)
+      .where(eq(users.id, userId));
+
+    return { attempts, lockedUntil };
+  }
+
+  async resetFailedLogin(userId: string): Promise<void> {
+    await getMysqlDb()
+      .update(users)
+      .set({
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        updatedAt: new Date(),
+      } as any)
+      .where(eq(users.id, userId));
+  }
+
+  async isAccountLocked(userId: string): Promise<{ locked: boolean; lockedUntil: Date | null }> {
+    const [user] = await getMysqlDb()
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!user) return { locked: false, lockedUntil: null };
+
+    const lockedUntil = (user as any).lockedUntil as Date | null;
+    if (!lockedUntil) return { locked: false, lockedUntil: null };
+
+    if (new Date() > lockedUntil) {
+      // Lock expired, clear it
+      await this.resetFailedLogin(userId);
+      return { locked: false, lockedUntil: null };
+    }
+
+    return { locked: true, lockedUntil };
   }
 }

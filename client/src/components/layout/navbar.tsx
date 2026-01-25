@@ -183,6 +183,22 @@ export function Navbar() {
                       Users
                     </DropdownMenuItem>
                   )}
+                  {isAdmin && (
+                    <DropdownMenuItem 
+                      onClick={() => setLocation("/admin/analytics")}
+                      className="text-muted-foreground hover:text-white focus:text-white"
+                    >
+                      Analytics
+                    </DropdownMenuItem>
+                  )}
+                  {isAdmin && (
+                    <DropdownMenuItem 
+                      onClick={() => setLocation("/admin/audit-logs")}
+                      className="text-muted-foreground hover:text-white focus:text-white"
+                    >
+                      Audit Logs
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator className="bg-white/10" />
                   <DropdownMenuItem 
                     className="text-red-400 hover:text-red-300 focus:text-red-300" 
@@ -251,6 +267,14 @@ export function Navbar() {
                     {/* Users for admin only */}
                     {isAdmin && (
                       <MobileLink label="Users" onClick={() => setLocation("/admin/users")} />
+                    )}
+                    {/* Analytics for admin only */}
+                    {isAdmin && (
+                      <MobileLink label="Analytics" onClick={() => setLocation("/admin/analytics")} />
+                    )}
+                    {/* Audit Logs for admin only */}
+                    {isAdmin && (
+                      <MobileLink label="Audit Logs" onClick={() => setLocation("/admin/audit-logs")} />
                     )}
                     <div className="pt-4">
                       <SheetClose asChild>

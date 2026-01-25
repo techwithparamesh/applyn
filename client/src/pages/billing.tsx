@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { useEffect } from "react";
 import { useLocation, Link } from "wouter";
-import { Loader2, Receipt, CreditCard, IndianRupee, Calendar, CheckCircle2, Clock, XCircle, ArrowRight, Sparkles } from "lucide-react";
+import { Loader2, Receipt, CreditCard, IndianRupee, Calendar, CheckCircle2, Clock, XCircle, ArrowRight, Sparkles, Download } from "lucide-react";
 import { format } from "date-fns";
 
 type Payment = {
@@ -33,7 +33,9 @@ export default function Billing() {
     queryFn: async () => {
       const res = await fetch("/api/payments", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch payments");
-      return res.json();
+      const data: Payment[] = await res.json();
+      // Filter out test/dummy payments with zero amount
+      return data.filter(p => p.amountInr > 0);
     },
     enabled: !!me,
   });
@@ -189,6 +191,19 @@ export default function Billing() {
                     <div className="flex items-center gap-4">
                       <p className="font-bold text-white">₹{payment.amountInr.toLocaleString("en-IN")}</p>
                       {getStatusBadge(payment.status)}
+                      {payment.status === "completed" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-white/10 hover:bg-white/5"
+                          onClick={() => {
+                            window.open(`/api/payments/${payment.id}/invoice`, '_blank');
+                          }}
+                        >
+                          <Download className="h-4 w-4 mr-1" />
+                          Invoice
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}

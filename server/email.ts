@@ -363,3 +363,267 @@ Convert your website to a mobile app in minutes.
     text,
   });
 }
+
+/**
+ * Send email verification email
+ */
+export async function sendEmailVerificationEmail(email: string, verifyUrl: string, name?: string): Promise<boolean> {
+  const subject = "Verify your Applyn email address";
+  
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+    <h1 style="color: white; margin: 0; font-size: 24px;">✉️ Verify Your Email</h1>
+  </div>
+  
+  <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+    <p>Hi${name ? ` ${name}` : ""},</p>
+    
+    <p>Thanks for signing up for Applyn! Please verify your email address by clicking the button below:</p>
+    
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${verifyUrl}" style="background: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">
+        Verify Email Address
+      </a>
+    </div>
+    
+    <p style="color: #6b7280; font-size: 14px;">This link will expire in <strong>24 hours</strong>.</p>
+    
+    <p style="color: #6b7280; font-size: 14px;">If you didn't create an account on Applyn, you can safely ignore this email.</p>
+    
+    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
+    
+    <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+      If the button doesn't work, copy and paste this link:<br>
+      <a href="${verifyUrl}" style="color: #06b6d4; word-break: break-all;">${verifyUrl}</a>
+    </p>
+  </div>
+  
+  <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
+    <p style="margin: 0;">© ${new Date().getFullYear()} Applyn. All rights reserved.</p>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  const text = `
+Verify Your Email Address
+
+Hi${name ? ` ${name}` : ""},
+
+Thanks for signing up for Applyn! Please verify your email address by clicking the link below:
+
+${verifyUrl}
+
+This link will expire in 24 hours.
+
+If you didn't create an account on Applyn, you can safely ignore this email.
+
+---
+© ${new Date().getFullYear()} Applyn. All rights reserved.
+  `.trim();
+
+  return sendEmail({
+    to: email,
+    subject,
+    html,
+    text,
+  });
+}
+
+/**
+ * Send build completion notification email
+ */
+export async function sendBuildCompleteEmail(
+  email: string,
+  appName: string,
+  status: "success" | "failed",
+  dashboardUrl: string,
+  errorMessage?: string
+): Promise<boolean> {
+  const isSuccess = status === "success";
+  const subject = isSuccess
+    ? `🎉 Your app "${appName}" is ready!`
+    : `❌ Build failed for "${appName}"`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: ${isSuccess ? 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)' : 'linear-gradient(135deg, #ef4444 0%, #f97316 100%)'}; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+    <h1 style="color: white; margin: 0; font-size: 24px;">${isSuccess ? '🎉 Build Complete!' : '❌ Build Failed'}</h1>
+  </div>
+  
+  <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+    <p>Hi there,</p>
+    
+    ${isSuccess ? `
+    <p>Great news! Your app <strong>${appName}</strong> has been successfully built and is ready for download.</p>
+    
+    <div style="background: #ecfdf5; border: 1px solid #10b981; border-radius: 8px; padding: 16px; margin: 20px 0;">
+      <p style="margin: 0; color: #065f46;">✓ APK file is ready for Android</p>
+    </div>
+    
+    <p>You can now:</p>
+    <ul>
+      <li>Download your APK file</li>
+      <li>Test on your Android device</li>
+      <li>Submit to Google Play Store (paid plans)</li>
+    </ul>
+    ` : `
+    <p>Unfortunately, there was an issue building your app <strong>${appName}</strong>.</p>
+    
+    ${errorMessage ? `
+    <div style="background: #fef2f2; border: 1px solid #ef4444; border-radius: 8px; padding: 16px; margin: 20px 0;">
+      <p style="margin: 0 0 8px 0; color: #991b1b; font-weight: 600;">Error Details:</p>
+      <p style="margin: 0; color: #7f1d1d; font-family: monospace; font-size: 13px;">${errorMessage}</p>
+    </div>
+    ` : ''}
+    
+    <p>Common fixes:</p>
+    <ul>
+      <li>Ensure your website URL is accessible</li>
+      <li>Check if the site loads correctly on mobile</li>
+      <li>Try rebuilding the app</li>
+    </ul>
+    `}
+    
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${dashboardUrl}" style="background: ${isSuccess ? 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)' : 'linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%)'}; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">
+        ${isSuccess ? 'Download Your App' : 'View Details & Retry'}
+      </a>
+    </div>
+    
+    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
+    
+    <p style="color: #6b7280; font-size: 14px;">
+      Need help? <a href="mailto:support@applyn.co.in" style="color: #06b6d4;">Contact our support team</a>
+    </p>
+  </div>
+  
+  <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
+    <p style="margin: 0;">© ${new Date().getFullYear()} Applyn. All rights reserved.</p>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  const text = `
+${isSuccess ? 'Build Complete!' : 'Build Failed'}
+
+Hi there,
+
+${isSuccess
+    ? `Great news! Your app "${appName}" has been successfully built and is ready for download.`
+    : `Unfortunately, there was an issue building your app "${appName}".`
+  }
+
+${errorMessage ? `Error: ${errorMessage}` : ''}
+
+Visit your dashboard to ${isSuccess ? 'download your app' : 'view details and retry'}:
+${dashboardUrl}
+
+---
+© ${new Date().getFullYear()} Applyn. All rights reserved.
+  `.trim();
+
+  return sendEmail({
+    to: email,
+    subject,
+    html,
+    text,
+  });
+}
+
+/**
+ * Send account locked notification email
+ */
+export async function sendAccountLockedEmail(
+  email: string,
+  unlockTime: Date
+): Promise<boolean> {
+  const subject = "🔒 Your Applyn account has been temporarily locked";
+  const unlockTimeStr = unlockTime.toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+    <h1 style="color: white; margin: 0; font-size: 24px;">🔒 Account Temporarily Locked</h1>
+  </div>
+  
+  <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+    <p>Hi there,</p>
+    
+    <p>Your Applyn account has been temporarily locked due to multiple failed login attempts.</p>
+    
+    <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 16px; margin: 20px 0;">
+      <p style="margin: 0; color: #92400e;">
+        Your account will be automatically unlocked at:<br>
+        <strong>${unlockTimeStr}</strong>
+      </p>
+    </div>
+    
+    <p>If this wasn't you, we recommend:</p>
+    <ul>
+      <li>Resetting your password after the lockout period</li>
+      <li>Using a strong, unique password</li>
+      <li>Enabling two-factor authentication (coming soon)</li>
+    </ul>
+    
+    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
+    
+    <p style="color: #6b7280; font-size: 14px;">
+      If you believe this is an error, please <a href="mailto:support@applyn.co.in" style="color: #06b6d4;">contact support</a>.
+    </p>
+  </div>
+  
+  <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
+    <p style="margin: 0;">© ${new Date().getFullYear()} Applyn. All rights reserved.</p>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  const text = `
+Account Temporarily Locked
+
+Hi there,
+
+Your Applyn account has been temporarily locked due to multiple failed login attempts.
+
+Your account will be automatically unlocked at: ${unlockTimeStr}
+
+If this wasn't you, we recommend resetting your password after the lockout period.
+
+If you believe this is an error, please contact support@applyn.co.in.
+
+---
+© ${new Date().getFullYear()} Applyn. All rights reserved.
+  `.trim();
+
+  return sendEmail({
+    to: email,
+    subject,
+    html,
+    text,
+  });
+}

@@ -17,6 +17,8 @@ import type {
   PushNotification,
   InsertPushNotification,
   PushStatus,
+  AuditLog,
+  InsertAuditLog,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { MysqlStorage } from "./storage.mysql";
@@ -137,6 +139,52 @@ export interface IStorage {
   getPushNotification(id: string): Promise<PushNotification | undefined>;
   listPushNotificationsByApp(appId: string): Promise<PushNotification[]>;
   updatePushNotificationStatus(id: string, status: PushStatus, sentCount?: number, failedCount?: number): Promise<PushNotification | undefined>;
+
+  // Audit Logs
+  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
+  listAuditLogs(options?: { 
+    userId?: string; 
+    action?: string; 
+    targetType?: string; 
+    targetId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<AuditLog[]>;
+  countAuditLogs(options?: { userId?: string; action?: string; targetType?: string; }): Promise<number>;
+
+  // Email verification
+  setEmailVerifyToken(userId: string, token: string): Promise<User | undefined>;
+  getUserByEmailVerifyToken(token: string): Promise<User | undefined>;
+  clearEmailVerifyToken(userId: string): Promise<User | undefined>;
+
+  // Analytics (for admin dashboard)
+  getAnalytics(): Promise<{
+    totalUsers: number;
+    totalApps: number;
+    totalPayments: number;
+    totalRevenue: number;
+    usersToday: number;
+    usersThisWeek: number;
+    usersThisMonth: number;
+    appsToday: number;
+    appsThisWeek: number;
+    appsThisMonth: number;
+    paymentsToday: number;
+    paymentsThisWeek: number;
+    paymentsThisMonth: number;
+    revenueToday: number;
+    revenueThisWeek: number;
+    revenueThisMonth: number;
+    usersByDay: Array<{ date: string; count: number }>;
+    revenueByDay: Array<{ date: string; amount: number }>;
+    appsByPlan: Array<{ plan: string; count: number }>;
+    buildSuccessRate: number;
+  }>;
+
+  // Account lockout (brute-force protection)
+  incrementFailedLogin(userId: string): Promise<{ attempts: number; lockedUntil: Date | null }>;
+  resetFailedLogin(userId: string): Promise<void>;
+  isAccountLocked(userId: string): Promise<{ locked: boolean; lockedUntil: Date | null }>;
 }
 
 export class MemStorage implements IStorage {
@@ -148,6 +196,7 @@ export class MemStorage implements IStorage {
   private payments: Map<string, Payment>;
   private pushTokens: Map<string, PushToken>;
   private pushNotifications: Map<string, PushNotification>;
+  private auditLogs: Map<string, AuditLog>;
 
   constructor() {
     this.users = new Map();
@@ -158,6 +207,7 @@ export class MemStorage implements IStorage {
     this.payments = new Map();
     this.pushTokens = new Map();
     this.pushNotifications = new Map();
+    this.auditLogs = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -743,6 +793,223 @@ export class MemStorage implements IStorage {
     };
     this.pushNotifications.set(id, updated);
     return updated;
+  }
+
+  // --- Audit Log methods ---
+  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
+    const id = randomUUID();
+    const now = new Date();
+    const row: AuditLog = {
+      id,
+      userId: log.userId ?? null,
+      action: log.action,
+      targetType: log.targetType ?? null,
+      targetId: log.targetId ?? null,
+      metadata: log.metadata ?? null,
+      ipAddress: log.ipAddress ?? null,
+      userAgent: log.userAgent ?? null,
+      createdAt: now,
+    };
+    this.auditLogs.set(id, row);
+    return row;
+  }
+
+  async listAuditLogs(options?: {
+    userId?: string;
+    action?: string;
+    targetType?: string;
+    targetId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<AuditLog[]> {
+    let logs = Array.from(this.auditLogs.values());
+    if (options?.userId) logs = logs.filter(l => l.userId === options.userId);
+    if (options?.action) logs = logs.filter(l => l.action === options.action);
+    if (options?.targetType) logs = logs.filter(l => l.targetType === options.targetType);
+    if (options?.targetId) logs = logs.filter(l => l.targetId === options.targetId);
+    logs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const offset = options?.offset ?? 0;
+    const limit = options?.limit ?? 100;
+    return logs.slice(offset, offset + limit);
+  }
+
+  async countAuditLogs(options?: { userId?: string; action?: string; targetType?: string; }): Promise<number> {
+    let logs = Array.from(this.auditLogs.values());
+    if (options?.userId) logs = logs.filter(l => l.userId === options.userId);
+    if (options?.action) logs = logs.filter(l => l.action === options.action);
+    if (options?.targetType) logs = logs.filter(l => l.targetType === options.targetType);
+    return logs.length;
+  }
+
+  // --- Email verification methods ---
+  async setEmailVerifyToken(userId: string, token: string): Promise<User | undefined> {
+    const user = this.users.get(userId);
+    if (!user) return undefined;
+    const updated = { ...user, emailVerifyToken: token, updatedAt: new Date() };
+    this.users.set(userId, updated as User);
+    return updated as User;
+  }
+
+  async getUserByEmailVerifyToken(token: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find((u: any) => u.emailVerifyToken === token);
+  }
+
+  async clearEmailVerifyToken(userId: string): Promise<User | undefined> {
+    const user = this.users.get(userId);
+    if (!user) return undefined;
+    const updated = { ...user, emailVerifyToken: null, updatedAt: new Date() };
+    this.users.set(userId, updated as User);
+    return updated as User;
+  }
+
+  // --- Analytics methods ---
+  async getAnalytics(): Promise<{
+    totalUsers: number;
+    totalApps: number;
+    totalPayments: number;
+    totalRevenue: number;
+    usersToday: number;
+    usersThisWeek: number;
+    usersThisMonth: number;
+    appsToday: number;
+    appsThisWeek: number;
+    appsThisMonth: number;
+    paymentsToday: number;
+    paymentsThisWeek: number;
+    paymentsThisMonth: number;
+    revenueToday: number;
+    revenueThisWeek: number;
+    revenueThisMonth: number;
+    usersByDay: Array<{ date: string; count: number }>;
+    revenueByDay: Array<{ date: string; amount: number }>;
+    appsByPlan: Array<{ plan: string; count: number }>;
+    buildSuccessRate: number;
+  }> {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const users = Array.from(this.users.values());
+    const apps = Array.from(this.apps.values());
+    const payments = Array.from(this.payments.values()).filter(p => p.status === "completed" && p.amountInr > 0);
+    const builds = Array.from(this.buildJobs.values());
+
+    const totalRevenue = payments.reduce((sum, p) => sum + p.amountInr, 0);
+    const usersToday = users.filter(u => u.createdAt >= today).length;
+    const usersThisWeek = users.filter(u => u.createdAt >= weekAgo).length;
+    const usersThisMonth = users.filter(u => u.createdAt >= monthAgo).length;
+    const appsToday = apps.filter(a => a.createdAt >= today).length;
+    const appsThisWeek = apps.filter(a => a.createdAt >= weekAgo).length;
+    const appsThisMonth = apps.filter(a => a.createdAt >= monthAgo).length;
+    const paymentsToday = payments.filter(p => p.createdAt >= today).length;
+    const paymentsThisWeek = payments.filter(p => p.createdAt >= weekAgo).length;
+    const paymentsThisMonth = payments.filter(p => p.createdAt >= monthAgo).length;
+    const revenueToday = payments.filter(p => p.createdAt >= today).reduce((sum, p) => sum + p.amountInr, 0);
+    const revenueThisWeek = payments.filter(p => p.createdAt >= weekAgo).reduce((sum, p) => sum + p.amountInr, 0);
+    const revenueThisMonth = payments.filter(p => p.createdAt >= monthAgo).reduce((sum, p) => sum + p.amountInr, 0);
+
+    // Users by day (last 30 days)
+    const usersByDay: Array<{ date: string; count: number }> = [];
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+      const nextDate = new Date(date.getTime() + 24 * 60 * 60 * 1000);
+      const count = users.filter(u => u.createdAt >= date && u.createdAt < nextDate).length;
+      usersByDay.push({ date: date.toISOString().split('T')[0], count });
+    }
+
+    // Revenue by day (last 30 days)
+    const revenueByDay: Array<{ date: string; amount: number }> = [];
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+      const nextDate = new Date(date.getTime() + 24 * 60 * 60 * 1000);
+      const amount = payments.filter(p => p.createdAt >= date && p.createdAt < nextDate).reduce((sum, p) => sum + p.amountInr, 0);
+      revenueByDay.push({ date: date.toISOString().split('T')[0], amount });
+    }
+
+    // Apps by plan
+    const planCounts: Record<string, number> = {};
+    apps.forEach(a => {
+      const plan = a.plan || "none";
+      planCounts[plan] = (planCounts[plan] || 0) + 1;
+    });
+    const appsByPlan = Object.entries(planCounts).map(([plan, count]) => ({ plan, count }));
+
+    // Build success rate
+    const completedBuilds = builds.filter(b => b.status === "succeeded" || b.status === "failed");
+    const successfulBuilds = builds.filter(b => b.status === "succeeded");
+    const buildSuccessRate = completedBuilds.length > 0 ? (successfulBuilds.length / completedBuilds.length) * 100 : 100;
+
+    return {
+      totalUsers: users.length,
+      totalApps: apps.length,
+      totalPayments: payments.length,
+      totalRevenue,
+      usersToday,
+      usersThisWeek,
+      usersThisMonth,
+      appsToday,
+      appsThisWeek,
+      appsThisMonth,
+      paymentsToday,
+      paymentsThisWeek,
+      paymentsThisMonth,
+      revenueToday,
+      revenueThisWeek,
+      revenueThisMonth,
+      usersByDay,
+      revenueByDay,
+      appsByPlan,
+      buildSuccessRate,
+    };
+  }
+
+  // Account lockout methods
+  async incrementFailedLogin(userId: string): Promise<{ attempts: number; lockedUntil: Date | null }> {
+    const user = this.users.get(userId);
+    if (!user) return { attempts: 0, lockedUntil: null };
+
+    const attempts = ((user as any).failedLoginAttempts || 0) + 1;
+    const MAX_ATTEMPTS = 5;
+    const LOCKOUT_MINUTES = 15;
+    
+    let lockedUntil: Date | null = null;
+    if (attempts >= MAX_ATTEMPTS) {
+      lockedUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000);
+    }
+
+    (user as any).failedLoginAttempts = attempts;
+    (user as any).lockedUntil = lockedUntil;
+    this.users.set(userId, user);
+
+    return { attempts, lockedUntil };
+  }
+
+  async resetFailedLogin(userId: string): Promise<void> {
+    const user = this.users.get(userId);
+    if (!user) return;
+
+    (user as any).failedLoginAttempts = 0;
+    (user as any).lockedUntil = null;
+    this.users.set(userId, user);
+  }
+
+  async isAccountLocked(userId: string): Promise<{ locked: boolean; lockedUntil: Date | null }> {
+    const user = this.users.get(userId);
+    if (!user) return { locked: false, lockedUntil: null };
+
+    const lockedUntil = (user as any).lockedUntil as Date | null;
+    if (!lockedUntil) return { locked: false, lockedUntil: null };
+
+    if (new Date() > lockedUntil) {
+      // Lock expired, clear it
+      (user as any).lockedUntil = null;
+      (user as any).failedLoginAttempts = 0;
+      this.users.set(userId, user);
+      return { locked: false, lockedUntil: null };
+    }
+
+    return { locked: true, lockedUntil };
   }
 }
 

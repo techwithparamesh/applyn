@@ -20,6 +20,8 @@ import Profile from "@/pages/profile";
 import Billing from "@/pages/billing";
 import AdminTeam from "@/pages/admin-team";
 import AdminUsers from "@/pages/admin-users";
+import AdminAnalytics from "@/pages/admin-analytics";
+import AdminAuditLogs from "@/pages/admin-audit-logs";
 import Ops from "@/pages/ops";
 import Tickets from "@/pages/tickets";
 import EditApp from "@/pages/edit-app";
@@ -29,6 +31,7 @@ import LivePreview from "@/pages/live-preview";
 import AppAnalytics from "@/pages/app-analytics";
 import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
+import VerifyEmail from "@/pages/verify-email";
 
 function Router() {
   return (
@@ -44,6 +47,8 @@ function Router() {
       <Route path="/terms" component={Terms} />
       <Route path="/admin/team" component={AdminTeam} />
       <Route path="/admin/users" component={AdminUsers} />
+      <Route path="/admin/analytics" component={AdminAnalytics} />
+      <Route path="/admin/audit-logs" component={AdminAuditLogs} />
       <Route path="/ops" component={Ops} />
       <Route path="/tickets" component={Tickets} />
       <Route path="/dashboard" component={Dashboard} />
@@ -52,6 +57,7 @@ function Router() {
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/change-password" component={ChangePassword} />
+      <Route path="/verify-email" component={VerifyEmail} />
       <Route path="/apps/:id/edit" component={EditApp} />
       <Route path="/apps/:id/push" component={PushNotifications} />
       <Route path="/apps/:id/preview" component={PreviewApp} />

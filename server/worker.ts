@@ -12,6 +12,7 @@ import { triggerIOSBuild } from "./build/github-ios";
 import { getPlan, PlanId } from "@shared/pricing";
 import { getAllowedFeatures } from "./subscription-middleware";
 import { User } from "@shared/schema";
+import { sendBuildCompleteEmail } from "./email";
 
 function artifactsRoot() {
   return process.env.ARTIFACTS_DIR || path.resolve(process.cwd(), "artifacts");
@@ -480,6 +481,15 @@ async function handleAndroidBuild(job: any, app: any, pkg: string, versionCode: 
 
     await storage.completeBuildJob(job.id, "succeeded", null);
 
+    // Send build success email notification
+    const owner = await storage.getUser(app.ownerId);
+    if (owner) {
+      const dashboardUrl = `${process.env.APP_URL || 'https://applyn.co.in'}/dashboard`;
+      sendBuildCompleteEmail(owner.username, app.name, "success", dashboardUrl).catch(err =>
+        console.error("[Worker] Failed to send build success email:", err)
+      );
+    }
+
     await cleanupArtifactsForApp(app.id);
   } catch (err: any) {
     const msg = err?.message || String(err);
@@ -510,6 +520,15 @@ async function handleAndroidBuild(job: any, app: any, pkg: string, versionCode: 
       buildLogs: logs.slice(-20000),
       lastBuildAt: new Date(),
     });
+
+    // Send build failure email notification
+    const owner = await storage.getUser(app.ownerId);
+    if (owner) {
+      const dashboardUrl = `${process.env.APP_URL || 'https://applyn.co.in'}/apps/${app.id}/edit`;
+      sendBuildCompleteEmail(owner.username, app.name, "failed", dashboardUrl, msg).catch(err =>
+        console.error("[Worker] Failed to send build failure email:", err)
+      );
+    }
   } finally {
     if (workDir) {
       await fs.rm(workDir, { recursive: true, force: true });

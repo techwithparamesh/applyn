@@ -12,6 +12,9 @@ export const users = mysqlTable("users", {
   emailVerifyToken: varchar("email_verify_token", { length: 128 }),
   resetToken: varchar("reset_token", { length: 128 }),
   resetTokenExpiresAt: timestamp("reset_token_expires_at", { mode: "date" }),
+  // Account lockout fields
+  failedLoginAttempts: int("failed_login_attempts").default(0),
+  lockedUntil: timestamp("locked_until", { mode: "date" }),
   // Subscription fields for yearly renewal model
   plan: varchar("plan", { length: 16 }),  // starter, standard, pro
   planStatus: varchar("plan_status", { length: 16 }),  // active, expired, cancelled
@@ -145,6 +148,24 @@ export const pushNotifications = mysqlTable("push_notifications", {
 }, (table) => ({
   appIdIdx: index("push_notifications_app_id_idx").on(table.appId),
   statusIdx: index("push_notifications_status_idx").on(table.status),
+}));
+
+// Audit log for tracking sensitive actions
+export const auditLogs = mysqlTable("audit_logs", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  userId: varchar("user_id", { length: 36 }), // Actor who performed action (null for system)
+  action: varchar("action", { length: 64 }).notNull(), // e.g., "user.login", "payment.completed", "app.deleted"
+  targetType: varchar("target_type", { length: 32 }), // e.g., "user", "app", "payment"
+  targetId: varchar("target_id", { length: 36 }), // ID of affected resource
+  metadata: text("metadata"), // JSON with additional details
+  ipAddress: varchar("ip_address", { length: 45 }), // IPv6 max length
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  userIdIdx: index("audit_logs_user_id_idx").on(table.userId),
+  actionIdx: index("audit_logs_action_idx").on(table.action),
+  targetIdx: index("audit_logs_target_idx").on(table.targetType, table.targetId),
+  createdAtIdx: index("audit_logs_created_at_idx").on(table.createdAt),
 }));
 
 export { contactSubmissions } from "./db.contact.mysql";
