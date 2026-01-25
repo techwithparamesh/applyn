@@ -11,6 +11,7 @@ import {
   insertAppSchema,
   insertContactSubmissionSchema,
   insertSupportTicketSchema,
+  insertTicketMessageSchema,
   insertUserSchema,
   supportTicketStatusSchema,
   supportTicketPrioritySchema,
@@ -607,6 +608,113 @@ export async function registerRoutes(
     }
   });
 
+  // ===== TICKET MESSAGES (Conversation Thread) =====
+
+  // Get all messages for a ticket
+  app.get("/api/support/tickets/:id/messages", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const ticket = await storage.getSupportTicket(req.params.id);
+      if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+
+      // Only ticket owner or staff can view messages
+      const staff = isStaff(user);
+      if (!staff && ticket.requesterId !== user.id) {
+        return res.status(404).json({ message: "Ticket not found" });
+      }
+
+      // Staff can see internal notes, users cannot
+      const messages = await storage.listTicketMessages(req.params.id, staff);
+      
+      // Enrich with sender info
+      const enrichedMessages = await Promise.all(messages.map(async (msg) => {
+        const sender = await storage.getUser(msg.senderId);
+        return {
+          ...msg,
+          senderName: sender?.name || sender?.username || "Unknown",
+          senderUsername: sender?.username,
+        };
+      }));
+
+      return res.json(enrichedMessages);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Add a message/reply to a ticket
+  app.post("/api/support/tickets/:id/messages", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const ticket = await storage.getSupportTicket(req.params.id);
+      if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+
+      // Only ticket owner or staff can reply
+      const staff = isStaff(user);
+      if (!staff && ticket.requesterId !== user.id) {
+        return res.status(404).json({ message: "Ticket not found" });
+      }
+
+      const payload = insertTicketMessageSchema.parse({
+        ...req.body,
+        ticketId: req.params.id,
+      });
+
+      // Users cannot send internal messages
+      if (!staff && payload.isInternal) {
+        return res.status(403).json({ message: "Only staff can send internal notes" });
+      }
+
+      const senderRole = staff ? "staff" : "user";
+      const message = await storage.createTicketMessage(user.id, senderRole, payload);
+
+      // Update ticket status based on who's replying
+      if (staff && !payload.isInternal) {
+        // Staff replied, waiting for user
+        if (ticket.status !== "closed") {
+          await storage.updateSupportTicketStatus(ticket.id, "waiting_user");
+        }
+      } else if (!staff) {
+        // User replied
+        if (ticket.status === "waiting_user") {
+          await storage.updateSupportTicketStatus(ticket.id, "in_progress");
+        } else if (ticket.status === "closed" || ticket.status === "resolved") {
+          // Reopen if user replies to closed/resolved ticket
+          await storage.reopenTicket(ticket.id);
+        }
+      }
+
+      // Log the reply
+      await storage.createAuditLog({
+        userId: user.id,
+        action: payload.isInternal ? "ticket_internal_note" : "ticket_reply",
+        targetType: "ticket",
+        targetId: ticket.id,
+        metadata: JSON.stringify({ 
+          ticketSubject: ticket.subject,
+          messagePreview: payload.message.substring(0, 100),
+        }),
+        ipAddress: req.ip || null,
+        userAgent: req.get("User-Agent") || null,
+      });
+
+      // Enrich with sender info for response
+      const enrichedMessage = {
+        ...message,
+        senderName: user.name || user.username,
+        senderUsername: user.username,
+      };
+
+      return res.status(201).json(enrichedMessage);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
   const loginSchema = z
     .object({
       username: z.string().min(3).max(200),
@@ -885,7 +993,10 @@ export async function registerRoutes(
     }
   });
 
-  const updateAppSchema = insertAppSchema.omit({ status: true }).partial().strict();
+  // Extended update schema that includes editorScreens for visual editor
+  const updateAppSchema = insertAppSchema.omit({ status: true }).partial().extend({
+    editorScreens: z.array(z.any()).optional(),
+  });
   app.patch("/api/apps/:id", requireAuth, async (req, res, next) => {
     try {
       const user = getAuthedUser(req);

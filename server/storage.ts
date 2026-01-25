@@ -4,9 +4,11 @@ import type {
   InsertApp,
   InsertContactSubmission,
   InsertSupportTicket,
+  InsertTicketMessage,
   InsertUser,
   SupportTicket,
   SupportTicketStatus,
+  TicketMessage,
   UserRole,
   User,
   Payment,
@@ -128,6 +130,11 @@ export interface IStorage {
   getTicketStats(): Promise<{ open: number; inProgress: number; waitingUser: number; resolved: number; closed: number }>;
   getStaffTicketStats(staffId: string): Promise<{ assigned: number; resolved: number }>;
   deleteSupportTicket(id: string): Promise<boolean>;
+
+  // Ticket Messages (conversation thread)
+  createTicketMessage(senderId: string, senderRole: string, payload: InsertTicketMessage): Promise<TicketMessage>;
+  listTicketMessages(ticketId: string, includeInternal?: boolean): Promise<TicketMessage[]>;
+  getTicketMessage(id: string): Promise<TicketMessage | undefined>;
 
   // Payments
   createPayment(userId: string, payment: InsertPayment): Promise<Payment>;
@@ -676,6 +683,36 @@ export class MemStorage implements IStorage {
 
   async deleteSupportTicket(id: string): Promise<boolean> {
     return this.tickets.delete(id);
+  }
+
+  // Ticket Messages - In-memory implementation
+  private ticketMessages = new Map<string, TicketMessage>();
+
+  async createTicketMessage(senderId: string, senderRole: string, payload: InsertTicketMessage): Promise<TicketMessage> {
+    const id = randomUUID();
+    const now = new Date();
+    const msg: TicketMessage = {
+      id,
+      ticketId: payload.ticketId,
+      senderId,
+      senderRole: senderRole as "user" | "staff" | "system",
+      message: payload.message,
+      isInternal: payload.isInternal || false,
+      attachments: null,
+      createdAt: now,
+    };
+    this.ticketMessages.set(id, msg);
+    return msg;
+  }
+
+  async listTicketMessages(ticketId: string, includeInternal = false): Promise<TicketMessage[]> {
+    return Array.from(this.ticketMessages.values())
+      .filter(m => m.ticketId === ticketId && (includeInternal || !m.isInternal))
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
+
+  async getTicketMessage(id: string): Promise<TicketMessage | undefined> {
+    return this.ticketMessages.get(id);
   }
 
   async enqueueBuildJob(ownerId: string, appId: string): Promise<BuildJob> {

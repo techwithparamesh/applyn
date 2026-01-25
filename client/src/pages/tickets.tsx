@@ -23,8 +23,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { formatDistanceToNow } from "date-fns";
-import { useEffect, useMemo, useState } from "react";
+import { formatDistanceToNow, format } from "date-fns";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
@@ -49,6 +49,9 @@ import {
   Wand2,
   AlertTriangle,
   Smartphone,
+  User,
+  Shield,
+  Lock,
 } from "lucide-react";
 
 type Role = "admin" | "support" | "user" | string;
@@ -74,9 +77,21 @@ type SupportTicket = {
   appId: string | null;
   subject: string;
   message: string;
-  status: "open" | "closed" | string;
+  status: "open" | "closed" | "in_progress" | "waiting_user" | "resolved" | string;
   createdAt: string | Date;
   updatedAt: string | Date;
+};
+
+type TicketMessage = {
+  id: string;
+  ticketId: string;
+  senderId: string;
+  senderRole: "user" | "staff" | "system";
+  senderName: string;
+  senderUsername: string;
+  message: string;
+  isInternal: boolean;
+  createdAt: string | Date;
 };
 
 function isStaffRole(role: Role) {
@@ -122,6 +137,52 @@ export default function Tickets() {
     summary: string;
     suggestedResponse?: string;
   } | null>(null);
+  const [replyMessage, setReplyMessage] = useState("");
+  const [isInternalNote, setIsInternalNote] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Fetch ticket messages when viewing a ticket
+  const { data: ticketMessages, isLoading: messagesLoading, refetch: refetchMessages } = useQuery<TicketMessage[]>({
+    queryKey: ["/api/support/tickets", activeTicket?.id, "messages"],
+    queryFn: async () => {
+      if (!activeTicket?.id) return [];
+      const res = await fetch(`/api/support/tickets/${activeTicket.id}/messages`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch messages");
+      return res.json();
+    },
+    enabled: !!activeTicket?.id && viewOpen,
+    refetchInterval: viewOpen ? 10000 : false, // Auto-refresh every 10s when dialog open
+  });
+
+  // Reply mutation
+  const replyMutation = useMutation({
+    mutationFn: async (payload: { message: string; isInternal: boolean }) => {
+      const res = await apiRequest("POST", `/api/support/tickets/${activeTicket?.id}/messages`, payload);
+      if (!res.ok) throw new Error("Failed to send reply");
+      return res.json();
+    },
+    onSuccess: () => {
+      setReplyMessage("");
+      setIsInternalNote(false);
+      refetchMessages();
+      queryClient.invalidateQueries({ queryKey: ["/api/support/tickets"] });
+      toast({ title: "Reply sent", description: "Your message has been added to the ticket." });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Failed to send reply",
+        description: err?.message || "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Scroll to bottom of messages when they change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [ticketMessages]);
 
   // AI Ticket Categorization for staff
   const categorizeMutation = useMutation({
@@ -193,6 +254,8 @@ export default function Tickets() {
   const handleView = (t: SupportTicket) => {
     setActiveTicket(t);
     setTicketAnalysis(null); // Reset analysis when viewing new ticket
+    setReplyMessage(""); // Reset reply
+    setIsInternalNote(false);
     setViewOpen(true);
   };
 
@@ -505,40 +568,39 @@ export default function Tickets() {
 
       <Footer />
 
-      {/* View Ticket Dialog */}
+      {/* View Ticket Dialog with Conversation */}
       <Dialog open={viewOpen} onOpenChange={setViewOpen}>
-        <DialogContent className="max-w-2xl glass border-white/10">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl glass border-white/10 max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="text-white">{activeTicket?.subject || "Ticket"}</DialogTitle>
             <DialogDescription className="text-muted-foreground">
               {activeTicket && (
-                <span className="flex items-center gap-2">
+                <span className="flex items-center gap-2 flex-wrap">
                   <Badge 
                     className={`${
-                      activeTicket.status === "open"
-                        ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20"
-                        : "bg-green-500/10 text-green-400 border-green-500/20"
+                      activeTicket.status === "open" ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" :
+                      activeTicket.status === "in_progress" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
+                      activeTicket.status === "waiting_user" ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
+                      activeTicket.status === "resolved" ? "bg-purple-500/10 text-purple-400 border-purple-500/20" :
+                      "bg-green-500/10 text-green-400 border-green-500/20"
                     }`}
                   >
-                    {activeTicket.status}
+                    {activeTicket.status.replace("_", " ")}
                   </Badge>
                   <span>• Ticket ID: {activeTicket.id.slice(0, 8)}...</span>
+                  {activeTicket.appId && (
+                    <span className="text-xs">• App: {activeTicket.appId.slice(0, 8)}...</span>
+                  )}
                 </span>
               )}
             </DialogDescription>
           </DialogHeader>
 
           {activeTicket && (
-            <div className="space-y-4">
-              {activeTicket.appId && (
-                <div className="text-xs text-muted-foreground">
-                  Related App: <span className="text-white">{activeTicket.appId}</span>
-                </div>
-              )}
-
+            <div className="flex-1 flex flex-col min-h-0 space-y-4">
               {/* AI Analysis for Staff */}
               {isStaff && (
-                <div className="p-3 rounded-lg bg-gradient-to-r from-purple-500/10 to-cyan-500/10 border border-purple-500/20">
+                <div className="p-3 rounded-lg bg-gradient-to-r from-purple-500/10 to-cyan-500/10 border border-purple-500/20 flex-shrink-0">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <Wand2 className="h-4 w-4 text-purple-400" />
@@ -582,23 +644,147 @@ export default function Tickets() {
                       </div>
                       <p className="text-muted-foreground">{ticketAnalysis.summary}</p>
                       {ticketAnalysis.suggestedResponse && (
-                        <div className="mt-2 p-2 rounded bg-white/5 border border-white/10">
-                          <p className="text-xs text-muted-foreground mb-1">Suggested Response:</p>
-                          <p className="text-white/80 text-xs">{ticketAnalysis.suggestedResponse}</p>
-                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setReplyMessage(ticketAnalysis.suggestedResponse || "")}
+                          className="h-7 text-xs text-cyan-400 hover:text-cyan-300"
+                        >
+                          Use suggested response
+                        </Button>
                       )}
                     </div>
                   )}
                 </div>
               )}
 
-              <ScrollArea className="h-[250px] rounded-lg border border-white/10 bg-white/[0.02] p-4">
-                <pre className="whitespace-pre-wrap text-sm text-white/90 font-sans">
-                  {activeTicket.message}
-                </pre>
+              {/* Conversation Thread */}
+              <ScrollArea className="flex-1 min-h-[250px] max-h-[350px] rounded-lg border border-white/10 bg-white/[0.02]">
+                <div className="p-4 space-y-4">
+                  {/* Original message as first message */}
+                  <div className="flex gap-3">
+                    <div className="flex-shrink-0 h-8 w-8 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                      <User className="h-4 w-4 text-cyan-400" />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-white">Original Request</span>
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(activeTicket.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                        </span>
+                      </div>
+                      <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+                        <p className="text-sm text-white/90 whitespace-pre-wrap">{activeTicket.message}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Loading messages */}
+                  {messagesLoading && (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+
+                  {/* Ticket messages */}
+                  {ticketMessages?.map((msg) => (
+                    <div key={msg.id} className={`flex gap-3 ${msg.isInternal ? "opacity-75" : ""}`}>
+                      <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${
+                        msg.senderRole === "staff" 
+                          ? "bg-purple-500/20" 
+                          : msg.senderRole === "system"
+                          ? "bg-gray-500/20"
+                          : "bg-cyan-500/20"
+                      }`}>
+                        {msg.senderRole === "staff" ? (
+                          <Shield className="h-4 w-4 text-purple-400" />
+                        ) : msg.senderRole === "system" ? (
+                          <Wand2 className="h-4 w-4 text-gray-400" />
+                        ) : (
+                          <User className="h-4 w-4 text-cyan-400" />
+                        )}
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-sm font-medium ${
+                            msg.senderRole === "staff" ? "text-purple-300" : "text-white"
+                          }`}>
+                            {msg.senderName || msg.senderUsername}
+                          </span>
+                          {msg.senderRole === "staff" && (
+                            <Badge className="text-[10px] h-4 bg-purple-500/20 text-purple-300 border-purple-500/30">
+                              Staff
+                            </Badge>
+                          )}
+                          {msg.isInternal && (
+                            <Badge className="text-[10px] h-4 bg-yellow-500/20 text-yellow-300 border-yellow-500/30">
+                              <Lock className="h-2.5 w-2.5 mr-1" /> Internal
+                            </Badge>
+                          )}
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(msg.createdAt), "MMM d 'at' h:mm a")}
+                          </span>
+                        </div>
+                        <div className={`p-3 rounded-lg border ${
+                          msg.isInternal 
+                            ? "bg-yellow-500/5 border-yellow-500/20" 
+                            : msg.senderRole === "staff"
+                            ? "bg-purple-500/5 border-purple-500/20"
+                            : "bg-white/5 border-white/10"
+                        }`}>
+                          <p className="text-sm text-white/90 whitespace-pre-wrap">{msg.message}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  <div ref={messagesEndRef} />
+                </div>
               </ScrollArea>
 
-              <div className="flex gap-2 justify-end">
+              {/* Reply Input */}
+              {activeTicket.status !== "closed" && (
+                <div className="flex-shrink-0 space-y-3 pt-2 border-t border-white/10">
+                  <div className="space-y-2">
+                    <Textarea
+                      value={replyMessage}
+                      onChange={(e) => setReplyMessage(e.target.value)}
+                      placeholder="Type your reply..."
+                      className="bg-white/5 border-white/10 text-white min-h-[80px] resize-none"
+                    />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {isStaff && (
+                          <label className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground hover:text-white transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={isInternalNote}
+                              onChange={(e) => setIsInternalNote(e.target.checked)}
+                              className="rounded border-white/20 bg-white/5"
+                            />
+                            <Lock className="h-3 w-3" />
+                            Internal note (not visible to user)
+                          </label>
+                        )}
+                      </div>
+                      <Button
+                        onClick={() => replyMutation.mutate({ message: replyMessage, isInternal: isInternalNote })}
+                        disabled={!replyMessage.trim() || replyMutation.isPending}
+                        className="bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-600 hover:to-purple-600"
+                      >
+                        {replyMutation.isPending ? (
+                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...</>
+                        ) : (
+                          <><Send className="h-4 w-4 mr-2" /> Send Reply</>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Footer Actions */}
+              <div className="flex gap-2 justify-between flex-shrink-0 pt-2">
                 <Button 
                   variant="ghost" 
                   onClick={() => handleCopy(activeTicket)}

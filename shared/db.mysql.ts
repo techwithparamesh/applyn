@@ -1,4 +1,4 @@
-import { mysqlTable, int, text, timestamp, varchar, boolean, index, customType } from "drizzle-orm/mysql-core";
+import { mysqlTable, int, text, timestamp, varchar, boolean, index, customType, tinyint } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: varchar("id", { length: 36 }).primaryKey(),
@@ -103,6 +103,22 @@ export const supportTickets = mysqlTable("support_tickets", {
   statusIdx: index("support_tickets_status_idx").on(table.status),
   assignedToIdx: index("support_tickets_assigned_to_idx").on(table.assignedTo),
   priorityIdx: index("support_tickets_priority_idx").on(table.priority),
+}));
+
+// Ticket messages for conversation thread
+export const ticketMessages = mysqlTable("ticket_messages", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  ticketId: varchar("ticket_id", { length: 36 }).notNull(),
+  senderId: varchar("sender_id", { length: 36 }).notNull(),
+  senderRole: varchar("sender_role", { length: 16 }).notNull().default("user"), // user, staff, system
+  message: text("message").notNull(),
+  isInternal: tinyint("is_internal").notNull().default(0), // Internal staff notes not visible to user
+  attachments: text("attachments"), // JSON array of attachment URLs
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  ticketIdIdx: index("ticket_messages_ticket_id_idx").on(table.ticketId),
+  senderIdIdx: index("ticket_messages_sender_id_idx").on(table.senderId),
+  createdAtIdx: index("ticket_messages_created_at_idx").on(table.createdAt),
 }));
 
 export const payments = mysqlTable("payments", {

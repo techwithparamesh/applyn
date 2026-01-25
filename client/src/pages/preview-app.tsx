@@ -1,6 +1,6 @@
 import { Navbar } from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Edit, Download, RefreshCw, ExternalLink, QrCode, Smartphone, Share2, Copy, CheckCircle2, Sparkles, Crown } from "lucide-react";
+import { ArrowLeft, Edit, Download, RefreshCw, ExternalLink, QrCode, Smartphone, Share2, Copy, CheckCircle2, Sparkles, Crown, Wand2 } from "lucide-react";
 import { useLocation, useParams, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
@@ -215,6 +215,16 @@ export default function PreviewApp() {
               <QrCode className="mr-2 h-4 w-4" /> QR Preview
             </Button>
             
+            {/* Visual Editor Button - New */}
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setLocation(`/apps/${app.id}/visual-editor`)}
+              className="border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10 text-purple-400 rounded-xl"
+            >
+              <Wand2 className="mr-2 h-4 w-4" /> Visual Editor
+            </Button>
+            
             <Button 
               variant="outline" 
               size="sm"
@@ -348,6 +358,13 @@ export default function PreviewApp() {
                 <h3 className="text-sm font-semibold text-white">Quick Actions</h3>
               </div>
               <div className="p-3 space-y-1">
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-start text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 rounded-xl"
+                  onClick={() => setLocation(`/apps/${app.id}/visual-editor`)}
+                >
+                  <Wand2 className="mr-3 h-4 w-4" /> Visual Editor
+                </Button>
                 <Button 
                   variant="ghost" 
                   className="w-full justify-start text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl"

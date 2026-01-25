@@ -87,10 +87,10 @@ export default function LivePreview() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col">
+    <div className="h-screen w-screen overflow-hidden bg-slate-950 flex flex-col">
       {/* Header Bar */}
       <header 
-        className="sticky top-0 z-50 px-4 py-3 border-b border-white/10 backdrop-blur-xl"
+        className="shrink-0 px-4 py-3 border-b border-white/10 backdrop-blur-xl z-50"
         style={{ backgroundColor: `${app.primaryColor}15` }}
       >
         <div className="flex items-center justify-between">
@@ -137,13 +137,14 @@ export default function LivePreview() {
         </div>
       </header>
 
-      {/* Preview Frame - Full height iframe */}
-      <div className="flex-1 relative">
+      {/* Preview Frame - Full remaining height iframe */}
+      <div className="flex-1 min-h-0 relative bg-white">
         <iframe 
           src={app.url}
-          className="w-full h-full border-0"
+          className="absolute inset-0 w-full h-full border-0"
           title={`${app.name} Preview`}
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-top-navigation"
+          allow="accelerometer; camera; encrypted-media; geolocation; gyroscope; microphone"
         />
       </div>
 

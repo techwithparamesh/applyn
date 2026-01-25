@@ -6,9 +6,11 @@ import type {
   InsertApp,
   InsertContactSubmission,
   InsertSupportTicket,
+  InsertTicketMessage,
   InsertUser,
   SupportTicket,
   SupportTicketStatus,
+  TicketMessage,
   UserRole,
   User,
   Payment,
@@ -22,7 +24,7 @@ import type {
   AuditLog,
   InsertAuditLog,
 } from "@shared/schema";
-import { apps, buildJobs, contactSubmissions, supportTickets, users, payments, pushTokens, pushNotifications, auditLogs } from "@shared/db.mysql";
+import { apps, buildJobs, contactSubmissions, supportTickets, ticketMessages, users, payments, pushTokens, pushNotifications, auditLogs } from "@shared/db.mysql";
 import { getMysqlDb } from "./db-mysql";
 import type { AppBuildPatch, BuildJob, BuildJobStatus } from "./storage";
 
@@ -649,6 +651,62 @@ export class MysqlStorage {
       .where(eq(supportTickets.id, id));
     
     return (result[0] as any).affectedRows > 0;
+  }
+
+  // Ticket Messages (conversation thread)
+  async createTicketMessage(senderId: string, senderRole: string, payload: InsertTicketMessage): Promise<TicketMessage> {
+    const id = randomUUID();
+    const now = new Date();
+
+    await getMysqlDb().insert(ticketMessages).values({
+      id,
+      ticketId: payload.ticketId,
+      senderId,
+      senderRole,
+      message: payload.message,
+      isInternal: payload.isInternal ? 1 : 0,
+      attachments: null,
+      createdAt: now,
+    });
+
+    const rows = await getMysqlDb().select().from(ticketMessages).where(eq(ticketMessages.id, id)).limit(1);
+    const row = rows[0];
+    return {
+      ...row,
+      isInternal: Boolean(row.isInternal),
+    } as unknown as TicketMessage;
+  }
+
+  async listTicketMessages(ticketId: string, includeInternal = false): Promise<TicketMessage[]> {
+    let query = getMysqlDb()
+      .select()
+      .from(ticketMessages)
+      .where(
+        includeInternal 
+          ? eq(ticketMessages.ticketId, ticketId)
+          : and(eq(ticketMessages.ticketId, ticketId), eq(ticketMessages.isInternal, 0))
+      )
+      .orderBy(ticketMessages.createdAt);
+
+    const rows = await query;
+    return rows.map(row => ({
+      ...row,
+      isInternal: Boolean(row.isInternal),
+    })) as unknown as TicketMessage[];
+  }
+
+  async getTicketMessage(id: string): Promise<TicketMessage | undefined> {
+    const rows = await getMysqlDb()
+      .select()
+      .from(ticketMessages)
+      .where(eq(ticketMessages.id, id))
+      .limit(1);
+    
+    if (!rows[0]) return undefined;
+    return {
+      ...rows[0],
+      isInternal: Boolean(rows[0].isInternal),
+    } as unknown as TicketMessage;
   }
 
   async enqueueBuildJob(ownerId: string, appId: string): Promise<BuildJob> {

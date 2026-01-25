@@ -199,8 +199,8 @@ export default function PromptCreate() {
     mutationFn: async (prompt: string) => {
       const template = selectedTemplate || INDUSTRY_TEMPLATES[INDUSTRY_TEMPLATES.length - 1];
       
+      // Try to use real AI parsing
       try {
-        // Try to use real AI parsing
         const res = await apiRequest("POST", "/api/ai/parse-prompt", {
           prompt,
           industryHint: template.id !== "custom" ? template.id : undefined,
@@ -209,28 +209,33 @@ export default function PromptCreate() {
         if (res.ok) {
           const aiResult = await res.json();
           return {
-            appName: aiResult.appName,
-            description: aiResult.appDescription,
-            suggestedScreens: aiResult.suggestedScreens?.map((s: any) => s.name) || ["Home", "About", "Contact"],
-            suggestedFeatures: aiResult.suggestedFeatures || ["pullToRefresh", "offlineScreen"],
+            appName: aiResult.appName || `My ${template.name} App`,
+            description: aiResult.appDescription || prompt,
+            suggestedScreens: aiResult.suggestedScreens?.map((s: any) => s.name) || template.screens || ["Home", "About", "Contact"],
+            suggestedFeatures: aiResult.suggestedFeatures || template.suggestedFeatures || ["pullToRefresh", "offlineScreen"],
             primaryColor: aiResult.primaryColor || getTemplateColor(template.id),
-            secondaryColor: aiResult.secondaryColor,
+            secondaryColor: aiResult.secondaryColor || getTemplateSecondaryColor(template.id),
             icon: aiResult.icon || getTemplateEmoji(template.id),
-            industry: aiResult.industry,
-            fullScreens: aiResult.suggestedScreens, // Keep full screen data for editor
+            industry: aiResult.industry || template.id,
+            fullScreens: aiResult.suggestedScreens,
             targetAudience: aiResult.targetAudience,
             monetization: aiResult.monetization,
+            aiGenerated: true,
           };
         }
+        // Non-OK response (like 503), fall through to template fallback
+        console.log("AI service returned non-OK status, using template fallback");
       } catch (e) {
-        console.log("AI parsing unavailable, using template fallback");
+        console.log("AI parsing unavailable, using template fallback:", e);
       }
       
-      // Fallback to template-based generation
+      // Template-based generation (no AI needed)
+      const appName = template.id === "custom" 
+        ? extractAppName(prompt) 
+        : generateSmartAppName(prompt, template);
+      
       return {
-        appName: template.id === "custom" 
-          ? extractAppName(prompt) 
-          : `My ${template.name} App`,
+        appName,
         description: prompt,
         suggestedScreens: template.screens.length > 0 
           ? template.screens 
@@ -239,7 +244,10 @@ export default function PromptCreate() {
           ? template.suggestedFeatures
           : ["pullToRefresh", "offlineScreen"],
         primaryColor: getTemplateColor(template.id),
+        secondaryColor: getTemplateSecondaryColor(template.id),
         icon: getTemplateEmoji(template.id),
+        industry: template.id,
+        aiGenerated: false,
       };
     },
     onSuccess: (data) => {
@@ -755,4 +763,53 @@ function formatFeatureName(feature: string): string {
     nativeLoadingProgress: "Loading Bar",
   };
   return names[feature] || feature;
+}
+
+function getTemplateSecondaryColor(id: string): string {
+  const colors: Record<string, string> = {
+    ecommerce: "#FCD34D",
+    salon: "#F472B6",
+    restaurant: "#FBBF24",
+    church: "#A78BFA",
+    radio: "#22D3EE",
+    fitness: "#34D399",
+    education: "#60A5FA",
+    realestate: "#94A3B8",
+    healthcare: "#FB7185",
+    photography: "#A78BFA",
+    music: "#E879F9",
+    business: "#64748B",
+    news: "#FBBF24",
+    custom: "#A855F7",
+  };
+  return colors[id] || "#A855F7";
+}
+
+function generateSmartAppName(prompt: string, template: typeof INDUSTRY_TEMPLATES[0]): string {
+  // Try to extract a business name from the prompt
+  const businessPatterns = [
+    /(?:for|called|named|my|our)\s+["']?([A-Z][a-zA-Z\s&]+?)["']?(?:\s+(?:app|store|shop|business|salon|restaurant|gym|church|clinic|studio))?/i,
+    /([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)\s+(?:app|mobile|website)/i,
+  ];
+  
+  for (const pattern of businessPatterns) {
+    const match = prompt.match(pattern);
+    if (match && match[1] && match[1].length > 2 && match[1].length < 25) {
+      return match[1].trim();
+    }
+  }
+  
+  // Generate a creative name based on template
+  const prefixes: Record<string, string[]> = {
+    ecommerce: ["Shop", "Store", "Market"],
+    salon: ["Glam", "Style", "Beauty"],
+    restaurant: ["Taste", "Dine", "Food"],
+    fitness: ["Fit", "Active", "Strong"],
+    education: ["Learn", "Study", "Edu"],
+    healthcare: ["Care", "Health", "Well"],
+    custom: ["My", "The", "Go"],
+  };
+  
+  const prefix = prefixes[template.id]?.[Math.floor(Math.random() * 3)] || "My";
+  return `${prefix} ${template.name}`;
 }

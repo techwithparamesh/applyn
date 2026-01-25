@@ -103,6 +103,7 @@ export type App = {
   buildError?: string | null;
   lastBuildAt?: Date | null;
   apiSecret?: string | null; // For authenticating push token registration
+  editorScreens?: any[] | null; // Visual editor screens data
   createdAt: Date;
   updatedAt: Date;
 };
@@ -158,6 +159,28 @@ export type SupportTicket = {
   closedAt: Date | null;          // When finally closed
   createdAt: Date;
   updatedAt: Date;
+};
+
+// --- Ticket Messages (conversation thread) ---
+export const ticketMessageRoleSchema = z.enum(["user", "staff", "system"]);
+export type TicketMessageRole = z.infer<typeof ticketMessageRoleSchema>;
+
+export const insertTicketMessageSchema = z.object({
+  ticketId: z.string().uuid(),
+  message: z.string().min(1).max(10000),
+  isInternal: z.boolean().optional().default(false), // Staff-only internal notes
+});
+
+export type InsertTicketMessage = z.infer<typeof insertTicketMessageSchema>;
+export type TicketMessage = {
+  id: string;
+  ticketId: string;
+  senderId: string;
+  senderRole: TicketMessageRole;
+  message: string;
+  isInternal: boolean;
+  attachments: string | null; // JSON array
+  createdAt: Date;
 };
 
 // --- Payments ---
