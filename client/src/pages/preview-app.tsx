@@ -215,7 +215,7 @@ export default function PreviewApp() {
               <QrCode className="mr-2 h-4 w-4" /> QR Preview
             </Button>
             
-            {/* Visual Editor Button - New */}
+            {/* Visual Editor Button */}
             <Button 
               variant="outline" 
               size="sm"
@@ -225,13 +225,14 @@ export default function PreviewApp() {
               <Wand2 className="mr-2 h-4 w-4" /> Visual Editor
             </Button>
             
+            {/* Settings/Edit Button */}
             <Button 
               variant="outline" 
               size="sm"
               onClick={() => setLocation(`/apps/${app.id}/edit`)}
               className="border-white/10 bg-white/5 hover:bg-white/10 rounded-xl"
             >
-              <Edit className="mr-2 h-4 w-4" /> Edit
+              <Edit className="mr-2 h-4 w-4" /> Settings
             </Button>
             
             {/* Download buttons - Only for paid plans with live status */}

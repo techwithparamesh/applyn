@@ -515,10 +515,18 @@ export default function AppEditor() {
                     {currentPlan}
                   </Badge>
                 </h1>
-                <p className="text-sm text-muted-foreground">Visual App Editor</p>
+                <p className="text-sm text-muted-foreground">App Settings & Branding</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setLocation(`/apps/${params.id}/visual-editor`)}
+                className="border-purple-500/30 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20"
+              >
+                <Sparkles className="mr-2 h-4 w-4" /> Visual Editor
+              </Button>
               <Button 
                 variant="outline" 
                 size="sm"
