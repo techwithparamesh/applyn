@@ -277,18 +277,30 @@ function IOSDeviceFrame({
       <div className="h-[64px] w-[3px] bg-gray-800 absolute -right-[17px] top-[142px] rounded-r-lg"></div>
 
       <div className="rounded-[2rem] overflow-hidden w-full h-full bg-white relative flex flex-col">
-        {/* iOS Status Bar */}
-        <div className="h-7 bg-gray-900 flex items-center justify-between px-5 text-[10px] font-medium text-white select-none z-20">
-          <span>9:41</span>
+        {/* iOS Status Bar - matches header color */}
+        <div 
+          className={`h-7 flex items-center justify-between px-5 text-[10px] font-medium text-white select-none z-20 ${!primaryColor ? 'bg-gray-800' : ''}`}
+          style={primaryColor ? { backgroundColor: primaryColor } : undefined}
+        >
+          <span>12:30</span>
           <div className="flex gap-1 items-center">
             {/* Signal Bars */}
-            <div className="flex gap-[2px]">
-              <div className="w-[3px] h-[6px] bg-white rounded-sm opacity-40"></div>
-              <div className="w-[3px] h-[8px] bg-white rounded-sm opacity-60"></div>
-              <div className="w-[3px] h-[10px] bg-white rounded-sm opacity-80"></div>
-              <div className="w-[3px] h-[12px] bg-white rounded-sm"></div>
+            <div className="flex gap-[2px] items-end">
+              <div className="w-[3px] h-[4px] bg-white/60 rounded-sm"></div>
+              <div className="w-[3px] h-[6px] bg-white/70 rounded-sm"></div>
+              <div className="w-[3px] h-[8px] bg-white/80 rounded-sm"></div>
+              <div className="w-[3px] h-[10px] bg-white rounded-sm"></div>
             </div>
-            <span className="ml-1">100%</span>
+            {/* Wifi */}
+            <svg className="w-4 h-4 text-white ml-1" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 18c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm-4.9-2.3l1.4 1.4C9.6 16.4 10.8 16 12 16s2.4.4 3.5 1.1l1.4-1.4C15.3 14.6 13.7 14 12 14s-3.3.6-4.9 1.7zM2.1 9.1l1.4 1.4C5.7 8.3 8.7 7 12 7s6.3 1.3 8.5 3.5l1.4-1.4C19.1 6.3 15.7 5 12 5S4.9 6.3 2.1 9.1z"/>
+            </svg>
+            {/* Battery */}
+            <div className="flex items-center ml-1">
+              <div className="w-6 h-3 border border-white/80 rounded-sm relative">
+                <div className="absolute inset-0.5 bg-white rounded-[1px]" style={{width: '85%'}}></div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -296,7 +308,7 @@ function IOSDeviceFrame({
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className={`h-11 flex items-center justify-between px-4 shadow-md z-10 shrink-0 ${!primaryColor ? 'bg-gray-800' : ''}`}
+          className={`h-11 flex items-center justify-between px-4 shadow-md z-10 shrink-0 ${!primaryColor ? 'bg-gray-700' : ''}`}
           style={primaryColor ? { backgroundColor: primaryColor } : undefined}
         >
           <div className="text-white font-bold flex items-center gap-2 text-sm">
@@ -378,8 +390,11 @@ function AndroidDeviceFrame({
       <div className="h-[60px] w-[3px] bg-gray-800 absolute -right-[15px] top-[160px] rounded-r-lg"></div>
 
       <div className="rounded-[1.25rem] overflow-hidden w-full h-full bg-white relative flex flex-col">
-        {/* Android Status Bar */}
-        <div className="h-6 bg-gray-900 flex items-center justify-between px-4 text-[10px] font-medium text-white select-none z-20">
+        {/* Android Status Bar - matches header color */}
+        <div 
+          className={`h-6 flex items-center justify-between px-4 text-[10px] font-medium text-white select-none z-20 ${!primaryColor ? 'bg-gray-800' : ''}`}
+          style={primaryColor ? { backgroundColor: primaryColor } : undefined}
+        >
           <span>12:30</span>
           <div className="flex gap-2 items-center">
             {/* WiFi Icon */}
@@ -404,7 +419,7 @@ function AndroidDeviceFrame({
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className={`h-12 flex items-center justify-between px-4 shadow-md z-10 shrink-0 ${!primaryColor ? 'bg-gray-800' : ''}`}
+          className={`h-12 flex items-center justify-between px-4 shadow-md z-10 shrink-0 ${!primaryColor ? 'bg-gray-700' : ''}`}
           style={primaryColor ? { backgroundColor: primaryColor } : undefined}
         >
           <div className="text-white font-bold flex items-center gap-3 text-sm">
