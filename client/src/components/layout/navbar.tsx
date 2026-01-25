@@ -11,7 +11,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { ThemeToggle } from "@/components/theme-toggle";
 
 
 function NavItem({
@@ -94,7 +93,6 @@ export function Navbar() {
               <NavItem href="/faq" label="FAQ" currentPath={location} />
               <NavItem href="/contact" label="Contact" currentPath={location} />
               <div className="h-5 w-px bg-white/10 mx-4" />
-              <ThemeToggle />
               <Link href="/login">
                 <Button variant="ghost" className="font-medium text-[15px] text-slate-300 hover:text-white hover:bg-white/5 px-4 h-10">
                   Sign in
@@ -137,7 +135,6 @@ export function Navbar() {
                 </Button>
               </Link>
               <div className="h-5 w-px bg-white/10 mx-3" />
-              <ThemeToggle />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="rounded-full hover:bg-white/5">
@@ -226,11 +223,6 @@ export function Navbar() {
             </SheetTrigger>
             <SheetContent side="right" className="bg-background text-slate-100 border-white/10">
               <div className="mt-10 space-y-4">
-                {/* Theme Toggle in Mobile */}
-                <div className="flex items-center justify-between pb-4 border-b border-white/10">
-                  <span className="text-sm text-muted-foreground">Theme</span>
-                  <ThemeToggle />
-                </div>
                 {!isAuthed ? (
                   <>
                     <MobileLink label="Home" onClick={() => setLocation("/")} />

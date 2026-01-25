@@ -45,7 +45,8 @@ import {
   FileText,
   Settings,
   TrendingUp,
-  Activity
+  Activity,
+  Trash2
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, Link } from "wouter";
@@ -235,6 +236,23 @@ export default function Ops() {
     } catch (err: any) {
       toast({
         title: "Update failed",
+        description: err?.message || "Please try again",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteTicket = async (ticketId: string) => {
+    if (!confirm("Are you sure you want to permanently delete this ticket? This action cannot be undone.")) {
+      return;
+    }
+    try {
+      await apiRequest("DELETE", `/api/support/tickets/${ticketId}`);
+      await queryClient.invalidateQueries({ queryKey: ["/api/support/tickets"] });
+      toast({ title: "Deleted", description: "Ticket has been permanently removed." });
+    } catch (err: any) {
+      toast({
+        title: "Delete failed",
         description: err?.message || "Please try again",
         variant: "destructive",
       });
@@ -494,6 +512,17 @@ export default function Ops() {
                             </>
                           )}
                         </Button>
+                        {t.status === "closed" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteTicket(t.id)}
+                            className="h-7 px-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Delete
+                          </Button>
+                        )}
                       </div>
                     </motion.div>
                   ))}

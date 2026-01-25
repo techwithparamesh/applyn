@@ -127,6 +127,7 @@ export interface IStorage {
   updateTicketPriority(id: string, priority: string): Promise<SupportTicket | undefined>;
   getTicketStats(): Promise<{ open: number; inProgress: number; waitingUser: number; resolved: number; closed: number }>;
   getStaffTicketStats(staffId: string): Promise<{ assigned: number; resolved: number }>;
+  deleteSupportTicket(id: string): Promise<boolean>;
 
   // Payments
   createPayment(userId: string, payment: InsertPayment): Promise<Payment>;
@@ -671,6 +672,10 @@ export class MemStorage implements IStorage {
       assigned: tickets.filter(t => t.assignedTo === staffId && t.status !== "closed").length,
       resolved: tickets.filter(t => t.assignedTo === staffId && (t.status === "resolved" || t.status === "closed")).length,
     };
+  }
+
+  async deleteSupportTicket(id: string): Promise<boolean> {
+    return this.tickets.delete(id);
   }
 
   async enqueueBuildJob(ownerId: string, appId: string): Promise<BuildJob> {

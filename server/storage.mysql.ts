@@ -643,6 +643,14 @@ export class MysqlStorage {
     };
   }
 
+  async deleteSupportTicket(id: number): Promise<boolean> {
+    const result = await getMysqlDb()
+      .delete(supportTickets)
+      .where(eq(supportTickets.id, id));
+    
+    return (result[0] as any).affectedRows > 0;
+  }
+
   async enqueueBuildJob(ownerId: string, appId: string): Promise<BuildJob> {
     // Check if there's already a queued or running job for this app
     const existing = await getMysqlDb()

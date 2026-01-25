@@ -502,6 +502,42 @@ export async function registerRoutes(
     }
   });
 
+  // Delete ticket (staff only, must be closed)
+  app.delete("/api/support/tickets/:id", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user || !isStaff(user)) return res.status(403).json({ message: "Staff access required" });
+
+      const existing = await storage.getSupportTicket(req.params.id);
+      if (!existing) return res.status(404).json({ message: "Ticket not found" });
+
+      // Only allow deletion of closed tickets
+      if (existing.status !== "closed") {
+        return res.status(400).json({ message: "Only closed tickets can be deleted" });
+      }
+
+      await storage.deleteSupportTicket(existing.id);
+      
+      // Log the deletion
+      await storage.createAuditLog({
+        userId: user.id,
+        action: "ticket_deleted",
+        targetType: "ticket",
+        targetId: existing.id,
+        metadata: JSON.stringify({ 
+          ticketSubject: existing.subject,
+          requesterId: existing.requesterId,
+        }),
+        ipAddress: req.ip || null,
+        userAgent: req.get("User-Agent") || null,
+      });
+
+      return res.json({ success: true, message: "Ticket deleted" });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
   // Update ticket priority (staff only)
   app.patch("/api/support/tickets/:id/priority", requireAuth, async (req, res, next) => {
     try {
