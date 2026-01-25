@@ -5,14 +5,14 @@ import { Globe, Home, Search, User, Menu, Loader2, RefreshCw } from "lucide-reac
 interface MobilePreviewProps {
   url?: string;
   appName?: string;
-  primaryColor?: string;
+  primaryColor?: string; // Empty = transparent header
   icon?: string; // URL or emoji
 }
 
 export function MobilePreview({ 
   url = "https://example.com", 
   appName = "My App", 
-  primaryColor = "#2563EB",
+  primaryColor, // No default - will show transparent if not set
   icon = "📱"
 }: MobilePreviewProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -60,12 +60,12 @@ export function MobilePreview({
             </div>
           </div>
 
-          {/* App Header Bar */}
+          {/* App Header Bar - transparent if no color set */}
           <motion.div 
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="h-11 flex items-center justify-between px-4 shadow-md z-10 shrink-0"
-            style={{ backgroundColor: primaryColor }}
+            className={`h-11 flex items-center justify-between px-4 shadow-md z-10 shrink-0 ${!primaryColor ? 'bg-gray-800' : ''}`}
+            style={primaryColor ? { backgroundColor: primaryColor } : undefined}
           >
             <div className="text-white font-bold flex items-center gap-2 text-sm">
               {icon && (icon.startsWith("data:") || icon.startsWith("http")) ? (

@@ -333,8 +333,8 @@ export default function CreateApp() {
     icon: "🚀",
     customLogo: null as string | null,
     iconColor: "#2563EB",
-    primaryColor: "", // Empty = will use detected or default cyan
-    secondaryColor: "", // Empty = will use detected or default purple
+    primaryColor: "", // Empty = no custom color, show neutral
+    secondaryColor: "", // Empty = no custom color
     splashBgColor: "#0a0a0a",
     statusBarStyle: "light" as "light" | "dark",
     enablePullToRefresh: true,
@@ -1065,7 +1065,7 @@ export default function CreateApp() {
                             <div className="flex items-center gap-3">
                               <div 
                                 className="h-10 w-10 rounded-lg border-2 border-white/20 shadow-lg"
-                                style={{ backgroundColor: websiteAnalysis.primaryColor }}
+                                style={{ backgroundColor: formData.primaryColor || websiteAnalysis.primaryColor }}
                               />
                               <div>
                                 <p className="text-sm text-white font-medium flex items-center gap-2">
@@ -1073,7 +1073,7 @@ export default function CreateApp() {
                                   Auto-detected from website
                                 </p>
                                 <p className="text-xs text-muted-foreground">
-                                  {websiteAnalysis.primaryColor} 
+                                  {formData.primaryColor || websiteAnalysis.primaryColor} 
                                   {websiteAnalysis.colorSource && (
                                     <span className="ml-1 text-cyan-400/70">
                                       (from {websiteAnalysis.colorSource.replace(/-/g, ' ')})
@@ -1094,31 +1094,71 @@ export default function CreateApp() {
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div 
-                                className="h-10 w-10 rounded-lg border-2 border-dashed border-white/20 flex items-center justify-center"
-                                style={{ backgroundColor: formData.primaryColor || "#00E5FF" }}
-                              >
-                                {!formData.primaryColor && <Sparkles className="h-4 w-4 text-white/50" />}
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div 
+                                  className={`h-10 w-10 rounded-lg border-2 flex items-center justify-center ${
+                                    formData.primaryColor 
+                                      ? 'border-white/20' 
+                                      : 'border-dashed border-white/30 bg-gray-700'
+                                  }`}
+                                  style={formData.primaryColor ? { backgroundColor: formData.primaryColor } : undefined}
+                                >
+                                  {!formData.primaryColor && <Palette className="h-4 w-4 text-white/40" />}
+                                </div>
+                                <div>
+                                  <p className="text-sm text-white font-medium">
+                                    {formData.primaryColor ? "Custom color selected" : "No color selected"}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {scrapeWebsiteMutation.isPending 
+                                      ? "Detecting from website..." 
+                                      : websiteAnalysis && !websiteAnalysis.primaryColor 
+                                        ? "Could not detect - select manually below" 
+                                        : "Select a brand color for your app header"}
+                                  </p>
+                                </div>
                               </div>
-                              <div>
-                                <p className="text-sm text-white font-medium">
-                                  {formData.primaryColor ? "Custom color selected" : "Default theme color"}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {formData.url && formData.url !== "https://" 
-                                    ? "Enter a complete URL to auto-detect colors" 
-                                    : "Enter your website URL above"}
-                                </p>
-                              </div>
+                              <Input
+                                type="color"
+                                value={formData.primaryColor || "#3B82F6"}
+                                onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
+                                className="h-8 w-8 p-1 rounded-lg cursor-pointer bg-transparent border-white/20"
+                              />
                             </div>
-                            <Input
-                              type="color"
-                              value={formData.primaryColor || "#00E5FF"}
-                              onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
-                              className="h-8 w-8 p-1 rounded-lg cursor-pointer bg-transparent border-white/20"
-                            />
+                            
+                            {/* Quick color presets - always show when no color set */}
+                            {!formData.primaryColor && (
+                              <div className="pt-2 border-t border-white/10">
+                                <p className="text-xs text-muted-foreground mb-2">Quick picks:</p>
+                                <div className="flex gap-2 flex-wrap">
+                                  {[
+                                    { color: "#B8860B", name: "Gold" },
+                                    { color: "#2563EB", name: "Blue" },
+                                    { color: "#10B981", name: "Green" },
+                                    { color: "#8B5CF6", name: "Purple" },
+                                    { color: "#F59E0B", name: "Amber" },
+                                    { color: "#EF4444", name: "Red" },
+                                    { color: "#06B6D4", name: "Cyan" },
+                                    { color: "#EC4899", name: "Pink" },
+                                  ].map((preset) => (
+                                    <button
+                                      key={preset.color}
+                                      type="button"
+                                      onClick={() => setFormData({ ...formData, primaryColor: preset.color })}
+                                      className={`h-8 w-8 rounded-lg border-2 transition-all hover:scale-110 ${
+                                        formData.primaryColor?.toUpperCase() === preset.color.toUpperCase() 
+                                          ? "border-white scale-110 ring-2 ring-cyan-500/50" 
+                                          : "border-white/20 hover:border-white/40"
+                                      }`}
+                                      style={{ backgroundColor: preset.color }}
+                                      title={preset.name}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
