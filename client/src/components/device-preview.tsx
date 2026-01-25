@@ -68,7 +68,7 @@ function AndroidIcon({ className }: { className?: string }) {
 export function DevicePreview({
   url = "https://example.com",
   appName = "My App",
-  primaryColor = "#2563EB",
+  primaryColor = "", // Empty = no custom color, show neutral
   icon = "📱",
   availablePlatforms = ["android", "ios"],
   defaultPlatform = "ios",
@@ -296,8 +296,8 @@ function IOSDeviceFrame({
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="h-11 flex items-center justify-between px-4 shadow-md z-10 shrink-0"
-          style={{ backgroundColor: primaryColor }}
+          className={`h-11 flex items-center justify-between px-4 shadow-md z-10 shrink-0 ${!primaryColor ? 'bg-gray-800' : ''}`}
+          style={primaryColor ? { backgroundColor: primaryColor } : undefined}
         >
           <div className="text-white font-bold flex items-center gap-2 text-sm">
             {icon && (icon.startsWith("data:") || icon.startsWith("http")) ? (
@@ -328,7 +328,7 @@ function IOSDeviceFrame({
         {/* iOS Bottom Navigation */}
         <div className="h-12 bg-white border-t border-gray-200 flex items-center justify-around px-4 shrink-0">
           <div className="flex flex-col items-center">
-            <Home className="w-5 h-5" style={{ color: primaryColor }} />
+            <Home className="w-5 h-5" style={{ color: primaryColor || '#6B7280' }} />
           </div>
           <div className="flex flex-col items-center">
             <Search className="w-5 h-5 text-gray-400" />
@@ -404,8 +404,8 @@ function AndroidDeviceFrame({
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="h-12 flex items-center justify-between px-4 shadow-md z-10 shrink-0"
-          style={{ backgroundColor: primaryColor }}
+          className={`h-12 flex items-center justify-between px-4 shadow-md z-10 shrink-0 ${!primaryColor ? 'bg-gray-800' : ''}`}
+          style={primaryColor ? { backgroundColor: primaryColor } : undefined}
         >
           <div className="text-white font-bold flex items-center gap-3 text-sm">
             {/* Android back arrow style */}

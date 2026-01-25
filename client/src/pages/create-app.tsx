@@ -1549,7 +1549,7 @@ export default function CreateApp() {
             <DevicePreview
               url={formData.url}
               appName={formData.appName}
-              primaryColor={formData.primaryColor || websiteAnalysis?.primaryColor || "#00E5FF"}
+              primaryColor={formData.primaryColor || websiteAnalysis?.primaryColor || ""}
               icon={formData.customLogo || formData.icon}
               availablePlatforms={
                 // Determine available platforms based on plan
