@@ -1126,45 +1126,57 @@ export default function CreateApp() {
                                   </p>
                                 </div>
                               </div>
-                              <Input
-                                type="color"
-                                value={formData.primaryColor || "#3B82F6"}
-                                onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
-                                className="h-8 w-8 p-1 rounded-lg cursor-pointer bg-transparent border-white/20"
-                              />
+                              <div className="flex items-center gap-2">
+                                {formData.primaryColor && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, primaryColor: "" })}
+                                    className="h-8 px-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                                    title="Clear color selection"
+                                  >
+                                    Clear
+                                  </button>
+                                )}
+                                <Input
+                                  type="color"
+                                  value={formData.primaryColor || "#3B82F6"}
+                                  onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
+                                  className="h-8 w-8 p-1 rounded-lg cursor-pointer bg-transparent border-white/20"
+                                />
+                              </div>
                             </div>
                             
-                            {/* Quick color presets - always show when no color set */}
-                            {!formData.primaryColor && (
-                              <div className="pt-2 border-t border-white/10">
-                                <p className="text-xs text-muted-foreground mb-2">Quick picks:</p>
-                                <div className="flex gap-2 flex-wrap">
-                                  {[
-                                    { color: "#B8860B", name: "Gold" },
-                                    { color: "#2563EB", name: "Blue" },
-                                    { color: "#10B981", name: "Green" },
-                                    { color: "#8B5CF6", name: "Purple" },
-                                    { color: "#F59E0B", name: "Amber" },
-                                    { color: "#EF4444", name: "Red" },
-                                    { color: "#06B6D4", name: "Cyan" },
-                                    { color: "#EC4899", name: "Pink" },
-                                  ].map((preset) => (
-                                    <button
-                                      key={preset.color}
-                                      type="button"
-                                      onClick={() => setFormData({ ...formData, primaryColor: preset.color })}
-                                      className={`h-8 w-8 rounded-lg border-2 transition-all hover:scale-110 ${
-                                        formData.primaryColor?.toUpperCase() === preset.color.toUpperCase() 
-                                          ? "border-white scale-110 ring-2 ring-cyan-500/50" 
-                                          : "border-white/20 hover:border-white/40"
-                                      }`}
-                                      style={{ backgroundColor: preset.color }}
-                                      title={preset.name}
-                                    />
-                                  ))}
-                                </div>
+                            {/* Quick color presets - show when no color or allow changing */}
+                            <div className="pt-2 border-t border-white/10">
+                              <p className="text-xs text-muted-foreground mb-2">
+                                {formData.primaryColor ? "Change color:" : "Quick picks:"}
+                              </p>
+                              <div className="flex gap-2 flex-wrap">
+                                {[
+                                  { color: "#B8860B", name: "Gold" },
+                                  { color: "#2563EB", name: "Blue" },
+                                  { color: "#10B981", name: "Green" },
+                                  { color: "#8B5CF6", name: "Purple" },
+                                  { color: "#F59E0B", name: "Amber" },
+                                  { color: "#EF4444", name: "Red" },
+                                  { color: "#06B6D4", name: "Cyan" },
+                                  { color: "#EC4899", name: "Pink" },
+                                ].map((preset) => (
+                                  <button
+                                    key={preset.color}
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, primaryColor: preset.color })}
+                                    className={`h-8 w-8 rounded-lg border-2 transition-all hover:scale-110 ${
+                                      formData.primaryColor?.toUpperCase() === preset.color.toUpperCase() 
+                                        ? "border-white scale-110 ring-2 ring-cyan-500/50" 
+                                        : "border-white/20 hover:border-white/40"
+                                    }`}
+                                    style={{ backgroundColor: preset.color }}
+                                    title={preset.name}
+                                  />
+                                ))}
                               </div>
-                            )}
+                            </div>
                           </div>
                         )}
                       </div>
