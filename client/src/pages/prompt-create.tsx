@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { MobilePreview } from "@/components/mobile-preview";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -594,64 +595,103 @@ export default function PromptCreate() {
                 <p className="text-muted-foreground">Review the generated configuration and create your app</p>
               </div>
 
-              <Card className="glass border-white/10 mb-6">
-                <CardContent className="p-6">
-                  <div className="grid md:grid-cols-2 gap-6">
-                    {/* App Info */}
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-4">
-                        <div 
-                          className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
-                          style={{ backgroundColor: generatedConfig.primaryColor + "20" }}
-                        >
-                          {generatedConfig.icon}
-                        </div>
-                        <div>
-                          <h3 className="text-xl font-bold text-white">{generatedConfig.appName}</h3>
-                          <div className="flex items-center gap-2 mt-1">
-                            <div 
-                              className="w-4 h-4 rounded-full border border-white/20"
-                              style={{ backgroundColor: generatedConfig.primaryColor }}
-                            />
-                            <span className="text-sm text-muted-foreground">{generatedConfig.primaryColor}</span>
-                          </div>
-                        </div>
-                      </div>
+              {/* Live Preview and Config Grid */}
+              <div className="grid lg:grid-cols-2 gap-8 mb-6">
+                {/* Mobile Preview - Shows actual website */}
+                <div className="flex justify-center">
+                  <MobilePreview
+                    url={websiteUrl || "https://example.com"}
+                    appName={generatedConfig.appName}
+                    primaryColor={generatedConfig.primaryColor}
+                    icon={generatedConfig.icon}
+                  />
+                </div>
 
+                {/* App Configuration Card */}
+                <Card className="glass border-white/10">
+                  <CardContent className="p-6 space-y-6">
+                    {/* App Identity */}
+                    <div className="flex items-center gap-4">
+                      <div 
+                        className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
+                        style={{ backgroundColor: generatedConfig.primaryColor + "20" }}
+                      >
+                        {generatedConfig.icon}
+                      </div>
                       <div>
-                        <h4 className="text-sm font-medium text-white mb-2">Description</h4>
-                        <p className="text-sm text-muted-foreground">{generatedConfig.description}</p>
+                        <h3 className="text-xl font-bold text-white">{generatedConfig.appName}</h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div 
+                            className="w-4 h-4 rounded-full border border-white/20"
+                            style={{ backgroundColor: generatedConfig.primaryColor }}
+                          />
+                          <span className="text-sm text-muted-foreground">{generatedConfig.primaryColor}</span>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Screens & Features */}
-                    <div className="space-y-4">
+                    {/* Website URL */}
+                    {websiteUrl ? (
                       <div>
-                        <h4 className="text-sm font-medium text-white mb-2">Suggested Screens</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {generatedConfig.suggestedScreens.map((screen: string) => (
-                            <Badge key={screen} variant="secondary" className="bg-white/10 text-white">
-                              {screen}
-                            </Badge>
-                          ))}
-                        </div>
+                        <h4 className="text-sm font-medium text-white mb-2 flex items-center gap-2">
+                          <Globe className="h-4 w-4 text-cyan-400" />
+                          Website URL
+                        </h4>
+                        <p className="text-sm text-cyan-400 bg-cyan-500/10 px-3 py-2 rounded-lg truncate">
+                          {websiteUrl}
+                        </p>
                       </div>
+                    ) : (
+                      <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 space-y-2">
+                        <p className="text-sm text-amber-400 flex items-center gap-2">
+                          <Globe className="h-4 w-4" />
+                          No website URL provided yet
+                        </p>
+                        <Input
+                          value={websiteUrl}
+                          onChange={(e) => setWebsiteUrl(e.target.value)}
+                          placeholder="https://yourbusiness.com"
+                          className="bg-white/10 border-amber-500/30 text-white placeholder:text-amber-400/50 text-sm"
+                        />
+                        <p className="text-xs text-amber-400/70">
+                          Add your website URL to see a live preview in your app
+                        </p>
+                      </div>
+                    )}
 
-                      <div>
-                        <h4 className="text-sm font-medium text-white mb-2">Enabled Features</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {generatedConfig.suggestedFeatures.map((feature: string) => (
-                            <Badge key={feature} variant="outline" className="border-cyan-500/50 text-cyan-400">
-                              <Check className="mr-1 h-3 w-3" />
-                              {formatFeatureName(feature)}
-                            </Badge>
-                          ))}
-                        </div>
+                    {/* Description */}
+                    <div>
+                      <h4 className="text-sm font-medium text-white mb-2">Description</h4>
+                      <p className="text-sm text-muted-foreground">{generatedConfig.description}</p>
+                    </div>
+
+                    {/* Suggested Screens */}
+                    <div>
+                      <h4 className="text-sm font-medium text-white mb-2">Suggested Screens</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {generatedConfig.suggestedScreens.map((screen: string) => (
+                          <Badge key={screen} variant="secondary" className="bg-white/10 text-white">
+                            {screen}
+                          </Badge>
+                        ))}
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+
+                    {/* Enabled Features */}
+                    <div>
+                      <h4 className="text-sm font-medium text-white mb-2">Enabled Features</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {generatedConfig.suggestedFeatures.map((feature: string) => (
+                          <Badge key={feature} variant="outline" className="border-cyan-500/50 text-cyan-400">
+                            <Check className="mr-1 h-3 w-3" />
+                            {formatFeatureName(feature)}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
 
               <div className="flex gap-4">
                 <Button

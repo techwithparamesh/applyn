@@ -61,6 +61,8 @@ import {
   MoreHorizontal,
   Loader2,
   Eye,
+  Globe,
+  Layout,
 } from "lucide-react";
 
 // Component types for the editor
@@ -602,6 +604,7 @@ export default function VisualEditor() {
   const [activeScreenId, setActiveScreenId] = useState("home");
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [deviceView, setDeviceView] = useState<"mobile" | "desktop">("mobile");
+  const [editorMode, setEditorMode] = useState<"components" | "website">("website"); // Default to website view
   const [sidebarTab, setSidebarTab] = useState<"components" | "templates">("components");
   const [hasChanges, setHasChanges] = useState(false);
   const [showComponentTree, setShowComponentTree] = useState(true);
@@ -798,6 +801,28 @@ export default function VisualEditor() {
               <Monitor className="h-4 w-4" />
             </Button>
           </div>
+
+          {/* Editor Mode Toggle - Website vs Components */}
+          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg ml-2">
+            <Button
+              variant={editorMode === "website" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setEditorMode("website")}
+              className={`h-8 ${editorMode === "website" ? "bg-cyan-500 hover:bg-cyan-600" : ""}`}
+            >
+              <Globe className="h-4 w-4 mr-1" />
+              <span className="text-xs">Website</span>
+            </Button>
+            <Button
+              variant={editorMode === "components" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setEditorMode("components")}
+              className={`h-8 ${editorMode === "components" ? "bg-purple-500 hover:bg-purple-600" : ""}`}
+            >
+              <Layout className="h-4 w-4 mr-1" />
+              <span className="text-xs">Screens</span>
+            </Button>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 text-sm">
@@ -832,8 +857,8 @@ export default function VisualEditor() {
       </header>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - Components */}
-        <aside className="w-64 bg-white border-r flex flex-col overflow-hidden shrink-0">
+        {/* Left Sidebar - Components (only shown in components mode) */}
+        <aside className={`w-64 bg-white border-r flex flex-col overflow-hidden shrink-0 ${editorMode === "website" ? "hidden" : ""}`}>
           <Tabs value={sidebarTab} onValueChange={(v) => setSidebarTab(v as any)} className="flex-1 flex flex-col">
             <TabsList className="grid w-full grid-cols-2 p-1 bg-slate-100 m-2 mb-0 rounded-lg shrink-0">
               <TabsTrigger value="components" className="text-xs">Components</TabsTrigger>
@@ -967,57 +992,153 @@ export default function VisualEditor() {
 
         {/* Canvas Area */}
         <main className="flex-1 overflow-auto p-8 flex items-start justify-center">
-          <div 
-            className={`bg-white rounded-2xl shadow-xl overflow-hidden transition-all ${
-              deviceView === "mobile" ? "w-[375px]" : "w-full max-w-4xl"
-            }`}
-            style={{ minHeight: deviceView === "mobile" ? "667px" : "600px" }}
-          >
-            {/* Phone Header */}
-            {deviceView === "mobile" && (
-              <div className="h-12 bg-slate-900 flex items-center justify-between px-4">
-                <Menu className="h-5 w-5 text-white" />
-                <span className="text-white font-medium text-sm">{activeScreen?.name}</span>
-                <MoreHorizontal className="h-5 w-5 text-white" />
-              </div>
-            )}
+          {editorMode === "website" ? (
+            /* Website Preview Mode - Shows actual website in mobile frame */
+            <div className="flex flex-col items-center gap-4">
+              {/* Mobile Device Frame */}
+              <div className="relative mx-auto border-gray-800 bg-gray-800 border-[14px] rounded-[2.5rem] h-[600px] w-[300px] shadow-xl">
+                <div className="w-[148px] h-[18px] bg-gray-800 top-0 rounded-b-[1rem] left-1/2 -translate-x-1/2 absolute z-10"></div>
+                <div className="h-[32px] w-[3px] bg-gray-800 absolute -left-[17px] top-[72px] rounded-l-lg"></div>
+                <div className="h-[46px] w-[3px] bg-gray-800 absolute -left-[17px] top-[124px] rounded-l-lg"></div>
+                <div className="h-[46px] w-[3px] bg-gray-800 absolute -left-[17px] top-[178px] rounded-l-lg"></div>
+                <div className="h-[64px] w-[3px] bg-gray-800 absolute -right-[17px] top-[142px] rounded-r-lg"></div>
+                
+                <div className="rounded-[2rem] overflow-hidden w-full h-full bg-white relative flex flex-col">
+                  {/* Status Bar */}
+                  <div className="h-7 bg-gray-900 flex items-center justify-between px-5 text-[10px] font-medium text-white select-none z-20 shrink-0">
+                    <span>9:41</span>
+                    <div className="flex gap-1 items-center">
+                      <span className="ml-1">100%</span>
+                    </div>
+                  </div>
 
-            {/* Content Area with Reorder */}
-            <div className="p-4">
-              {activeScreen && activeScreen.components.length > 0 ? (
-                <Reorder.Group 
-                  axis="y" 
-                  values={activeScreen.components} 
-                  onReorder={handleReorder}
-                  className="space-y-4"
-                >
-                  {activeScreen.components.map((component) => (
-                    <Reorder.Item 
-                      key={component.id} 
-                      value={component}
-                      className="cursor-grab active:cursor-grabbing"
-                    >
-                      <ComponentPreview
-                        component={component}
-                        isSelected={selectedComponentId === component.id}
-                        onClick={() => setSelectedComponentId(component.id)}
+                  {/* App Header Bar */}
+                  <div 
+                    className="h-11 flex items-center justify-between px-4 shadow-md z-10 shrink-0"
+                    style={{ backgroundColor: app?.primaryColor || "#2563EB" }}
+                  >
+                    <div className="text-white font-bold flex items-center gap-2 text-sm">
+                      <span className="text-base">{app?.icon || "📱"}</span>
+                      <span className="truncate max-w-[180px]">{app?.name || "My App"}</span>
+                    </div>
+                    <Menu className="w-5 h-5 text-white/80" />
+                  </div>
+
+                  {/* Website Content - Live iframe */}
+                  <div className="flex-1 bg-white relative overflow-hidden">
+                    {app?.url ? (
+                      <iframe
+                        src={app.url}
+                        className="w-full h-full border-0"
+                        title="Website Preview"
+                        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
                       />
-                    </Reorder.Item>
-                  ))}
-                </Reorder.Group>
-              ) : (
-                <div className="py-20 text-center text-slate-400">
-                  <Layers className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-sm">Click a component to add it here</p>
-                  <p className="text-xs mt-1">Or use a template to get started</p>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full text-slate-400 p-4">
+                        <Globe className="h-10 w-10 mb-3 opacity-50" />
+                        <p className="text-sm text-center">No website URL configured</p>
+                        <p className="text-xs mt-1">Go to Settings to add your website URL</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Bottom Navigation */}
+                  <div className="h-12 bg-white border-t border-gray-200 flex items-center justify-around px-4 shrink-0">
+                    <div className="flex flex-col items-center">
+                      <svg className="w-5 h-5" style={{ color: app?.primaryColor || "#2563EB" }} fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                      </svg>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                  </div>
                 </div>
+              </div>
+              
+              {/* App name label */}
+              <p className="text-sm text-slate-600 text-center font-medium">
+                {app?.name || "My App"}
+              </p>
+              
+              {/* Quick Info */}
+              {app?.url && (
+                <a 
+                  href={app.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-xs text-cyan-500 hover:text-cyan-400 flex items-center gap-1"
+                >
+                  <Globe className="h-3 w-3" />
+                  {app.url.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                  <ExternalLink className="h-3 w-3" />
+                </a>
               )}
             </div>
-          </div>
+          ) : (
+            /* Component Editor Mode - Drag and drop components */
+            <div 
+              className={`bg-white rounded-2xl shadow-xl overflow-hidden transition-all ${
+                deviceView === "mobile" ? "w-[375px]" : "w-full max-w-4xl"
+              }`}
+              style={{ minHeight: deviceView === "mobile" ? "667px" : "600px" }}
+            >
+              {/* Phone Header */}
+              {deviceView === "mobile" && (
+                <div 
+                  className="h-12 flex items-center justify-between px-4"
+                  style={{ backgroundColor: app?.primaryColor || "#1f2937" }}
+                >
+                  <Menu className="h-5 w-5 text-white" />
+                  <span className="text-white font-medium text-sm">{activeScreen?.name}</span>
+                  <MoreHorizontal className="h-5 w-5 text-white" />
+                </div>
+              )}
+
+              {/* Content Area with Reorder */}
+              <div className="p-4">
+                {activeScreen && activeScreen.components.length > 0 ? (
+                  <Reorder.Group 
+                    axis="y" 
+                    values={activeScreen.components} 
+                    onReorder={handleReorder}
+                    className="space-y-4"
+                  >
+                    {activeScreen.components.map((component) => (
+                      <Reorder.Item 
+                        key={component.id} 
+                        value={component}
+                        className="cursor-grab active:cursor-grabbing"
+                      >
+                        <ComponentPreview
+                          component={component}
+                          isSelected={selectedComponentId === component.id}
+                          onClick={() => setSelectedComponentId(component.id)}
+                        />
+                      </Reorder.Item>
+                    ))}
+                  </Reorder.Group>
+                ) : (
+                  <div className="py-20 text-center text-slate-400">
+                    <Layers className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-sm">Click a component to add it here</p>
+                    <p className="text-xs mt-1">Or use a template to get started</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </main>
 
-        {/* Right Sidebar - Properties */}
-        <aside className="w-72 bg-white border-l flex flex-col overflow-hidden shrink-0">
+        {/* Right Sidebar - Properties (only shown in components mode) */}
+        <aside className={`w-72 bg-white border-l flex flex-col overflow-hidden shrink-0 ${editorMode === "website" ? "hidden" : ""}`}>
           <div className="p-3 border-b flex items-center gap-2 shrink-0">
             <Sparkles className="h-4 w-4 text-cyan-500" />
             <span className="text-sm font-semibold">Properties</span>
