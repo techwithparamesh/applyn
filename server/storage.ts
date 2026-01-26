@@ -495,6 +495,8 @@ export class MemStorage implements IStorage {
       platform: insertApp.platform ?? "android",
       status: insertApp.status ?? "draft",
       features: insertApp.features ?? null,
+      industry: insertApp.industry ?? null,
+      isNativeOnly: insertApp.isNativeOnly ?? null,
       createdAt: now,
       updatedAt: now,
     };

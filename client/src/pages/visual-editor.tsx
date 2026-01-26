@@ -10,6 +10,7 @@ import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { getTemplateById, cloneTemplate, type IndustryTemplate, type TemplateScreen } from "@/lib/app-templates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -65,7 +66,7 @@ import {
   Layout,
 } from "lucide-react";
 
-// Component types for the editor
+// Component types for the editor (extended to support industry templates)
 type ComponentType = 
   | "text" 
   | "heading" 
@@ -83,7 +84,20 @@ type ComponentType =
   | "form"
   | "input"
   | "video"
-  | "map";
+  | "map"
+  // Extended template components
+  | "hero"
+  | "productGrid"
+  | "productCard"
+  | "carousel"
+  | "testimonial"
+  | "pricingCard"
+  | "contactForm"
+  | "socialLinks"
+  | "featureList"
+  | "stats"
+  | "team"
+  | "faq";
 
 // Component definition
 interface EditorComponent {
@@ -350,13 +364,180 @@ function ComponentPreview({ component, isSelected, onClick }: {
           </form>
         );
       case "list":
+        // Handle different list variants
+        if (component.props.variant === 'menu') {
+          return (
+            <div className="bg-white rounded-lg divide-y divide-gray-100">
+              {component.props.items?.map((item: any, i: number) => (
+                <div key={i} className="flex items-center gap-3 p-3 hover:bg-gray-50">
+                  <span className="text-lg">{item.icon}</span>
+                  <span className="text-sm flex-1">{item.label}</span>
+                  <ChevronRight className="h-4 w-4 text-gray-400" />
+                </div>
+              ))}
+            </div>
+          );
+        }
+        if (component.props.variant === 'cart' || component.props.variant === 'orders') {
+          return (
+            <div className="space-y-3">
+              {component.props.items?.map((item: any, i: number) => (
+                <div key={i} className="flex items-center gap-3 p-2 bg-white rounded-lg border">
+                  {item.image && <img src={item.image} alt={item.name} className="w-14 h-14 rounded object-cover" />}
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">{item.name}</p>
+                    <p className="text-xs text-gray-500">{item.quantity ? `Qty: ${item.quantity}` : item.status}</p>
+                  </div>
+                  <p className="font-semibold text-sm">{item.price || item.total}</p>
+                </div>
+              ))}
+            </div>
+          );
+        }
+        // Default bullet list
         return (
           <ul className="list-disc list-inside space-y-1">
-            {component.props.items?.map((item: string, i: number) => (
-              <li key={i} className="text-slate-700">{item}</li>
+            {component.props.items?.map((item: any, i: number) => (
+              <li key={i} className="text-slate-700">{typeof item === 'string' ? item : item.name || item.title}</li>
             ))}
           </ul>
         );
+        
+      // ---- Extended Template Components ----
+      case "hero":
+        return (
+          <div 
+            className="relative rounded-lg overflow-hidden"
+            style={{ 
+              backgroundImage: component.props.backgroundImage ? `url(${component.props.backgroundImage})` : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              height: component.props.height || 200
+            }}
+          >
+            <div className="absolute inset-0" style={{ backgroundColor: component.props.overlayColor || 'rgba(0,0,0,0.4)' }} />
+            <div className="relative z-10 flex flex-col justify-center items-center h-full text-center p-4">
+              <h2 className="text-xl font-bold text-white mb-2">{component.props.title}</h2>
+              {component.props.subtitle && <p className="text-sm text-white/80 mb-4">{component.props.subtitle}</p>}
+              {component.props.buttonText && (
+                <button className="px-6 py-2 bg-white text-gray-900 rounded-full font-medium text-sm">
+                  {component.props.buttonText}
+                </button>
+              )}
+            </div>
+          </div>
+        );
+        
+      case "productGrid":
+        return (
+          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${component.props.columns || 2}, 1fr)` }}>
+            {component.props.products?.slice(0, 4).map((product: any, i: number) => (
+              <div key={i} className="bg-white rounded-lg border overflow-hidden">
+                {product.image && (
+                  <img src={product.image} alt={product.name} className="w-full h-24 object-cover" />
+                )}
+                <div className="p-2">
+                  <p className="font-medium text-xs truncate">{product.name}</p>
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="text-sm font-bold text-green-600">{product.price}</p>
+                    {product.rating && <span className="text-xs text-amber-500">★ {product.rating}</span>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+        
+      case "carousel":
+        return (
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {component.props.items?.map((item: any, i: number) => (
+              <div key={i} className="flex-shrink-0 w-48 rounded-lg overflow-hidden bg-white border">
+                {item.image && <img src={item.image} alt={item.title} className="w-full h-24 object-cover" />}
+                <div className="p-2">
+                  <p className="font-medium text-sm">{item.title}</p>
+                  <p className="text-xs text-gray-500">{item.subtitle}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+        
+      case "testimonial":
+        return (
+          <div className="space-y-3">
+            {component.props.reviews?.map((review: any, i: number) => (
+              <div key={i} className="bg-white rounded-lg p-3 border">
+                <div className="flex items-center gap-2 mb-2">
+                  {review.avatar && <img src={review.avatar} alt="" className="w-8 h-8 rounded-full" />}
+                  <div>
+                    <p className="font-medium text-sm">{review.name}</p>
+                    <div className="flex text-amber-500 text-xs">{'★'.repeat(review.rating || 5)}</div>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-600">"{review.text}"</p>
+              </div>
+            ))}
+          </div>
+        );
+        
+      case "stats":
+        return (
+          <div className="grid grid-cols-3 gap-3 p-3 bg-white rounded-lg">
+            {component.props.items?.map((stat: any, i: number) => (
+              <div key={i} className="text-center">
+                <span className="text-lg">{stat.icon}</span>
+                <p className="text-lg font-bold">{stat.value}</p>
+                <p className="text-xs text-gray-500">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+        );
+        
+      case "team":
+        return (
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {component.props.members?.map((member: any, i: number) => (
+              <div key={i} className="flex-shrink-0 text-center w-24">
+                <img src={member.image} alt={member.name} className="w-16 h-16 rounded-full mx-auto object-cover" />
+                <p className="font-medium text-xs mt-2 truncate">{member.name}</p>
+                <p className="text-[10px] text-gray-500 truncate">{member.role}</p>
+              </div>
+            ))}
+          </div>
+        );
+        
+      case "contactForm":
+        return (
+          <div className="space-y-3 p-3 bg-white rounded-lg border">
+            {component.props.fields?.map((field: string, i: number) => (
+              <input 
+                key={i}
+                type={field === 'email' ? 'email' : 'text'}
+                placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
+                className="w-full px-3 py-2 border rounded-lg text-sm"
+              />
+            ))}
+            <button className="w-full py-2 bg-cyan-500 text-white rounded-lg font-medium text-sm">
+              {component.props.submitText || 'Submit'}
+            </button>
+          </div>
+        );
+        
+      case "socialLinks":
+        return (
+          <div className="flex justify-center gap-4 p-3">
+            {component.props.links?.map((link: any, i: number) => (
+              <div key={i} className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl">
+                {link.platform === 'instagram' ? '📷' : 
+                 link.platform === 'twitter' ? '🐦' :
+                 link.platform === 'facebook' ? '📘' :
+                 link.platform === 'youtube' ? '📺' : '🔗'}
+              </div>
+            ))}
+          </div>
+        );
+
       default:
         return <div className="p-4 bg-slate-100 rounded text-sm text-slate-500">{component.type}</div>;
     }
@@ -616,10 +797,28 @@ export default function VisualEditor() {
     enabled: !!id,
   });
 
-  // Load saved screens from app
+  // Load saved screens from app OR initialize from industry template
   useEffect(() => {
     if (app?.editorScreens && app.editorScreens.length > 0) {
+      // Load existing screens from saved data
       setScreens(app.editorScreens);
+    } else if (app?.industry && !app?.editorScreens?.length) {
+      // No saved screens but has industry template - load the template
+      const template = getTemplateById(app.industry);
+      if (template) {
+        // Clone template to get fresh IDs
+        const clonedTemplate = cloneTemplate(template);
+        // Convert template screens to editor screens
+        const templateScreens: EditorScreen[] = clonedTemplate.screens.map((ts: TemplateScreen) => ({
+          id: ts.id,
+          name: ts.name,
+          icon: ts.icon,
+          isHome: ts.isHome,
+          components: ts.components as EditorComponent[],
+        }));
+        setScreens(templateScreens);
+        setHasChanges(true); // Mark as changed so user can save
+      }
     }
   }, [app]);
 

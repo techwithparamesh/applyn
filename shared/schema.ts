@@ -78,6 +78,10 @@ export const insertAppSchema = z.object({
   status: appStatusSchema.default("draft"),
   features: appFeaturesSchema.optional(), // Native enhancement features
   plan: planIdSchema.optional(), // Plan tier (preview, starter, standard, pro, agency)
+  // Industry template for pre-built screen designs (ecommerce, salon, restaurant, etc.)
+  industry: z.string().max(50).optional(),
+  // Flag to indicate this is a native-only app (no website URL)
+  isNativeOnly: z.boolean().optional(),
 });
 
 export type InsertApp = z.infer<typeof insertAppSchema>;
@@ -94,6 +98,8 @@ export type App = {
   status: z.infer<typeof appStatusSchema>;
   features?: AppFeatures | null; // Native enhancement features
   plan?: PlanId | null; // Plan tier for this app
+  industry?: string | null; // Industry template ID
+  isNativeOnly?: boolean | null; // True if app is native-only (no website)
   packageName?: string | null;
   versionCode?: number | null;
   artifactPath?: string | null;

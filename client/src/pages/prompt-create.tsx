@@ -32,6 +32,9 @@ import {
   Globe,
   Check,
   ChevronRight,
+  Rocket,
+  Layout,
+  Smartphone,
 } from "lucide-react";
 
 // Industry templates with pre-defined features
@@ -178,15 +181,19 @@ const INDUSTRY_TEMPLATES = [
   },
 ];
 
-type Step = "template" | "prompt" | "generating" | "preview";
+// Creation mode: website-to-app or build from scratch
+type CreationMode = "website" | "scratch" | null;
+type Step = "mode" | "template" | "prompt" | "generating" | "preview";
 
 export default function PromptCreate() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [step, setStep] = useState<Step>("template");
+  const [creationMode, setCreationMode] = useState<CreationMode>(null);
+  const [step, setStep] = useState<Step>("mode");
   const [selectedTemplate, setSelectedTemplate] = useState<typeof INDUSTRY_TEMPLATES[0] | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
+  const [appName, setAppName] = useState("");
   const [generatedConfig, setGeneratedConfig] = useState<any>(null);
 
   // Auth check
@@ -272,9 +279,15 @@ export default function PromptCreate() {
         throw new Error("Please sign in to create an app");
       }
 
+      // For scratch mode, we use a placeholder URL that signals "native app"
+      // For website mode, we use the actual website URL
+      const appUrl = creationMode === "website" 
+        ? websiteUrl 
+        : "native://app"; // Special URL to indicate native-only app
+
       const appData = {
-        name: generatedConfig.appName,
-        url: websiteUrl || "https://example.com",
+        name: creationMode === "scratch" ? appName : generatedConfig.appName,
+        url: appUrl,
         icon: generatedConfig.icon,
         primaryColor: generatedConfig.primaryColor,
         platform: "android",
@@ -289,6 +302,10 @@ export default function PromptCreate() {
         // Store generated config for later use
         generatedPrompt: customPrompt || selectedTemplate?.prompt,
         generatedScreens: generatedConfig.suggestedScreens,
+        // Flag to indicate creation mode
+        isNativeOnly: creationMode === "scratch",
+        // Industry template ID - used to load pre-built screens in visual editor
+        industry: generatedConfig.industry || selectedTemplate?.id || "custom",
       };
 
       const res = await apiRequest("POST", "/api/apps", appData);
@@ -300,12 +317,22 @@ export default function PromptCreate() {
     },
     onSuccess: (app) => {
       queryClient.invalidateQueries({ queryKey: ["/api/apps"] });
-      toast({
-        title: "🎉 App created!",
-        description: "Taking you to the app editor...",
-      });
-      // Go to the new visual editor
-      setLocation(`/apps/${app.id}/editor`);
+      
+      if (creationMode === "scratch") {
+        // For scratch mode, go directly to visual editor to build screens
+        toast({
+          title: "🎉 App created!",
+          description: "Let's build your app screens...",
+        });
+        setLocation(`/apps/${app.id}/visual-editor`);
+      } else {
+        // For website mode, go to preview/settings
+        toast({
+          title: "🎉 App created!",
+          description: "Your app is ready! Customize it further...",
+        });
+        setLocation(`/apps/${app.id}/preview`);
+      }
     },
     onError: (err: any) => {
       toast({
@@ -318,25 +345,44 @@ export default function PromptCreate() {
 
   const handleTemplateSelect = (template: typeof INDUSTRY_TEMPLATES[0]) => {
     setSelectedTemplate(template);
-    if (template.id === "custom") {
-      setCustomPrompt("");
-    } else {
-      setCustomPrompt(template.prompt);
-    }
+    // Don't pre-fill prompt - it's optional. Let users describe their specific needs
+    setCustomPrompt("");
     setStep("prompt");
   };
 
+  const handleModeSelect = (mode: CreationMode) => {
+    setCreationMode(mode);
+    setStep("template");
+  };
+
   const handleGenerate = () => {
-    if (!customPrompt.trim()) {
-      toast({
-        title: "Please describe your app",
-        description: "Enter a description of what you want to build",
-        variant: "destructive",
-      });
-      return;
+    if (creationMode === "website") {
+      // Website mode - URL is required
+      if (!websiteUrl.trim() || !websiteUrl.startsWith("http")) {
+        toast({
+          title: "Website URL required",
+          description: "Please enter your website URL to create an app",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else {
+      // Scratch mode - App name is required
+      if (!appName.trim()) {
+        toast({
+          title: "App name required",
+          description: "Please enter a name for your app",
+          variant: "destructive",
+        });
+        return;
+      }
     }
+    
+    // Use template prompt if no custom description provided
+    const promptToUse = customPrompt.trim() || selectedTemplate?.prompt || "Create a mobile app";
+    
     setStep("generating");
-    generateMutation.mutate(customPrompt);
+    generateMutation.mutate(promptToUse);
   };
 
   const handleCreate = () => {
@@ -390,44 +436,115 @@ export default function PromptCreate() {
             AI-Powered App Builder
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-            Describe Your App,<br />
-            <span className="text-gradient">We'll Build It</span>
+            Create Your App<br />
+            <span className="text-gradient">In Minutes</span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-            Choose an industry template or describe your custom app idea. 
-            Our AI will generate the perfect app structure for you.
+            {step === "mode" 
+              ? "Choose how you want to create your app"
+              : creationMode === "website"
+              ? "Convert your website into a mobile app"
+              : "Build a native app from scratch with our visual editor"
+            }
           </p>
         </motion.div>
 
-        {/* Progress Steps */}
-        <div className="flex items-center justify-center gap-2 mb-12">
-          {["template", "prompt", "preview"].map((s, i) => (
-            <div key={s} className="flex items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                step === s || (s === "generating" && step === "generating")
-                  ? "bg-cyan-500 text-white"
-                  : ["template", "prompt", "generating", "preview"].indexOf(step) > i
-                  ? "bg-green-500 text-white"
-                  : "bg-white/10 text-white/40"
-              }`}>
-                {["template", "prompt", "generating", "preview"].indexOf(step) > i ? (
-                  <Check className="h-4 w-4" />
-                ) : (
-                  i + 1
+        {/* Progress Steps - Only show after mode selection */}
+        {step !== "mode" && (
+          <div className="flex items-center justify-center gap-2 mb-12">
+            {["template", "prompt", "preview"].map((s, i) => (
+              <div key={s} className="flex items-center">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
+                  step === s || (s === "generating" && step === "generating")
+                    ? "bg-cyan-500 text-white"
+                    : ["template", "prompt", "generating", "preview"].indexOf(step) > i
+                    ? "bg-green-500 text-white"
+                    : "bg-white/10 text-white/40"
+                }`}>
+                  {["template", "prompt", "generating", "preview"].indexOf(step) > i ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    i + 1
+                  )}
+                </div>
+                {i < 2 && (
+                  <div className={`w-16 h-0.5 mx-2 ${
+                    ["template", "prompt", "generating", "preview"].indexOf(step) > i
+                      ? "bg-green-500"
+                      : "bg-white/10"
+                  }`} />
                 )}
               </div>
-              {i < 2 && (
-                <div className={`w-16 h-0.5 mx-2 ${
-                  ["template", "prompt", "generating", "preview"].indexOf(step) > i
-                    ? "bg-green-500"
-                    : "bg-white/10"
-                }`} />
-              )}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         <AnimatePresence mode="wait">
+          {/* Step 0: Mode Selection - Website or Build from Scratch */}
+          {step === "mode" && (
+            <motion.div
+              key="mode"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="max-w-3xl mx-auto"
+            >
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* Option 1: I have a website */}
+                <Card 
+                  className="glass border-white/10 cursor-pointer transition-all hover:scale-[1.02] hover:border-cyan-500/50 group"
+                  onClick={() => handleModeSelect("website")}
+                >
+                  <CardContent className="p-8 text-center">
+                    <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Globe className="h-10 w-10 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2">I have a website</h3>
+                    <p className="text-muted-foreground text-sm mb-4">
+                      Convert your existing website into a mobile app instantly
+                    </p>
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      <Badge variant="secondary" className="bg-cyan-500/10 text-cyan-400 text-xs">
+                        Instant Preview
+                      </Badge>
+                      <Badge variant="secondary" className="bg-cyan-500/10 text-cyan-400 text-xs">
+                        Auto-detect Branding
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Option 2: Build from scratch */}
+                <Card 
+                  className="glass border-white/10 cursor-pointer transition-all hover:scale-[1.02] hover:border-purple-500/50 group"
+                  onClick={() => handleModeSelect("scratch")}
+                >
+                  <CardContent className="p-8 text-center">
+                    <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Layout className="h-10 w-10 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2">Build from scratch</h3>
+                    <p className="text-muted-foreground text-sm mb-4">
+                      Create a native app using our visual drag-and-drop builder
+                    </p>
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      <Badge variant="secondary" className="bg-purple-500/10 text-purple-400 text-xs">
+                        Visual Builder
+                      </Badge>
+                      <Badge variant="secondary" className="bg-purple-500/10 text-purple-400 text-xs">
+                        Native Screens
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <p className="text-center text-sm text-muted-foreground mt-8">
+                Not sure? You can always add a website later or build native screens for your web app.
+              </p>
+            </motion.div>
+          )}
+
           {/* Step 1: Template Selection */}
           {step === "template" && (
             <motion.div
@@ -436,6 +553,13 @@ export default function PromptCreate() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
             >
+              <Button
+                variant="ghost"
+                onClick={() => setStep("mode")}
+                className="mb-4 text-muted-foreground"
+              >
+                ← Change mode
+              </Button>
               <h2 className="text-2xl font-semibold text-white mb-6 text-center">
                 What type of app do you want to build?
               </h2>
@@ -464,7 +588,8 @@ export default function PromptCreate() {
             </motion.div>
           )}
 
-          {/* Step 2: Prompt Input */}
+          {/* Step 2: Website URL + Prompt Input */}
+          {/* Step 2: Input based on mode */}
           {step === "prompt" && (
             <motion.div
               key="prompt"
@@ -495,55 +620,164 @@ export default function PromptCreate() {
 
               <Card className="glass border-white/10">
                 <CardContent className="p-6 space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-white flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-cyan-400" />
-                      Describe your app
-                    </label>
-                    <Textarea
-                      value={customPrompt}
-                      onChange={(e) => setCustomPrompt(e.target.value)}
-                      placeholder="Example: Build an ecommerce app to sell handmade crafts with product catalog, shopping cart, secure checkout, order tracking..."
-                      className="min-h-[150px] bg-white/5 border-white/10 text-white placeholder:text-muted-foreground resize-none"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Be specific about features, screens, and functionality you want.
-                    </p>
-                  </div>
+                  {/* MODE: WEBSITE - URL is primary */}
+                  {creationMode === "website" && (
+                    <>
+                      <div className="space-y-3">
+                        <label className="text-base font-semibold text-white flex items-center gap-2">
+                          <Globe className="h-5 w-5 text-cyan-400" />
+                          Your Website URL
+                          <Badge variant="secondary" className="bg-cyan-500/20 text-cyan-400 text-xs ml-2">Required</Badge>
+                        </label>
+                        <div className="relative">
+                          <Input
+                            value={websiteUrl}
+                            onChange={(e) => setWebsiteUrl(e.target.value)}
+                            placeholder="https://yourbusiness.com"
+                            className="h-14 text-lg bg-white/10 border-cyan-500/30 text-white placeholder:text-muted-foreground pl-4 pr-12 focus:border-cyan-500 focus:ring-cyan-500/20"
+                          />
+                          {websiteUrl && websiteUrl.startsWith("http") && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                              <Check className="h-5 w-5 text-green-400" />
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-sm text-cyan-400/80">
+                          Enter your website URL to convert it into a mobile app
+                        </p>
+                      </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-white flex items-center gap-2">
-                      <Globe className="h-4 w-4 text-cyan-400" />
-                      Website URL (optional)
-                    </label>
-                    <Input
-                      value={websiteUrl}
-                      onChange={(e) => setWebsiteUrl(e.target.value)}
-                      placeholder="https://yourbusiness.com"
-                      className="bg-white/5 border-white/10 text-white placeholder:text-muted-foreground"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      If you have a website, we'll auto-detect logo and colors.
-                    </p>
-                  </div>
+                      <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-white/10"></div>
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                          <span className="bg-gray-900 px-3 text-muted-foreground">Optional</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-white flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-purple-400" />
+                          Additional Features
+                        </label>
+                        <Textarea
+                          value={customPrompt}
+                          onChange={(e) => setCustomPrompt(e.target.value)}
+                          placeholder="Add any specific features: push notifications, user accounts, booking system..."
+                          className="min-h-[80px] bg-white/5 border-white/10 text-white placeholder:text-muted-foreground resize-none"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* MODE: SCRATCH - App name is primary */}
+                  {creationMode === "scratch" && (
+                    <>
+                      <div className="space-y-3">
+                        <label className="text-base font-semibold text-white flex items-center gap-2">
+                          <Smartphone className="h-5 w-5 text-purple-400" />
+                          App Name
+                          <Badge variant="secondary" className="bg-purple-500/20 text-purple-400 text-xs ml-2">Required</Badge>
+                        </label>
+                        <div className="relative">
+                          <Input
+                            value={appName}
+                            onChange={(e) => setAppName(e.target.value)}
+                            placeholder="My Awesome App"
+                            className="h-14 text-lg bg-white/10 border-purple-500/30 text-white placeholder:text-muted-foreground pl-4 pr-12 focus:border-purple-500 focus:ring-purple-500/20"
+                          />
+                          {appName.trim().length >= 2 && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                              <Check className="h-5 w-5 text-green-400" />
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-sm text-purple-400/80">
+                          Choose a name for your app
+                        </p>
+                      </div>
+
+                      <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-white/10"></div>
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                          <span className="bg-gray-900 px-3 text-muted-foreground">Describe Your App</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-white flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-cyan-400" />
+                          What does your app do?
+                        </label>
+                        <Textarea
+                          value={customPrompt}
+                          onChange={(e) => setCustomPrompt(e.target.value)}
+                          placeholder="Describe your app: A fitness app with workout tracking, meal plans, progress photos..."
+                          className="min-h-[100px] bg-white/5 border-white/10 text-white placeholder:text-muted-foreground resize-none"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Help us understand what screens and features your app needs
+                        </p>
+                      </div>
+
+                      {/* Optional website for scratch mode */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-white flex items-center gap-2">
+                          <Globe className="h-4 w-4 text-muted-foreground" />
+                          Website URL (optional)
+                        </label>
+                        <Input
+                          value={websiteUrl}
+                          onChange={(e) => setWebsiteUrl(e.target.value)}
+                          placeholder="https://yourbusiness.com"
+                          className="bg-white/5 border-white/10 text-white placeholder:text-muted-foreground"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Have a website? Add it to include web content in your app
+                        </p>
+                      </div>
+                    </>
+                  )}
 
                   <Button
                     onClick={handleGenerate}
-                    disabled={!customPrompt.trim() || generateMutation.isPending}
-                    className="w-full h-12 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-lg font-semibold"
+                    disabled={
+                      (creationMode === "website" && (!websiteUrl.trim() || !websiteUrl.startsWith("http"))) ||
+                      (creationMode === "scratch" && !appName.trim()) ||
+                      generateMutation.isPending
+                    }
+                    className={`w-full h-14 text-lg font-semibold disabled:opacity-50 ${
+                      creationMode === "website" 
+                        ? "bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500"
+                        : "bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-400 hover:to-pink-500"
+                    }`}
                   >
                     {generateMutation.isPending ? (
                       <>
                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Generating...
+                        {creationMode === "website" ? "Analyzing Website..." : "Generating App..."}
                       </>
                     ) : (
                       <>
                         <Sparkles className="mr-2 h-5 w-5" />
-                        Generate App Structure
+                        {creationMode === "website" ? "Generate My App" : "Create My App"}
                       </>
                     )}
                   </Button>
+
+                  {creationMode === "website" && !websiteUrl.trim() && (
+                    <p className="text-center text-sm text-amber-400/80">
+                      Please enter your website URL to continue
+                    </p>
+                  )}
+                  {creationMode === "scratch" && !appName.trim() && (
+                    <p className="text-center text-sm text-amber-400/80">
+                      Please enter an app name to continue
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>
@@ -559,18 +793,33 @@ export default function PromptCreate() {
               className="text-center py-20"
             >
               <div className="relative w-24 h-24 mx-auto mb-8">
-                <div className="absolute inset-0 rounded-full bg-cyan-500/20 animate-ping" />
-                <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center">
+                <div className={`absolute inset-0 rounded-full animate-ping ${
+                  creationMode === "website" ? "bg-cyan-500/20" : "bg-purple-500/20"
+                }`} />
+                <div className={`relative w-24 h-24 rounded-full flex items-center justify-center ${
+                  creationMode === "website" 
+                    ? "bg-gradient-to-br from-cyan-500 to-blue-600" 
+                    : "bg-gradient-to-br from-purple-500 to-pink-600"
+                }`}>
                   <Sparkles className="h-10 w-10 text-white animate-pulse" />
                 </div>
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">AI is building your app...</h2>
-              <p className="text-muted-foreground">Analyzing your requirements and generating the perfect structure</p>
+              <h2 className="text-2xl font-bold text-white mb-2">
+                {creationMode === "website" ? "Analyzing your website..." : "Generating your app..."}
+              </h2>
+              <p className="text-muted-foreground">
+                {creationMode === "website" 
+                  ? "Detecting branding and preparing your mobile app"
+                  : "Creating the perfect app structure for you"
+                }
+              </p>
               <div className="flex justify-center gap-1 mt-8">
                 {[0, 1, 2].map((i) => (
                   <div
                     key={i}
-                    className="w-2 h-2 rounded-full bg-cyan-400 animate-bounce"
+                    className={`w-2 h-2 rounded-full animate-bounce ${
+                      creationMode === "website" ? "bg-cyan-400" : "bg-purple-400"
+                    }`}
                     style={{ animationDelay: `${i * 0.15}s` }}
                   />
                 ))}
@@ -585,92 +834,103 @@ export default function PromptCreate() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="max-w-3xl mx-auto"
+              className="max-w-4xl mx-auto"
             >
               <div className="text-center mb-8">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
+                <div className={`w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
+                  creationMode === "website" 
+                    ? "bg-gradient-to-br from-green-500 to-emerald-500" 
+                    : "bg-gradient-to-br from-purple-500 to-pink-500"
+                }`}>
                   <Check className="h-8 w-8 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-2">Your App is Ready!</h2>
-                <p className="text-muted-foreground">Review the generated configuration and create your app</p>
+                <h2 className="text-2xl font-bold text-white mb-2">
+                  {creationMode === "website" ? "Your App Preview" : "App Configuration Ready"}
+                </h2>
+                <p className="text-muted-foreground">
+                  {creationMode === "website" 
+                    ? "This is how your app will look on mobile devices"
+                    : "Review your app settings and start building"
+                  }
+                </p>
               </div>
 
               {/* Live Preview and Config Grid */}
-              <div className="grid lg:grid-cols-2 gap-8 mb-6">
-                {/* Mobile Preview - Shows actual website */}
-                <div className="flex justify-center">
-                  <MobilePreview
-                    url={websiteUrl || "https://example.com"}
-                    appName={generatedConfig.appName}
-                    primaryColor={generatedConfig.primaryColor}
-                    icon={generatedConfig.icon}
-                  />
-                </div>
+              <div className={`grid gap-8 mb-6 ${creationMode === "website" ? "lg:grid-cols-2" : ""}`}>
+                {/* Mobile Preview - Only for website mode */}
+                {creationMode === "website" && websiteUrl && (
+                  <div className="flex justify-center">
+                    <MobilePreview
+                      url={websiteUrl}
+                      appName={generatedConfig.appName}
+                      primaryColor={generatedConfig.primaryColor}
+                      icon={generatedConfig.icon}
+                    />
+                  </div>
+                )}
 
                 {/* App Configuration Card */}
                 <Card className="glass border-white/10">
-                  <CardContent className="p-6 space-y-6">
+                  <CardContent className="p-6 space-y-5">
                     {/* App Identity */}
                     <div className="flex items-center gap-4">
                       <div 
-                        className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
+                        className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl"
                         style={{ backgroundColor: generatedConfig.primaryColor + "20" }}
                       >
                         {generatedConfig.icon}
                       </div>
                       <div>
-                        <h3 className="text-xl font-bold text-white">{generatedConfig.appName}</h3>
+                        <h3 className="text-lg font-bold text-white">
+                          {creationMode === "scratch" ? appName : generatedConfig.appName}
+                        </h3>
                         <div className="flex items-center gap-2 mt-1">
                           <div 
-                            className="w-4 h-4 rounded-full border border-white/20"
+                            className="w-3 h-3 rounded-full border border-white/20"
                             style={{ backgroundColor: generatedConfig.primaryColor }}
                           />
-                          <span className="text-sm text-muted-foreground">{generatedConfig.primaryColor}</span>
+                          <span className="text-xs text-muted-foreground">{generatedConfig.primaryColor}</span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Website URL */}
-                    {websiteUrl ? (
-                      <div>
-                        <h4 className="text-sm font-medium text-white mb-2 flex items-center gap-2">
+                    {/* Website URL - Only if provided */}
+                    {websiteUrl && (
+                      <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-1">
                           <Globe className="h-4 w-4 text-cyan-400" />
-                          Website URL
-                        </h4>
-                        <p className="text-sm text-cyan-400 bg-cyan-500/10 px-3 py-2 rounded-lg truncate">
-                          {websiteUrl}
-                        </p>
+                          <span className="text-sm font-medium text-white">Website</span>
+                        </div>
+                        <a 
+                          href={websiteUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-sm text-cyan-400 hover:text-cyan-300 truncate block"
+                        >
+                          {websiteUrl.replace(/^https?:\/\//, '')}
+                        </a>
                       </div>
-                    ) : (
-                      <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 space-y-2">
-                        <p className="text-sm text-amber-400 flex items-center gap-2">
-                          <Globe className="h-4 w-4" />
-                          No website URL provided yet
-                        </p>
-                        <Input
-                          value={websiteUrl}
-                          onChange={(e) => setWebsiteUrl(e.target.value)}
-                          placeholder="https://yourbusiness.com"
-                          className="bg-white/10 border-amber-500/30 text-white placeholder:text-amber-400/50 text-sm"
-                        />
-                        <p className="text-xs text-amber-400/70">
-                          Add your website URL to see a live preview in your app
+                    )}
+
+                    {/* For scratch mode - show what they'll build */}
+                    {creationMode === "scratch" && !websiteUrl && (
+                      <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Layout className="h-4 w-4 text-purple-400" />
+                          <span className="text-sm font-medium text-white">Native App</span>
+                        </div>
+                        <p className="text-sm text-purple-400">
+                          Build custom screens with our visual editor
                         </p>
                       </div>
                     )}
 
-                    {/* Description */}
-                    <div>
-                      <h4 className="text-sm font-medium text-white mb-2">Description</h4>
-                      <p className="text-sm text-muted-foreground">{generatedConfig.description}</p>
-                    </div>
-
                     {/* Suggested Screens */}
                     <div>
-                      <h4 className="text-sm font-medium text-white mb-2">Suggested Screens</h4>
-                      <div className="flex flex-wrap gap-2">
+                      <h4 className="text-sm font-medium text-white mb-2">App Screens</h4>
+                      <div className="flex flex-wrap gap-1.5">
                         {generatedConfig.suggestedScreens.map((screen: string) => (
-                          <Badge key={screen} variant="secondary" className="bg-white/10 text-white">
+                          <Badge key={screen} variant="secondary" className="bg-white/10 text-white text-xs">
                             {screen}
                           </Badge>
                         ))}
@@ -679,10 +939,14 @@ export default function PromptCreate() {
 
                     {/* Enabled Features */}
                     <div>
-                      <h4 className="text-sm font-medium text-white mb-2">Enabled Features</h4>
-                      <div className="flex flex-wrap gap-2">
+                      <h4 className="text-sm font-medium text-white mb-2">Features Included</h4>
+                      <div className="flex flex-wrap gap-1.5">
                         {generatedConfig.suggestedFeatures.map((feature: string) => (
-                          <Badge key={feature} variant="outline" className="border-cyan-500/50 text-cyan-400">
+                          <Badge key={feature} variant="outline" className={`text-xs ${
+                            creationMode === "website" 
+                              ? "border-cyan-500/50 text-cyan-400"
+                              : "border-purple-500/50 text-purple-400"
+                          }`}>
                             <Check className="mr-1 h-3 w-3" />
                             {formatFeatureName(feature)}
                           </Badge>
@@ -699,21 +963,26 @@ export default function PromptCreate() {
                   onClick={() => setStep("prompt")}
                   className="flex-1 border-white/10"
                 >
-                  ← Modify Prompt
+                  ← Modify
                 </Button>
                 <Button
                   onClick={handleCreate}
                   disabled={createAppMutation.isPending}
-                  className="flex-1 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400"
+                  className={`flex-[2] h-12 text-lg font-semibold ${
+                    creationMode === "website"
+                      ? "bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500"
+                      : "bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-400 hover:to-pink-500"
+                  }`}
                 >
                   {createAppMutation.isPending ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creating...
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Creating App...
                     </>
                   ) : (
                     <>
-                      Create App <ChevronRight className="ml-2 h-4 w-4" />
+                      {creationMode === "scratch" ? "Start Building" : "Create My App"}
+                      <ChevronRight className="ml-2 h-5 w-5" />
                     </>
                   )}
                 </Button>
@@ -721,7 +990,7 @@ export default function PromptCreate() {
 
               {!me && (
                 <p className="text-center text-sm text-muted-foreground mt-4">
-                  You'll be asked to sign in before creating the app
+                  You'll need to sign in to create your app
                 </p>
               )}
             </motion.div>
