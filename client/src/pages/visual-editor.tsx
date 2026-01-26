@@ -867,7 +867,7 @@ export default function VisualEditor() {
     
     // Create default screens for apps without templates
     const homeId = generateId();
-      const defaultScreens: EditorScreen[] = [
+    const defaultScreens: EditorScreen[] = [
         {
           id: homeId,
           name: "Home",
@@ -982,7 +982,6 @@ export default function VisualEditor() {
       setActiveScreenId(homeId);
       setHasChanges(true);
       setTemplatesLoaded(true);
-    }
   }, [app, templatesLoaded, toast]);
 
   // Ensure activeScreenId always points to a valid screen
