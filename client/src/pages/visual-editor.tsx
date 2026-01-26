@@ -567,12 +567,18 @@ function PropertiesPanel({
 }) {
   if (!component) {
     return (
-      <div className="p-4 text-center text-slate-400">
-        <Sparkles className="h-12 w-12 mx-auto mb-3 opacity-50" />
-        <p className="text-sm">Select an element to edit</p>
+      <div className="py-12 text-center">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center border border-slate-600/50">
+          <Sparkles className="h-8 w-8 text-slate-500" />
+        </div>
+        <p className="text-sm text-slate-400">Select an element to edit</p>
+        <p className="text-xs text-slate-500 mt-1">Click any component in the preview</p>
       </div>
     );
   }
+
+  const inputClass = "mt-1.5 bg-slate-800/50 border-slate-700/50 text-white placeholder:text-slate-500 focus:border-cyan-500/50 focus:ring-cyan-500/20";
+  const labelClass = "text-xs text-slate-400 font-medium";
 
   const renderPropsEditor = () => {
     switch (component.type) {
@@ -580,33 +586,33 @@ function PropertiesPanel({
         return (
           <div className="space-y-4">
             <div>
-              <Label className="text-xs text-slate-500">Text Content</Label>
+              <Label className={labelClass}>Text Content</Label>
               <Textarea
                 value={component.props.text}
                 onChange={(e) => onUpdate({ ...component.props, text: e.target.value })}
                 rows={3}
-                className="mt-1"
+                className={inputClass}
               />
             </div>
             <div>
-              <Label className="text-xs text-slate-500">Font Size</Label>
+              <Label className={labelClass}>Font Size</Label>
               <Input
                 type="number"
                 value={component.props.fontSize}
                 onChange={(e) => onUpdate({ ...component.props, fontSize: parseInt(e.target.value) })}
-                className="mt-1"
+                className={inputClass}
               />
             </div>
             <div>
-              <Label className="text-xs text-slate-500">Text Color</Label>
-              <div className="flex gap-2 mt-1">
+              <Label className={labelClass}>Text Color</Label>
+              <div className="flex gap-2 mt-1.5">
                 <input
                   type="color"
                   value={component.props.color}
                   onChange={(e) => onUpdate({ ...component.props, color: e.target.value })}
-                  className="h-9 w-12 rounded cursor-pointer"
+                  className="h-9 w-12 rounded-lg cursor-pointer bg-slate-800 border border-slate-700"
                 />
-                <Input value={component.props.color} onChange={(e) => onUpdate({ ...component.props, color: e.target.value })} className="font-mono text-sm" />
+                <Input value={component.props.color} onChange={(e) => onUpdate({ ...component.props, color: e.target.value })} className={`${inputClass} font-mono text-sm`} />
               </div>
             </div>
           </div>
@@ -615,8 +621,8 @@ function PropertiesPanel({
         return (
           <div className="space-y-4">
             <div>
-              <Label className="text-xs text-slate-500">Heading Text</Label>
-              <Input value={component.props.text} onChange={(e) => onUpdate({ ...component.props, text: e.target.value })} className="mt-1" />
+              <Label className={labelClass}>Heading Text</Label>
+              <Input value={component.props.text} onChange={(e) => onUpdate({ ...component.props, text: e.target.value })} className={inputClass} />
             </div>
             <div>
               <Label className="text-xs text-slate-500">Heading Level</Label>
@@ -755,15 +761,25 @@ function PropertiesPanel({
           </div>
         );
       default:
-        return <div className="text-sm text-slate-500">Properties for {component.type}</div>;
+        return <div className="text-sm text-slate-400">Properties for {component.type}</div>;
     }
   };
 
   return (
-    <div className="p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-slate-900 capitalize">{component.type}</span>
-        <Button variant="ghost" size="sm" onClick={onDelete} className="text-red-500 hover:text-red-600 hover:bg-red-50">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center border border-cyan-500/30">
+            <span className="text-sm">✨</span>
+          </div>
+          <span className="text-sm font-medium text-white capitalize">{component.type}</span>
+        </div>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={onDelete} 
+          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+        >
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
@@ -785,10 +801,11 @@ export default function VisualEditor() {
   const [activeScreenId, setActiveScreenId] = useState("home");
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [deviceView, setDeviceView] = useState<"mobile" | "desktop">("mobile");
-  const [editorMode, setEditorMode] = useState<"components" | "website">("website"); // Default to website view
+  const [editorMode, setEditorMode] = useState<"components" | "website">("components"); // Default to components for native apps
   const [sidebarTab, setSidebarTab] = useState<"components" | "templates">("components");
   const [hasChanges, setHasChanges] = useState(false);
   const [showComponentTree, setShowComponentTree] = useState(true);
+  const [templatesLoaded, setTemplatesLoaded] = useState(false);
 
   // Fetch app data
   const { data: app, isLoading } = useQuery<any>({
@@ -797,30 +814,37 @@ export default function VisualEditor() {
     enabled: !!id,
   });
 
+  // Set editor mode based on app type
+  useEffect(() => {
+    if (app) {
+      // Native apps should show components mode, website apps show website mode
+      const isNative = app.isNativeOnly || app.url === "native://app" || !app.url;
+      setEditorMode(isNative ? "components" : "website");
+    }
+  }, [app]);
+
   // Load saved screens from app OR initialize from industry template OR create default
   useEffect(() => {
-    if (app?.editorScreens && app.editorScreens.length > 0) {
-      // Check if saved screens have actual content (components)
+    if (!app || templatesLoaded) return;
+    
+    // Check for existing saved screens with actual content
+    if (app.editorScreens && app.editorScreens.length > 0) {
       const hasContent = app.editorScreens.some((s: EditorScreen) => s.components && s.components.length > 0);
       
       if (hasContent) {
-        // Load existing screens from saved data
         setScreens(app.editorScreens);
-        // Set active screen to first screen or home screen
         const homeScreen = app.editorScreens.find((s: EditorScreen) => s.isHome);
         setActiveScreenId(homeScreen?.id || app.editorScreens[0].id);
-        return; // Don't generate defaults
+        setTemplatesLoaded(true);
+        return;
       }
-      // If no content, fall through to generate defaults
     }
     
-    if (app?.industry) {
-      // Has industry template - load the template
+    // Load industry template if available
+    if (app.industry) {
       const template = getTemplateById(app.industry);
       if (template) {
-        // Clone template to get fresh IDs
         const clonedTemplate = cloneTemplate(template);
-        // Convert template screens to editor screens
         const templateScreens: EditorScreen[] = clonedTemplate.screens.map((ts: TemplateScreen) => ({
           id: ts.id,
           name: ts.name,
@@ -829,14 +853,20 @@ export default function VisualEditor() {
           components: ts.components as EditorComponent[],
         }));
         setScreens(templateScreens);
-        // Set active to home screen
         const homeScreen = templateScreens.find(s => s.isHome);
         setActiveScreenId(homeScreen?.id || templateScreens[0].id);
-        setHasChanges(true); // Mark as changed so user can save
+        setHasChanges(true);
+        setTemplatesLoaded(true);
+        toast({
+          title: "✨ Template loaded!",
+          description: `${template.name} template with ${templateScreens.length} screens ready to customize.`,
+        });
+        return;
       }
-    } else if (app) {
-      // App without industry (website-based) - create a default welcome screen
-      const homeId = generateId();
+    }
+    
+    // Create default screens for apps without templates
+    const homeId = generateId();
       const defaultScreens: EditorScreen[] = [
         {
           id: homeId,
@@ -951,8 +981,9 @@ export default function VisualEditor() {
       setScreens(defaultScreens);
       setActiveScreenId(homeId);
       setHasChanges(true);
+      setTemplatesLoaded(true);
     }
-  }, [app]);
+  }, [app, templatesLoaded, toast]);
 
   // Ensure activeScreenId always points to a valid screen
   useEffect(() => {
@@ -1116,84 +1147,111 @@ export default function VisualEditor() {
     );
   }
 
+  // Check if this is a native-only app
+  const isNativeApp = app?.isNativeOnly || app?.url === "native://app" || !app?.url;
+
   return (
-    <div className="h-screen bg-slate-100 flex flex-col overflow-hidden">
-      {/* Top Toolbar */}
-      <header className="h-14 bg-white border-b flex items-center justify-between px-4 shrink-0 shadow-sm">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => setLocation(`/apps/${id}/preview`)}>
+    <div className="h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col overflow-hidden">
+      {/* Top Toolbar - Modern Dark Theme */}
+      <header className="h-16 bg-slate-900/80 backdrop-blur-sm border-b border-slate-700/50 flex items-center justify-between px-6 shrink-0">
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setLocation(`/apps/${id}/preview`)}
+            className="text-slate-300 hover:text-white hover:bg-slate-700/50"
+          >
             <ArrowLeft className="h-5 w-5" />
           </Button>
           
+          {/* App Name & Info */}
+          <div className="flex items-center gap-3 border-l border-slate-700/50 pl-4">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-purple-500 flex items-center justify-center text-lg shadow-lg">
+              {app?.icon || "📱"}
+            </div>
+            <div>
+              <h1 className="text-white font-semibold text-sm">{app?.name || "My App"}</h1>
+              <p className="text-slate-400 text-xs">
+                {isNativeApp ? "Native App" : "Web App"} • {activeScreen?.name || "Home"}
+              </p>
+            </div>
+          </div>
+
+          {/* Editor Mode Toggle - Only show for non-native apps */}
+          {!isNativeApp && (
+            <div className="flex items-center gap-1 p-1 bg-slate-800/80 rounded-xl ml-4 border border-slate-700/50">
+              <Button
+                size="sm"
+                onClick={() => setEditorMode("website")}
+                className={`h-8 px-4 font-medium rounded-lg transition-all ${editorMode === "website" 
+                  ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/25" 
+                  : "bg-transparent hover:bg-slate-700/50 text-slate-400"}`}
+              >
+                <Globe className="h-4 w-4 mr-2" />
+                Website
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setEditorMode("components")}
+                className={`h-8 px-4 font-medium rounded-lg transition-all ${editorMode === "components" 
+                  ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/25" 
+                  : "bg-transparent hover:bg-slate-700/50 text-slate-400"}`}
+              >
+                <Layout className="h-4 w-4 mr-2" />
+                Screens
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
           {/* Device Toggle */}
-          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
+          <div className="flex items-center gap-1 p-1 bg-slate-800/80 rounded-lg border border-slate-700/50">
             <Button
-              variant={deviceView === "mobile" ? "default" : "ghost"}
+              variant="ghost"
               size="sm"
               onClick={() => setDeviceView("mobile")}
-              className="h-8"
+              className={`h-8 w-8 p-0 ${deviceView === "mobile" 
+                ? "text-cyan-400 bg-cyan-500/10" 
+                : "text-slate-400 hover:text-white"}`}
             >
               <Smartphone className="h-4 w-4" />
             </Button>
             <Button
-              variant={deviceView === "desktop" ? "default" : "ghost"}
+              variant="ghost"
               size="sm"
               onClick={() => setDeviceView("desktop")}
-              className="h-8"
+              className={`h-8 w-8 p-0 ${deviceView === "desktop" 
+                ? "text-cyan-400 bg-cyan-500/10" 
+                : "text-slate-400 hover:text-white"}`}
             >
               <Monitor className="h-4 w-4" />
             </Button>
           </div>
 
-          {/* Editor Mode Toggle - Website vs Screens */}
-          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg ml-2">
-            <Button
-              size="sm"
-              onClick={() => setEditorMode("website")}
-              className={`h-8 px-3 font-medium ${editorMode === "website" 
-                ? "bg-cyan-500 hover:bg-cyan-600 text-white" 
-                : "bg-transparent hover:bg-slate-200 text-slate-600"}`}
-            >
-              <Globe className="h-4 w-4 mr-1.5" />
-              Website
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => setEditorMode("components")}
-              className={`h-8 px-3 font-medium ${editorMode === "components" 
-                ? "bg-purple-500 hover:bg-purple-600 text-white" 
-                : "bg-transparent hover:bg-slate-200 text-slate-600"}`}
-            >
-              <Layout className="h-4 w-4 mr-1.5" />
-              Screens
-            </Button>
-          </div>
-        </div>
+          <div className="h-6 w-px bg-slate-700" />
 
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-slate-500">Visual Editor</span>
-          <ChevronRight className="h-4 w-4 text-slate-400" />
-          <span className="font-medium text-slate-900">{activeScreen?.name}</span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" title="Undo">
+          <Button variant="ghost" size="icon" title="Undo" className="text-slate-400 hover:text-white">
             <Undo2 className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" title="Redo">
+          <Button variant="ghost" size="icon" title="Redo" className="text-slate-400 hover:text-white">
             <Redo2 className="h-4 w-4" />
           </Button>
+          
+          <div className="h-6 w-px bg-slate-700" />
+          
           <Button 
             variant="outline"
             size="sm"
             onClick={() => window.open(`/live-preview/${id}`, "_blank")}
+            className="border-slate-600 text-slate-300 hover:bg-slate-700/50 hover:text-white"
           >
             <Eye className="h-4 w-4 mr-2" /> Preview
           </Button>
           <Button 
             onClick={() => saveMutation.mutate()}
             disabled={!hasChanges || saveMutation.isPending}
-            className="bg-cyan-500 hover:bg-cyan-600"
+            className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white shadow-lg shadow-cyan-500/25"
           >
             {saveMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
             Save
@@ -1202,59 +1260,102 @@ export default function VisualEditor() {
       </header>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - Components (only shown in components mode) */}
-        <aside className={`w-64 bg-white border-r flex flex-col overflow-hidden shrink-0 ${editorMode === "website" ? "hidden" : ""}`}>
+        {/* Left Sidebar - Components Panel */}
+        <aside className={`w-72 bg-slate-900/95 border-r border-slate-700/50 flex flex-col overflow-hidden shrink-0 ${editorMode === "website" ? "hidden" : ""}`}>
+          {/* Screens Section */}
+          <div className="p-4 border-b border-slate-700/50">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                <Layers className="h-3.5 w-3.5" /> 
+                Screens ({screens.length})
+              </h3>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-6 w-6 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10" 
+                onClick={addScreen}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="space-y-1">
+              {screens.map((screen) => (
+                <button
+                  key={screen.id}
+                  onClick={() => { setActiveScreenId(screen.id); setSelectedComponentId(null); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
+                    activeScreenId === screen.id 
+                      ? "bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-white border border-cyan-500/30" 
+                      : "text-slate-400 hover:bg-slate-800/50 hover:text-white border border-transparent"
+                  }`}
+                >
+                  <span className="text-base">{screen.icon}</span>
+                  <span className="flex-1 text-left">{screen.name}</span>
+                  {screen.isHome && (
+                    <Badge className="text-[10px] h-5 bg-cyan-500/20 text-cyan-400 border-0">Home</Badge>
+                  )}
+                  <span className="text-xs text-slate-500">{screen.components.length}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Components Palette */}
           <Tabs value={sidebarTab} onValueChange={(v) => setSidebarTab(v as any)} className="flex-1 flex flex-col">
-            <TabsList className="grid w-full grid-cols-2 p-1 bg-slate-100 m-2 mb-0 rounded-lg shrink-0">
-              <TabsTrigger value="components" className="text-xs">Components</TabsTrigger>
-              <TabsTrigger value="templates" className="text-xs">Templates</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 p-1 bg-slate-800/50 m-3 mb-0 rounded-xl shrink-0 border border-slate-700/50">
+              <TabsTrigger value="components" className="text-xs rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
+                Components
+              </TabsTrigger>
+              <TabsTrigger value="templates" className="text-xs rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white">
+                Sections
+              </TabsTrigger>
             </TabsList>
             
-            <TabsContent value="components" className="flex-1 overflow-auto p-2 m-0">
+            <TabsContent value="components" className="flex-1 overflow-auto p-3 m-0">
               <div className="space-y-4">
                 <div>
-                  <h3 className="text-xs font-semibold text-slate-500 uppercase px-2 mb-2">Basic</h3>
+                  <h3 className="text-xs font-bold text-slate-500 uppercase px-1 mb-2">Basic</h3>
                   <div className="grid grid-cols-2 gap-2">
                     {BASIC_COMPONENTS.map((comp) => (
                       <button
                         key={comp.type}
                         onClick={() => addComponent(comp.type)}
-                        className="flex flex-col items-center gap-1 p-3 rounded-lg border border-slate-200 hover:border-cyan-500 hover:bg-cyan-50 transition-colors"
+                        className="flex flex-col items-center gap-2 p-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all group"
                       >
-                        <comp.icon className="h-5 w-5 text-slate-600" />
-                        <span className="text-xs text-slate-700">{comp.name}</span>
+                        <comp.icon className="h-5 w-5 text-slate-400 group-hover:text-cyan-400 transition-colors" />
+                        <span className="text-xs text-slate-400 group-hover:text-white transition-colors">{comp.name}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="text-xs font-semibold text-slate-500 uppercase px-2 mb-2">Form</h3>
+                  <h3 className="text-xs font-bold text-slate-500 uppercase px-1 mb-2">Form</h3>
                   <div className="grid grid-cols-2 gap-2">
                     {FORM_COMPONENTS.map((comp) => (
                       <button
                         key={comp.type}
                         onClick={() => addComponent(comp.type)}
-                        className="flex flex-col items-center gap-1 p-3 rounded-lg border border-slate-200 hover:border-cyan-500 hover:bg-cyan-50 transition-colors"
+                        className="flex flex-col items-center gap-2 p-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all group"
                       >
-                        <comp.icon className="h-5 w-5 text-slate-600" />
-                        <span className="text-xs text-slate-700">{comp.name}</span>
+                        <comp.icon className="h-5 w-5 text-slate-400 group-hover:text-cyan-400 transition-colors" />
+                        <span className="text-xs text-slate-400 group-hover:text-white transition-colors">{comp.name}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="text-xs font-semibold text-slate-500 uppercase px-2 mb-2">Media</h3>
+                  <h3 className="text-xs font-bold text-slate-500 uppercase px-1 mb-2">Media</h3>
                   <div className="grid grid-cols-2 gap-2">
                     {MEDIA_COMPONENTS.map((comp) => (
                       <button
                         key={comp.type}
                         onClick={() => addComponent(comp.type)}
-                        className="flex flex-col items-center gap-1 p-3 rounded-lg border border-slate-200 hover:border-cyan-500 hover:bg-cyan-50 transition-colors"
+                        className="flex flex-col items-center gap-2 p-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all group"
                       >
-                        <comp.icon className="h-5 w-5 text-slate-600" />
-                        <span className="text-xs text-slate-700">{comp.name}</span>
+                        <comp.icon className="h-5 w-5 text-slate-400 group-hover:text-cyan-400 transition-colors" />
+                        <span className="text-xs text-slate-400 group-hover:text-white transition-colors">{comp.name}</span>
                       </button>
                     ))}
                   </div>
@@ -1262,17 +1363,17 @@ export default function VisualEditor() {
               </div>
             </TabsContent>
 
-            <TabsContent value="templates" className="flex-1 overflow-auto p-2 m-0">
+            <TabsContent value="templates" className="flex-1 overflow-auto p-3 m-0">
               <div className="space-y-2">
                 {SECTION_TEMPLATES.map((template) => (
                   <button
                     key={template.id}
                     onClick={() => addTemplate(template)}
-                    className="w-full p-3 rounded-lg border border-slate-200 hover:border-cyan-500 hover:bg-cyan-50 transition-colors text-left"
+                    className="w-full p-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:border-purple-500/50 hover:bg-purple-500/10 transition-all text-left group"
                   >
                     <div className="flex items-center gap-3">
                       <span className="text-xl">{template.preview}</span>
-                      <span className="text-sm font-medium text-slate-700">{template.name}</span>
+                      <span className="text-sm font-medium text-slate-400 group-hover:text-white transition-colors">{template.name}</span>
                     </div>
                   </button>
                 ))}
@@ -1282,218 +1383,274 @@ export default function VisualEditor() {
 
           {/* Component Tree */}
           {showComponentTree && activeScreen && activeScreen.components.length > 0 && (
-            <div className="border-t p-2 max-h-48 overflow-auto shrink-0">
-              <div className="flex items-center justify-between px-2 mb-2">
-                <h3 className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
-                  <Layers className="h-3 w-3" /> Tree
+            <div className="border-t border-slate-700/50 p-3 max-h-48 overflow-auto shrink-0">
+              <div className="flex items-center justify-between px-1 mb-2">
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                  <GripVertical className="h-3.5 w-3.5" /> Layer Tree
                 </h3>
               </div>
-              <div className="space-y-0.5">
-                {activeScreen.components.map((comp) => (
+              <div className="space-y-1">
+                {activeScreen.components.map((comp, index) => (
                   <button
                     key={comp.id}
                     onClick={() => setSelectedComponentId(comp.id)}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs ${
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all ${
                       selectedComponentId === comp.id 
-                        ? "bg-cyan-50 text-cyan-700 font-medium" 
-                        : "text-slate-600 hover:bg-slate-50"
+                        ? "bg-cyan-500/20 text-cyan-400 font-medium border border-cyan-500/30" 
+                        : "text-slate-400 hover:bg-slate-800/50 hover:text-white border border-transparent"
                     }`}
                   >
-                    <GripVertical className="h-3 w-3 text-slate-400" />
+                    <span className="text-slate-500 w-4">{index + 1}</span>
                     <span className="capitalize">{comp.type}</span>
                   </button>
                 ))}
               </div>
             </div>
           )}
-
-          {/* Screens List */}
-          <div className="border-t p-2 shrink-0">
-            <div className="flex items-center justify-between px-2 mb-2">
-              <h3 className="text-xs font-semibold text-slate-500 uppercase">Screens</h3>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={addScreen}>
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="space-y-1">
-              {screens.map((screen) => (
-                <button
-                  key={screen.id}
-                  onClick={() => { setActiveScreenId(screen.id); setSelectedComponentId(null); }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${
-                    activeScreenId === screen.id 
-                      ? "bg-cyan-50 text-cyan-700 font-medium" 
-                      : "text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  <span>{screen.icon}</span>
-                  <span>{screen.name}</span>
-                  {screen.isHome && <Badge className="ml-auto text-[10px] h-4" variant="secondary">Home</Badge>}
-                </button>
-              ))}
-            </div>
-          </div>
         </aside>
 
-        {/* Canvas Area */}
-        <main className="flex-1 overflow-auto p-8 flex items-start justify-center">
+        {/* Canvas Area - Premium Dark Design */}
+        <main className="flex-1 overflow-auto p-8 flex items-start justify-center bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800">
           {editorMode === "website" ? (
             /* Website Preview Mode - Shows actual website in mobile frame */
-            <div className="flex flex-col items-center gap-4">
-              {/* Mobile Device Frame */}
-              <div className="relative mx-auto border-gray-800 bg-gray-800 border-[14px] rounded-[2.5rem] h-[600px] w-[300px] shadow-xl">
-                <div className="w-[148px] h-[18px] bg-gray-800 top-0 rounded-b-[1rem] left-1/2 -translate-x-1/2 absolute z-10"></div>
-                <div className="h-[32px] w-[3px] bg-gray-800 absolute -left-[17px] top-[72px] rounded-l-lg"></div>
-                <div className="h-[46px] w-[3px] bg-gray-800 absolute -left-[17px] top-[124px] rounded-l-lg"></div>
-                <div className="h-[46px] w-[3px] bg-gray-800 absolute -left-[17px] top-[178px] rounded-l-lg"></div>
-                <div className="h-[64px] w-[3px] bg-gray-800 absolute -right-[17px] top-[142px] rounded-r-lg"></div>
+            <div className="flex flex-col items-center gap-6">
+              {/* Mobile Device Frame - Premium Design */}
+              <div className="relative">
+                {/* Glow effect */}
+                <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 blur-3xl rounded-full scale-150 opacity-30" />
                 
-                <div className="rounded-[2rem] overflow-hidden w-full h-full bg-white relative flex flex-col">
-                  {/* Status Bar */}
-                  <div className="h-7 bg-gray-900 flex items-center justify-between px-5 text-[10px] font-medium text-white select-none z-20 shrink-0">
-                    <span>9:41</span>
-                    <div className="flex gap-1 items-center">
-                      <span className="ml-1">100%</span>
-                    </div>
+                <div className="relative mx-auto border-gray-900 bg-gray-900 border-[12px] rounded-[3rem] h-[640px] w-[310px] shadow-2xl shadow-black/50">
+                  {/* Dynamic Island */}
+                  <div className="w-[120px] h-[28px] bg-black top-3 rounded-full left-1/2 -translate-x-1/2 absolute z-20 flex items-center justify-center gap-2">
+                    <div className="w-2 h-2 bg-slate-700 rounded-full" />
                   </div>
-
-                  {/* App Header Bar */}
-                  <div 
-                    className="h-11 flex items-center justify-between px-4 shadow-md z-10 shrink-0"
-                    style={{ backgroundColor: app?.primaryColor || "#2563EB" }}
-                  >
-                    <div className="text-white font-bold flex items-center gap-2 text-sm">
-                      <span className="text-base">{app?.icon || "📱"}</span>
-                      <span className="truncate max-w-[180px]">{app?.name || "My App"}</span>
-                    </div>
-                    <Menu className="w-5 h-5 text-white/80" />
-                  </div>
-
-                  {/* Website Content - Live iframe */}
-                  <div className="flex-1 bg-white relative overflow-hidden">
-                    {app?.url ? (
-                      <iframe
-                        src={app.url}
-                        className="w-full h-full border-0"
-                        title="Website Preview"
-                        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-full text-slate-400 p-4">
-                        <Globe className="h-10 w-10 mb-3 opacity-50" />
-                        <p className="text-sm text-center">No website URL configured</p>
-                        <p className="text-xs mt-1">Go to Settings to add your website URL</p>
-                      </div>
-                    )}
-                  </div>
+                  {/* Side buttons */}
+                  <div className="h-[32px] w-[3px] bg-gray-700 absolute -left-[15px] top-[100px] rounded-l-lg"></div>
+                  <div className="h-[46px] w-[3px] bg-gray-700 absolute -left-[15px] top-[150px] rounded-l-lg"></div>
+                  <div className="h-[46px] w-[3px] bg-gray-700 absolute -left-[15px] top-[210px] rounded-l-lg"></div>
+                  <div className="h-[64px] w-[3px] bg-gray-700 absolute -right-[15px] top-[170px] rounded-r-lg"></div>
                   
-                  {/* Bottom Navigation */}
-                  <div className="h-12 bg-white border-t border-gray-200 flex items-center justify-around px-4 shrink-0">
-                    <div className="flex flex-col items-center">
-                      <svg className="w-5 h-5" style={{ color: app?.primaryColor || "#2563EB" }} fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
-                      </svg>
+                  <div className="rounded-[2.5rem] overflow-hidden w-full h-full bg-white relative flex flex-col">
+                    {/* Status Bar */}
+                    <div className="h-12 bg-black/90 flex items-end justify-between px-6 pb-1 text-[11px] font-medium text-white select-none z-20 shrink-0">
+                      <span className="font-semibold">9:41</span>
+                      <div className="flex gap-1.5 items-center">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 20.5a8.5 8.5 0 100-17 8.5 8.5 0 000 17z" /></svg>
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M2 17h20v2H2zm2-4h16v2H4zm2-4h12v2H6zm2-4h8v2H8z" /></svg>
+                        <span className="ml-0.5 font-semibold">100%</span>
+                      </div>
                     </div>
-                    <div className="flex flex-col items-center">
-                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
+
+                    {/* App Header Bar */}
+                    <div 
+                      className="h-12 flex items-center justify-between px-4 shadow-lg z-10 shrink-0"
+                      style={{ backgroundColor: app?.primaryColor || "#2563EB" }}
+                    >
+                      <div className="text-white font-bold flex items-center gap-2 text-sm">
+                        <span className="text-lg">{app?.icon || "📱"}</span>
+                        <span className="truncate max-w-[180px]">{app?.name || "My App"}</span>
+                      </div>
+                      <Menu className="w-5 h-5 text-white/80" />
                     </div>
-                    <div className="flex flex-col items-center">
-                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
+
+                    {/* Website Content - Live iframe */}
+                    <div className="flex-1 bg-white relative overflow-hidden">
+                      {app?.url && app.url !== "native://app" ? (
+                        <iframe
+                          src={app.url}
+                          className="w-full h-full border-0"
+                          title="Website Preview"
+                          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-slate-400 p-6 bg-gradient-to-b from-slate-50 to-white">
+                          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-cyan-100 to-purple-100 flex items-center justify-center mb-4">
+                            <Globe className="h-10 w-10 text-cyan-500" />
+                          </div>
+                          <p className="text-sm text-center font-medium text-slate-600">No website URL configured</p>
+                          <p className="text-xs mt-2 text-slate-400 text-center">Add your website URL in Settings<br/>or switch to <strong>Screens</strong> mode</p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Bottom Navigation */}
+                    <div className="h-16 bg-white border-t border-gray-100 flex items-center justify-around px-6 shrink-0 pb-2">
+                      <div className="flex flex-col items-center gap-1">
+                        <svg className="w-6 h-6" style={{ color: app?.primaryColor || "#2563EB" }} fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                        </svg>
+                        <span className="text-[10px] font-medium" style={{ color: app?.primaryColor || "#2563EB" }}>Home</span>
+                      </div>
+                      <div className="flex flex-col items-center gap-1">
+                        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <span className="text-[10px] text-gray-400">Search</span>
+                      </div>
+                      <div className="flex flex-col items-center gap-1">
+                        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        <span className="text-[10px] text-gray-400">Profile</span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
               
               {/* App name label */}
-              <p className="text-sm text-slate-600 text-center font-medium">
+              <p className="text-sm text-slate-400 text-center font-medium">
                 {app?.name || "My App"}
               </p>
               
               {/* Quick Info */}
-              {app?.url && (
+              {app?.url && app.url !== "native://app" && (
                 <a 
                   href={app.url} 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="text-xs text-cyan-500 hover:text-cyan-400 flex items-center gap-1"
+                  className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1.5 bg-slate-800/50 px-3 py-1.5 rounded-full border border-slate-700/50"
                 >
                   <Globe className="h-3 w-3" />
-                  {app.url.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                  {app.url.replace(/^https?:\/\//, "").replace(/\/$/, "").substring(0, 30)}
                   <ExternalLink className="h-3 w-3" />
                 </a>
               )}
             </div>
           ) : (
-            /* Component Editor Mode - Drag and drop components */
-            <div 
-              className={`bg-white rounded-2xl shadow-xl overflow-hidden transition-all ${
-                deviceView === "mobile" ? "w-[375px]" : "w-full max-w-4xl"
-              }`}
-              style={{ minHeight: deviceView === "mobile" ? "667px" : "600px" }}
-            >
-              {/* Phone Header */}
-              {deviceView === "mobile" && (
+            /* Component Editor Mode - Premium Drag and Drop */
+            <div className="flex flex-col items-center gap-6">
+              {/* Glow effect */}
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-cyan-500/10 blur-3xl rounded-full opacity-20 pointer-events-none" />
+              
+              <div className="relative">
+                {/* Phone glow */}
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-cyan-500/20 blur-3xl rounded-full scale-125 opacity-40" />
+                
                 <div 
-                  className="h-12 flex items-center justify-between px-4"
-                  style={{ backgroundColor: app?.primaryColor || "#1f2937" }}
+                  className={`relative bg-white rounded-[2.5rem] shadow-2xl shadow-black/50 overflow-hidden transition-all border-[10px] border-slate-900 ${
+                    deviceView === "mobile" ? "w-[340px]" : "w-full max-w-4xl rounded-2xl"
+                  }`}
+                  style={{ minHeight: deviceView === "mobile" ? "700px" : "600px" }}
                 >
-                  <Menu className="h-5 w-5 text-white" />
-                  <span className="text-white font-medium text-sm">{activeScreen?.name}</span>
-                  <MoreHorizontal className="h-5 w-5 text-white" />
-                </div>
-              )}
-
-              {/* Content Area with Reorder */}
-              <div className="p-4">
-                {activeScreen && activeScreen.components.length > 0 ? (
-                  <Reorder.Group 
-                    axis="y" 
-                    values={activeScreen.components} 
-                    onReorder={handleReorder}
-                    className="space-y-4"
-                  >
-                    {activeScreen.components.map((component) => (
-                      <Reorder.Item 
-                        key={component.id} 
-                        value={component}
-                        className="cursor-grab active:cursor-grabbing"
+                  {/* Phone Header with Dynamic Island */}
+                  {deviceView === "mobile" && (
+                    <>
+                      {/* Status Bar */}
+                      <div className="h-12 bg-black/90 flex items-end justify-between px-6 pb-1 text-[11px] font-semibold text-white select-none z-20 shrink-0 relative">
+                        <span>9:41</span>
+                        {/* Dynamic Island */}
+                        <div className="absolute left-1/2 -translate-x-1/2 top-2 w-[100px] h-[26px] bg-black rounded-full flex items-center justify-center">
+                          <div className="w-2 h-2 bg-slate-700 rounded-full" />
+                        </div>
+                        <div className="flex gap-1.5 items-center">
+                          <span>100%</span>
+                        </div>
+                      </div>
+                      
+                      {/* App Header */}
+                      <div 
+                        className="h-12 flex items-center justify-between px-4 shadow-lg"
+                        style={{ backgroundColor: app?.primaryColor || "#2563EB" }}
                       >
-                        <ComponentPreview
-                          component={component}
-                          isSelected={selectedComponentId === component.id}
-                          onClick={() => setSelectedComponentId(component.id)}
-                        />
-                      </Reorder.Item>
-                    ))}
-                  </Reorder.Group>
-                ) : (
-                  <div className="py-20 text-center text-slate-400">
-                    <Layers className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p className="text-sm">Click a component to add it here</p>
-                    <p className="text-xs mt-1">Or use a template to get started</p>
-                  </div>
-                )}
+                        <Menu className="h-5 w-5 text-white/80" />
+                        <span className="text-white font-semibold text-sm">{activeScreen?.name}</span>
+                        <MoreHorizontal className="h-5 w-5 text-white/80" />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Content Area with Reorder */}
+                  <ScrollArea className="flex-1" style={{ height: deviceView === "mobile" ? "calc(700px - 140px)" : "540px" }}>
+                    <div className="p-4 min-h-full bg-gradient-to-b from-slate-50 to-white">
+                      {activeScreen && activeScreen.components.length > 0 ? (
+                        <Reorder.Group 
+                          axis="y" 
+                          values={activeScreen.components} 
+                          onReorder={handleReorder}
+                          className="space-y-4"
+                        >
+                          {activeScreen.components.map((component) => (
+                            <Reorder.Item 
+                              key={component.id} 
+                              value={component}
+                              className="cursor-grab active:cursor-grabbing"
+                            >
+                              <ComponentPreview
+                                component={component}
+                                isSelected={selectedComponentId === component.id}
+                                onClick={() => setSelectedComponentId(component.id)}
+                              />
+                            </Reorder.Item>
+                          ))}
+                        </Reorder.Group>
+                      ) : (
+                        <div className="py-16 text-center">
+                          <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-purple-100 to-cyan-100 flex items-center justify-center">
+                            <Sparkles className="h-10 w-10 text-purple-500" />
+                          </div>
+                          <p className="text-slate-600 font-medium">Ready to build!</p>
+                          <p className="text-sm text-slate-400 mt-2">Click components on the left to add them here</p>
+                          <p className="text-xs text-slate-400 mt-1">Drag to reorder • Click to edit</p>
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+
+                  {/* Bottom Navigation - Mobile Only */}
+                  {deviceView === "mobile" && (
+                    <div className="h-16 bg-white border-t border-gray-100 flex items-center justify-around px-6 shrink-0">
+                      {screens.slice(0, 4).map((screen, i) => (
+                        <button 
+                          key={screen.id}
+                          onClick={() => { setActiveScreenId(screen.id); setSelectedComponentId(null); }}
+                          className="flex flex-col items-center gap-1"
+                        >
+                          <span className="text-lg">{screen.icon}</span>
+                          <span 
+                            className={`text-[10px] font-medium ${screen.id === activeScreenId ? "" : "text-gray-400"}`}
+                            style={{ color: screen.id === activeScreenId ? app?.primaryColor || "#2563EB" : undefined }}
+                          >
+                            {screen.name.length > 8 ? screen.name.substring(0, 8) + "..." : screen.name}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Screen info */}
+              <div className="text-center">
+                <p className="text-sm text-slate-400 font-medium">
+                  {activeScreen?.name} • {activeScreen?.components.length || 0} components
+                </p>
               </div>
             </div>
           )}
         </main>
 
-        {/* Right Sidebar - Properties (only shown in components mode) */}
-        <aside className={`w-72 bg-white border-l flex flex-col overflow-hidden shrink-0 ${editorMode === "website" ? "hidden" : ""}`}>
-          <div className="p-3 border-b flex items-center gap-2 shrink-0">
-            <Sparkles className="h-4 w-4 text-cyan-500" />
-            <span className="text-sm font-semibold">Properties</span>
+        {/* Right Sidebar - Properties Panel */}
+        <aside className={`w-80 bg-slate-900/95 border-l border-slate-700/50 flex flex-col overflow-hidden shrink-0 ${editorMode === "website" ? "hidden" : ""}`}>
+          <div className="p-4 border-b border-slate-700/50 flex items-center gap-3 shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center">
+              <Sparkles className="h-4 w-4 text-white" />
+            </div>
+            <div>
+              <span className="text-sm font-semibold text-white">Properties</span>
+              <p className="text-xs text-slate-400">
+                {selectedComponent ? `Editing: ${selectedComponent.type}` : "Select an element"}
+              </p>
+            </div>
           </div>
-          <ScrollArea className="flex-1">
-            <PropertiesPanel
-              component={selectedComponent}
-              onUpdate={updateComponent}
-              onDelete={deleteComponent}
-            />
+          <ScrollArea className="flex-1 bg-slate-800/30">
+            <div className="p-4">
+              <PropertiesPanel
+                component={selectedComponent}
+                onUpdate={updateComponent}
+                onDelete={deleteComponent}
+              />
+            </div>
           </ScrollArea>
         </aside>
       </div>
