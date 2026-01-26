@@ -802,6 +802,9 @@ export default function VisualEditor() {
     if (app?.editorScreens && app.editorScreens.length > 0) {
       // Load existing screens from saved data
       setScreens(app.editorScreens);
+      // Set active screen to first screen or home screen
+      const homeScreen = app.editorScreens.find((s: EditorScreen) => s.isHome);
+      setActiveScreenId(homeScreen?.id || app.editorScreens[0].id);
     } else if (app?.industry) {
       // Has industry template - load the template
       const template = getTemplateById(app.industry);
@@ -817,13 +820,17 @@ export default function VisualEditor() {
           components: ts.components as EditorComponent[],
         }));
         setScreens(templateScreens);
+        // Set active to home screen
+        const homeScreen = templateScreens.find(s => s.isHome);
+        setActiveScreenId(homeScreen?.id || templateScreens[0].id);
         setHasChanges(true); // Mark as changed so user can save
       }
-    } else if (app && !app?.industry && screens.length === 1 && screens[0].components.length === 0) {
+    } else if (app && !app?.industry) {
       // App without industry (website-based) - create a default welcome screen
+      const homeId = generateId();
       const defaultScreens: EditorScreen[] = [
         {
-          id: generateId(),
+          id: homeId,
           name: "Home",
           icon: "🏠",
           isHome: true,
@@ -834,9 +841,10 @@ export default function VisualEditor() {
               props: {
                 title: app.name || "Welcome",
                 subtitle: "Your app is ready to customize",
-                image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800",
+                backgroundImage: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800",
                 buttonText: "Get Started",
-                buttonLink: "#"
+                buttonLink: "#",
+                height: 200
               }
             },
             {
@@ -864,6 +872,7 @@ export default function VisualEditor() {
         }
       ];
       setScreens(defaultScreens);
+      setActiveScreenId(homeId);
       setHasChanges(true);
     }
   }, [app]);
