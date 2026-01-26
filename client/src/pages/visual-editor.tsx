@@ -797,13 +797,13 @@ export default function VisualEditor() {
     enabled: !!id,
   });
 
-  // Load saved screens from app OR initialize from industry template
+  // Load saved screens from app OR initialize from industry template OR create default
   useEffect(() => {
     if (app?.editorScreens && app.editorScreens.length > 0) {
       // Load existing screens from saved data
       setScreens(app.editorScreens);
-    } else if (app?.industry && !app?.editorScreens?.length) {
-      // No saved screens but has industry template - load the template
+    } else if (app?.industry) {
+      // Has industry template - load the template
       const template = getTemplateById(app.industry);
       if (template) {
         // Clone template to get fresh IDs
@@ -819,6 +819,52 @@ export default function VisualEditor() {
         setScreens(templateScreens);
         setHasChanges(true); // Mark as changed so user can save
       }
+    } else if (app && !app?.industry && screens.length === 1 && screens[0].components.length === 0) {
+      // App without industry (website-based) - create a default welcome screen
+      const defaultScreens: EditorScreen[] = [
+        {
+          id: generateId(),
+          name: "Home",
+          icon: "🏠",
+          isHome: true,
+          components: [
+            {
+              id: generateId(),
+              type: "hero",
+              props: {
+                title: app.name || "Welcome",
+                subtitle: "Your app is ready to customize",
+                image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800",
+                buttonText: "Get Started",
+                buttonLink: "#"
+              }
+            },
+            {
+              id: generateId(),
+              type: "text",
+              props: {
+                content: "Start customizing your app by adding components from the left panel. Drag and drop to rearrange, and click to edit properties."
+              }
+            }
+          ]
+        },
+        {
+          id: generateId(),
+          name: "About",
+          icon: "ℹ️",
+          isHome: false,
+          components: []
+        },
+        {
+          id: generateId(),
+          name: "Contact",
+          icon: "📞",
+          isHome: false,
+          components: []
+        }
+      ];
+      setScreens(defaultScreens);
+      setHasChanges(true);
     }
   }, [app]);
 
@@ -1001,25 +1047,27 @@ export default function VisualEditor() {
             </Button>
           </div>
 
-          {/* Editor Mode Toggle - Website vs Components */}
+          {/* Editor Mode Toggle - Website vs Screens */}
           <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg ml-2">
             <Button
-              variant={editorMode === "website" ? "default" : "ghost"}
               size="sm"
               onClick={() => setEditorMode("website")}
-              className={`h-8 ${editorMode === "website" ? "bg-cyan-500 hover:bg-cyan-600" : ""}`}
+              className={`h-8 px-3 font-medium ${editorMode === "website" 
+                ? "bg-cyan-500 hover:bg-cyan-600 text-white" 
+                : "bg-transparent hover:bg-slate-200 text-slate-600"}`}
             >
-              <Globe className="h-4 w-4 mr-1" />
-              <span className="text-xs">Website</span>
+              <Globe className="h-4 w-4 mr-1.5" />
+              Website
             </Button>
             <Button
-              variant={editorMode === "components" ? "default" : "ghost"}
               size="sm"
               onClick={() => setEditorMode("components")}
-              className={`h-8 ${editorMode === "components" ? "bg-purple-500 hover:bg-purple-600" : ""}`}
+              className={`h-8 px-3 font-medium ${editorMode === "components" 
+                ? "bg-purple-500 hover:bg-purple-600 text-white" 
+                : "bg-transparent hover:bg-slate-200 text-slate-600"}`}
             >
-              <Layout className="h-4 w-4 mr-1" />
-              <span className="text-xs">Screens</span>
+              <Layout className="h-4 w-4 mr-1.5" />
+              Screens
             </Button>
           </div>
         </div>

@@ -98,7 +98,7 @@ export function Navbar() {
                   Sign in
                 </Button>
               </Link>
-              <Link href="/create">
+              <Link href="/prompt-create">
                 <Button
                   className="bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold px-6 h-10 rounded-lg shadow-lg glow-primary ml-2"
                 >

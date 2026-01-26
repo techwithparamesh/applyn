@@ -519,7 +519,7 @@ export default function Dashboard() {
               </p>
             </div>
             {!isSupport && (
-              <Link href="/create">
+              <Link href="/prompt-create">
                 <Button className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold shadow-lg glow-primary">
                   <Plus className="h-4 w-4" /> Create New App
                 </Button>
@@ -775,7 +775,7 @@ export default function Dashboard() {
               ) : (
                 /* Regular user actions */
                 <>
-                  <Link href="/create">
+                  <Link href="/prompt-create">
                     <Card className="glass glass-hover cursor-pointer group">
                       <CardContent className="p-5 flex items-center gap-4">
                         <div className="h-10 w-10 rounded-xl bg-cyan-500/10 flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
@@ -783,7 +783,7 @@ export default function Dashboard() {
                         </div>
                         <div>
                           <p className="font-medium text-white">New App</p>
-                          <p className="text-xs text-muted-foreground">Convert website</p>
+                          <p className="text-xs text-muted-foreground">Create or convert</p>
                         </div>
                       </CardContent>
                     </Card>
@@ -1227,7 +1227,7 @@ export default function Dashboard() {
                       Transform your website into a native mobile app in minutes. No coding required.
                     </p>
                     <div className="mt-6">
-                      <Link href="/create">
+                      <Link href="/prompt-create">
                         <Button className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold">
                           <Plus className="h-4 w-4" /> Create Your First App
                         </Button>

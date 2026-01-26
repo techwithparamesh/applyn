@@ -217,7 +217,7 @@ export default function Billing() {
                 <p className="text-muted-foreground mb-6">
                   You haven't made any payments. Create your first app to get started!
                 </p>
-                <Link href="/create">
+                <Link href="/prompt-create">
                   <Button className="bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white">
                     <Sparkles className="mr-2 h-4 w-4" />
                     Create Your First App
