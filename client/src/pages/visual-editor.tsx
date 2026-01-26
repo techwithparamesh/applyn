@@ -800,12 +800,21 @@ export default function VisualEditor() {
   // Load saved screens from app OR initialize from industry template OR create default
   useEffect(() => {
     if (app?.editorScreens && app.editorScreens.length > 0) {
-      // Load existing screens from saved data
-      setScreens(app.editorScreens);
-      // Set active screen to first screen or home screen
-      const homeScreen = app.editorScreens.find((s: EditorScreen) => s.isHome);
-      setActiveScreenId(homeScreen?.id || app.editorScreens[0].id);
-    } else if (app?.industry) {
+      // Check if saved screens have actual content (components)
+      const hasContent = app.editorScreens.some((s: EditorScreen) => s.components && s.components.length > 0);
+      
+      if (hasContent) {
+        // Load existing screens from saved data
+        setScreens(app.editorScreens);
+        // Set active screen to first screen or home screen
+        const homeScreen = app.editorScreens.find((s: EditorScreen) => s.isHome);
+        setActiveScreenId(homeScreen?.id || app.editorScreens[0].id);
+        return; // Don't generate defaults
+      }
+      // If no content, fall through to generate defaults
+    }
+    
+    if (app?.industry) {
       // Has industry template - load the template
       const template = getTemplateById(app.industry);
       if (template) {
@@ -825,7 +834,7 @@ export default function VisualEditor() {
         setActiveScreenId(homeScreen?.id || templateScreens[0].id);
         setHasChanges(true); // Mark as changed so user can save
       }
-    } else if (app && !app?.industry) {
+    } else if (app) {
       // App without industry (website-based) - create a default welcome screen
       const homeId = generateId();
       const defaultScreens: EditorScreen[] = [
@@ -851,7 +860,9 @@ export default function VisualEditor() {
               id: generateId(),
               type: "text",
               props: {
-                content: "Start customizing your app by adding components from the left panel. Drag and drop to rearrange, and click to edit properties."
+                text: "Start customizing your app by adding components from the left panel. Drag and drop to rearrange, and click to edit properties.",
+                fontSize: 14,
+                color: "#6B7280"
               }
             }
           ]
@@ -861,14 +872,80 @@ export default function VisualEditor() {
           name: "About",
           icon: "ℹ️",
           isHome: false,
-          components: []
+          components: [
+            {
+              id: generateId(),
+              type: "heading",
+              props: {
+                text: "About Us",
+                level: 1,
+                color: "#1F2937"
+              }
+            },
+            {
+              id: generateId(),
+              type: "text",
+              props: {
+                text: "Welcome to our app! We're dedicated to providing you with the best experience. Edit this section to tell your story.",
+                fontSize: 14,
+                color: "#6B7280"
+              }
+            },
+            {
+              id: generateId(),
+              type: "image",
+              props: {
+                src: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800",
+                alt: "Our Team"
+              }
+            }
+          ]
         },
         {
           id: generateId(),
           name: "Contact",
           icon: "📞",
           isHome: false,
-          components: []
+          components: [
+            {
+              id: generateId(),
+              type: "heading",
+              props: {
+                text: "Contact Us",
+                level: 1,
+                color: "#1F2937"
+              }
+            },
+            {
+              id: generateId(),
+              type: "text",
+              props: {
+                text: "We'd love to hear from you! Reach out using the information below.",
+                fontSize: 14,
+                color: "#6B7280"
+              }
+            },
+            {
+              id: generateId(),
+              type: "button",
+              props: {
+                text: "📧 Email Us",
+                url: "mailto:contact@example.com",
+                backgroundColor: "#2563EB",
+                textColor: "#FFFFFF"
+              }
+            },
+            {
+              id: generateId(),
+              type: "button",
+              props: {
+                text: "📞 Call Us",
+                url: "tel:+1234567890",
+                backgroundColor: "#059669",
+                textColor: "#FFFFFF"
+              }
+            }
+          ]
         }
       ];
       setScreens(defaultScreens);
@@ -877,8 +954,20 @@ export default function VisualEditor() {
     }
   }, [app]);
 
-  // Get active screen
-  const activeScreen = screens.find(s => s.id === activeScreenId);
+  // Ensure activeScreenId always points to a valid screen
+  useEffect(() => {
+    if (screens.length > 0) {
+      const screenExists = screens.some(s => s.id === activeScreenId);
+      if (!screenExists) {
+        // Find home screen or use first screen
+        const homeScreen = screens.find(s => s.isHome);
+        setActiveScreenId(homeScreen?.id || screens[0].id);
+      }
+    }
+  }, [screens, activeScreenId]);
+
+  // Get active screen - use memoized lookup
+  const activeScreen = screens.find(s => s.id === activeScreenId) || screens[0];
   
   // Find component by ID recursively
   const findComponent = (components: EditorComponent[], targetId: string): EditorComponent | null => {
