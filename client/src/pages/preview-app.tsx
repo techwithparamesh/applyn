@@ -275,6 +275,9 @@ export default function PreviewApp() {
               appName={app.name}
               primaryColor={app.primaryColor}
               icon={app.iconUrl || app.icon}
+              screens={app.editorScreens}
+              industry={app.industry}
+              isNativeOnly={app.isNativeOnly || app.url?.startsWith("native://")}
               availablePlatforms={getAvailablePlatforms()}
               defaultPlatform={app.platform === "ios" ? "ios" : "android"}
               showToggle={true}

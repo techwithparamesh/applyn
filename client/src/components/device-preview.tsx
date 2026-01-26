@@ -41,11 +41,33 @@ import {
 // Types for the component
 type DevicePlatform = "android" | "ios";
 
+// Screen/component types for native apps
+interface NativeScreen {
+  id: string;
+  name: string;
+  icon: string;
+  isHome?: boolean;
+  components: NativeComponent[];
+}
+
+interface NativeComponent {
+  id: string;
+  type: string;
+  props: Record<string, any>;
+  children?: NativeComponent[];
+}
+
 interface DevicePreviewProps {
   url?: string;
   appName?: string;
   primaryColor?: string;
   icon?: string;
+  /** Native app screens for preview */
+  screens?: NativeScreen[];
+  /** Industry type for generating demo content */
+  industry?: string;
+  /** Whether app is native only (no website) */
+  isNativeOnly?: boolean;
   /** Platforms available based on user's plan */
   availablePlatforms?: DevicePlatform[];
   /** Initial selected platform */
@@ -70,6 +92,9 @@ export function DevicePreview({
   appName = "My App",
   primaryColor = "", // Empty = no custom color, show neutral
   icon = "📱",
+  screens,
+  industry,
+  isNativeOnly = false,
   availablePlatforms = ["android", "ios"],
   defaultPlatform = "ios",
   onPlatformChange,
@@ -79,6 +104,10 @@ export function DevicePreview({
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [activeScreenIndex, setActiveScreenIndex] = useState(0);
+
+  // Determine if this is a native-only app (no website)
+  const isNativeApp = isNativeOnly || url?.startsWith("native://") || !url || url === "https://example.com";
 
   // Check if a platform is available based on user's plan
   const isPlatformAvailable = (platform: DevicePlatform) => {
@@ -205,6 +234,11 @@ export function DevicePreview({
               onImageLoad={() => setImageLoaded(true)}
               onImageError={() => setImageError(true)}
               onRetry={handleRetry}
+              isNativeApp={isNativeApp}
+              screens={screens}
+              industry={industry}
+              activeScreenIndex={activeScreenIndex}
+              onScreenChange={setActiveScreenIndex}
             />
           ) : (
             <AndroidDeviceFrame
@@ -219,6 +253,11 @@ export function DevicePreview({
               onImageLoad={() => setImageLoaded(true)}
               onImageError={() => setImageError(true)}
               onRetry={handleRetry}
+              isNativeApp={isNativeApp}
+              screens={screens}
+              industry={industry}
+              activeScreenIndex={activeScreenIndex}
+              onScreenChange={setActiveScreenIndex}
             />
           )}
         </motion.div>
@@ -287,6 +326,12 @@ interface DeviceFrameProps {
   onImageLoad: () => void;
   onImageError: () => void;
   onRetry: () => void;
+  // Native app props
+  isNativeApp?: boolean;
+  screens?: NativeScreen[];
+  industry?: string;
+  activeScreenIndex?: number;
+  onScreenChange?: (index: number) => void;
 }
 
 function IOSDeviceFrame({
@@ -301,6 +346,11 @@ function IOSDeviceFrame({
   onImageLoad,
   onImageError,
   onRetry,
+  isNativeApp,
+  screens,
+  industry,
+  activeScreenIndex,
+  onScreenChange,
 }: DeviceFrameProps) {
   const phoneScreenWidth = 272;
 
@@ -357,7 +407,7 @@ function IOSDeviceFrame({
           <Menu className="w-5 h-5 text-white/80" />
         </motion.div>
 
-        {/* Website Screenshot Content */}
+        {/* Content Area */}
         <div className="flex-1 bg-white relative overflow-hidden">
           <PreviewContent
             imageLoaded={imageLoaded}
@@ -369,21 +419,30 @@ function IOSDeviceFrame({
             onImageError={onImageError}
             onRetry={onRetry}
             url={url}
+            isNativeApp={isNativeApp}
+            appName={appName}
+            primaryColor={primaryColor}
+            screens={screens}
+            industry={industry}
+            activeScreenIndex={activeScreenIndex}
+            onScreenChange={onScreenChange}
           />
         </div>
 
-        {/* iOS Bottom Navigation */}
-        <div className="h-12 bg-white border-t border-gray-200 flex items-center justify-around px-4 shrink-0">
-          <div className="flex flex-col items-center">
-            <Home className="w-5 h-5" style={{ color: primaryColor || '#6B7280' }} />
+        {/* iOS Bottom Navigation - hide for native apps (they have their own) */}
+        {!isNativeApp && (
+          <div className="h-12 bg-white border-t border-gray-200 flex items-center justify-around px-4 shrink-0">
+            <div className="flex flex-col items-center">
+              <Home className="w-5 h-5" style={{ color: primaryColor || '#6B7280' }} />
+            </div>
+            <div className="flex flex-col items-center">
+              <Search className="w-5 h-5 text-gray-400" />
+            </div>
+            <div className="flex flex-col items-center">
+              <User className="w-5 h-5 text-gray-400" />
+            </div>
           </div>
-          <div className="flex flex-col items-center">
-            <Search className="w-5 h-5 text-gray-400" />
-          </div>
-          <div className="flex flex-col items-center">
-            <User className="w-5 h-5 text-gray-400" />
-          </div>
-        </div>
+        )}
 
         {/* iOS Home Indicator */}
         <div className="h-5 bg-white flex items-center justify-center shrink-0">
@@ -410,6 +469,11 @@ function AndroidDeviceFrame({
   onImageLoad,
   onImageError,
   onRetry,
+  isNativeApp,
+  screens,
+  industry,
+  activeScreenIndex,
+  onScreenChange,
 }: DeviceFrameProps) {
   const phoneScreenWidth = 272;
 
@@ -471,7 +535,7 @@ function AndroidDeviceFrame({
           </div>
         </motion.div>
 
-        {/* Website Screenshot Content */}
+        {/* Content Area */}
         <div className="flex-1 bg-white relative overflow-hidden">
           <PreviewContent
             imageLoaded={imageLoaded}
@@ -483,6 +547,13 @@ function AndroidDeviceFrame({
             onImageError={onImageError}
             onRetry={onRetry}
             url={url}
+            isNativeApp={isNativeApp}
+            appName={appName}
+            primaryColor={primaryColor}
+            screens={screens}
+            industry={industry}
+            activeScreenIndex={activeScreenIndex}
+            onScreenChange={onScreenChange}
           />
         </div>
 
@@ -509,6 +580,204 @@ function AndroidDeviceFrame({
 }
 
 // ============================================
+// Native App Content Component (for apps without website)
+// ============================================
+
+interface NativeAppContentProps {
+  appName: string;
+  primaryColor: string;
+  screens?: NativeScreen[];
+  industry?: string;
+  activeScreenIndex: number;
+  onScreenChange: (index: number) => void;
+}
+
+function NativeAppContent({
+  appName,
+  primaryColor,
+  screens,
+  industry,
+  activeScreenIndex,
+  onScreenChange,
+}: NativeAppContentProps) {
+  const themeColor = primaryColor || "#2563EB";
+  
+  // Generate demo content based on app name and industry
+  const getDemoContent = () => {
+    const name = appName.toLowerCase();
+    
+    // Detect app type from name
+    if (name.includes("farm") || name.includes("food") || name.includes("fresh") || name.includes("organic") || industry === "ecommerce") {
+      return {
+        hero: {
+          image: "https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=800&q=80",
+          title: appName,
+          subtitle: "Fresh from local farms, delivered to your door",
+          buttonText: "Shop Now"
+        },
+        products: [
+          { image: "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=300&q=80", name: "Organic Vegetables", price: "$12.99", desc: "Farm fresh daily" },
+          { image: "https://images.unsplash.com/photo-1518569656558-1f25e69d93d7?w=300&q=80", name: "Free-Range Eggs", price: "$6.99", desc: "From happy hens" },
+          { image: "https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=300&q=80", name: "Artisan Cheese", price: "$15.99", desc: "Locally crafted" },
+        ]
+      };
+    }
+    
+    if (name.includes("salon") || name.includes("beauty") || name.includes("spa") || industry === "salon") {
+      return {
+        hero: {
+          image: "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800&q=80",
+          title: appName,
+          subtitle: "Your beauty, our passion",
+          buttonText: "Book Now"
+        },
+        products: [
+          { image: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=300&q=80", name: "Hair Styling", price: "$45", desc: "Expert stylists" },
+          { image: "https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=300&q=80", name: "Spa Treatment", price: "$89", desc: "Relax & rejuvenate" },
+          { image: "https://images.unsplash.com/photo-1519014816548-bf5fe059798b?w=300&q=80", name: "Manicure", price: "$35", desc: "Nail perfection" },
+        ]
+      };
+    }
+    
+    if (name.includes("restaurant") || name.includes("food") || name.includes("cafe") || name.includes("kitchen") || industry === "restaurant") {
+      return {
+        hero: {
+          image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&q=80",
+          title: appName,
+          subtitle: "Delicious food, delivered fast",
+          buttonText: "Order Now"
+        },
+        products: [
+          { image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300&q=80", name: "Gourmet Burger", price: "$14.99", desc: "100% Angus beef" },
+          { image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=300&q=80", name: "Wood-Fired Pizza", price: "$18.99", desc: "Italian style" },
+          { image: "https://images.unsplash.com/photo-1551024601-bec78aea704b?w=300&q=80", name: "Sweet Desserts", price: "$8.99", desc: "House special" },
+        ]
+      };
+    }
+    
+    if (name.includes("fitness") || name.includes("gym") || name.includes("health") || industry === "fitness") {
+      return {
+        hero: {
+          image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80",
+          title: appName,
+          subtitle: "Transform your body, transform your life",
+          buttonText: "Start Free Trial"
+        },
+        products: [
+          { image: "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=300&q=80", name: "Personal Training", price: "$59/session", desc: "1-on-1 coaching" },
+          { image: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=300&q=80", name: "Group Classes", price: "$29/month", desc: "Yoga, HIIT & more" },
+          { image: "https://images.unsplash.com/photo-1576678927484-cc907957088c?w=300&q=80", name: "Gym Access", price: "$49/month", desc: "24/7 access" },
+        ]
+      };
+    }
+    
+    // Default business content
+    return {
+      hero: {
+        image: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=80",
+        title: appName,
+        subtitle: "Welcome to our app",
+        buttonText: "Get Started"
+      },
+      products: [
+        { image: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=300&q=80", name: "Premium Service", price: "Contact Us", desc: "Best quality" },
+        { image: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=300&q=80", name: "Consultation", price: "Free", desc: "Expert advice" },
+        { image: "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=300&q=80", name: "Support", price: "24/7", desc: "Always here" },
+      ]
+    };
+  };
+  
+  const content = getDemoContent();
+  
+  return (
+    <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto">
+        {/* Hero Section */}
+        <div className="relative h-48 overflow-hidden">
+          <img 
+            src={content.hero.image} 
+            alt={content.hero.title}
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
+            <h1 className="text-xl font-bold mb-1">{content.hero.title}</h1>
+            <p className="text-xs text-white/80 mb-3">{content.hero.subtitle}</p>
+            <button 
+              className="px-4 py-2 rounded-full text-xs font-semibold text-white"
+              style={{ backgroundColor: themeColor }}
+            >
+              {content.hero.buttonText}
+            </button>
+          </div>
+        </div>
+        
+        {/* Products/Services Section */}
+        <div className="p-4">
+          <h2 className="text-sm font-semibold text-gray-800 mb-3">Featured</h2>
+          <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4">
+            {content.products.map((product, i) => (
+              <div key={i} className="flex-shrink-0 w-32 bg-white rounded-xl shadow-sm overflow-hidden">
+                <img 
+                  src={product.image} 
+                  alt={product.name}
+                  className="w-full h-20 object-cover"
+                />
+                <div className="p-2">
+                  <p className="text-xs font-medium text-gray-800 truncate">{product.name}</p>
+                  <p className="text-[10px] text-gray-500 truncate">{product.desc}</p>
+                  <p className="text-xs font-bold mt-1" style={{ color: themeColor }}>{product.price}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Quick Actions */}
+        <div className="px-4 pb-4">
+          <div className="grid grid-cols-4 gap-2">
+            {["🏠 Home", "🔍 Search", "❤️ Saved", "👤 Profile"].map((item, i) => (
+              <div key={i} className="flex flex-col items-center p-2 bg-white rounded-lg">
+                <span className="text-lg">{item.split(" ")[0]}</span>
+                <span className="text-[9px] text-gray-500 mt-1">{item.split(" ")[1]}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* More Content Placeholder */}
+        <div className="px-4 pb-6">
+          <h2 className="text-sm font-semibold text-gray-800 mb-3">Popular Now</h2>
+          <div className="space-y-2">
+            {content.products.slice(0, 2).map((product, i) => (
+              <div key={i} className="flex items-center gap-3 p-2 bg-white rounded-lg shadow-sm">
+                <img 
+                  src={product.image} 
+                  alt={product.name}
+                  className="w-14 h-14 rounded-lg object-cover"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-800">{product.name}</p>
+                  <p className="text-[10px] text-gray-500">{product.desc}</p>
+                  <p className="text-xs font-bold mt-0.5" style={{ color: themeColor }}>{product.price}</p>
+                </div>
+                <button 
+                  className="px-3 py-1.5 rounded-full text-[10px] font-medium text-white"
+                  style={{ backgroundColor: themeColor }}
+                >
+                  Add
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
 // Shared Preview Content Component
 // ============================================
 
@@ -522,6 +791,14 @@ interface PreviewContentProps {
   onImageError: () => void;
   onRetry: () => void;
   url?: string;
+  // Native app props
+  isNativeApp?: boolean;
+  appName?: string;
+  primaryColor?: string;
+  screens?: NativeScreen[];
+  industry?: string;
+  activeScreenIndex?: number;
+  onScreenChange?: (index: number) => void;
 }
 
 function PreviewContent({
@@ -534,9 +811,30 @@ function PreviewContent({
   onImageError,
   onRetry,
   url,
+  isNativeApp = false,
+  appName = "My App",
+  primaryColor = "#2563EB",
+  screens,
+  industry,
+  activeScreenIndex = 0,
+  onScreenChange,
 }: PreviewContentProps) {
   const [useIframe, setUseIframe] = useState(false);
   const [iframeLoaded, setIframeLoaded] = useState(false);
+  
+  // For native apps, show native content
+  if (isNativeApp) {
+    return (
+      <NativeAppContent
+        appName={appName}
+        primaryColor={primaryColor}
+        screens={screens}
+        industry={industry}
+        activeScreenIndex={activeScreenIndex}
+        onScreenChange={onScreenChange || (() => {})}
+      />
+    );
+  }
   
   // Check if URL is valid (not just "https://" or empty)
   const isValidUrl = domain && domain.length > 3 && domain.includes(".");
