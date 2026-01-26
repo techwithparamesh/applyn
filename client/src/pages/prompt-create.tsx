@@ -35,6 +35,7 @@ import {
   Rocket,
   Layout,
   Smartphone,
+  Wand2,
 } from "lucide-react";
 
 // Industry templates with pre-defined features
@@ -652,11 +653,11 @@ export default function PromptCreate() {
                           <div className="w-full border-t border-white/10"></div>
                         </div>
                         <div className="relative flex justify-center text-xs uppercase">
-                          <span className="bg-gray-900 px-3 text-muted-foreground">Optional</span>
+                          <span className="bg-gray-900 px-3 text-muted-foreground">Optional Enhancements</span>
                         </div>
                       </div>
 
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <label className="text-sm font-medium text-white flex items-center gap-2">
                           <Sparkles className="h-4 w-4 text-purple-400" />
                           Additional Features
@@ -664,9 +665,34 @@ export default function PromptCreate() {
                         <Textarea
                           value={customPrompt}
                           onChange={(e) => setCustomPrompt(e.target.value)}
-                          placeholder="Add any specific features: push notifications, user accounts, booking system..."
+                          placeholder={selectedTemplate?.prompt || "Add any specific features: push notifications, user accounts, booking system..."}
                           className="min-h-[80px] bg-white/5 border-white/10 text-white placeholder:text-muted-foreground resize-none"
                         />
+                        
+                        {/* AI Pre-fill Suggestions for website mode */}
+                        {selectedTemplate && selectedTemplate.id !== 'custom' && !customPrompt && (
+                          <div className="p-3 bg-gradient-to-r from-purple-500/10 to-cyan-500/10 rounded-lg border border-purple-500/20">
+                            <div className="flex items-start gap-2">
+                              <Wand2 className="h-4 w-4 text-purple-400 mt-0.5 shrink-0" />
+                              <div className="space-y-2 flex-1">
+                                <p className="text-xs text-purple-300 font-medium">✨ Suggested features for {selectedTemplate.name}</p>
+                                <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+                                  {selectedTemplate.prompt}
+                                </p>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setCustomPrompt(selectedTemplate.prompt)}
+                                  className="h-7 text-xs border-purple-500/30 text-purple-400 hover:bg-purple-500/10 hover:text-purple-300"
+                                >
+                                  <Sparkles className="h-3 w-3 mr-1" />
+                                  Add These Features
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </>
                   )}
@@ -707,7 +733,7 @@ export default function PromptCreate() {
                         </div>
                       </div>
 
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <label className="text-sm font-medium text-white flex items-center gap-2">
                           <Sparkles className="h-4 w-4 text-cyan-400" />
                           What does your app do?
@@ -715,11 +741,37 @@ export default function PromptCreate() {
                         <Textarea
                           value={customPrompt}
                           onChange={(e) => setCustomPrompt(e.target.value)}
-                          placeholder="Describe your app: A fitness app with workout tracking, meal plans, progress photos..."
+                          placeholder={selectedTemplate?.prompt || "Describe your app: A fitness app with workout tracking, meal plans, progress photos..."}
                           className="min-h-[100px] bg-white/5 border-white/10 text-white placeholder:text-muted-foreground resize-none"
                         />
+                        
+                        {/* AI Pre-fill Suggestions based on selected template */}
+                        {selectedTemplate && selectedTemplate.id !== 'custom' && !customPrompt && (
+                          <div className="p-3 bg-gradient-to-r from-cyan-500/10 to-purple-500/10 rounded-lg border border-cyan-500/20">
+                            <div className="flex items-start gap-2">
+                              <Wand2 className="h-4 w-4 text-cyan-400 mt-0.5 shrink-0" />
+                              <div className="space-y-2 flex-1">
+                                <p className="text-xs text-cyan-300 font-medium">✨ AI Suggestion for {selectedTemplate.name}</p>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                  {selectedTemplate.prompt}
+                                </p>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setCustomPrompt(selectedTemplate.prompt)}
+                                  className="h-7 text-xs border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300"
+                                >
+                                  <Sparkles className="h-3 w-3 mr-1" />
+                                  Use This Prompt
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
                         <p className="text-xs text-muted-foreground">
-                          Help us understand what screens and features your app needs
+                          Help us understand what screens and features your app needs. {selectedTemplate?.id !== 'custom' && 'Or use the AI suggestion above!'}
                         </p>
                       </div>
 

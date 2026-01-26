@@ -823,15 +823,81 @@ export default function VisualEditor() {
     }
   }, [app]);
 
+  // Helper function to personalize template content with app name
+  const personalizeTemplateContent = useCallback((template: IndustryTemplate, appName: string): EditorScreen[] => {
+    const clonedTemplate = cloneTemplate(template);
+    
+    // Replace placeholder text with app name and personalized content
+    const personalizeComponent = (comp: any): any => {
+      const newComp = { ...comp };
+      
+      // Personalize hero sections
+      if (comp.type === 'hero' && comp.props) {
+        if (comp.props.title?.includes('Fresh Products') || comp.props.title?.includes('Welcome')) {
+          newComp.props = { ...comp.props, title: appName };
+        }
+        if (comp.props.subtitle) {
+          // Keep original subtitle or make it more personalized
+          const subtitles: Record<string, string> = {
+            'ecommerce': 'Shop the best products online',
+            'salon': 'Book your perfect appointment',
+            'restaurant': 'Delicious food, delivered fresh',
+            'church': 'Join our community of faith',
+            'fitness': 'Transform your body and mind',
+            'education': 'Learn something new today',
+            'healthcare': 'Your health, our priority',
+            'realestate': 'Find your dream home',
+            'photography': 'Capturing moments that matter',
+            'music': 'Feel the rhythm',
+            'business': 'Professional services for you',
+            'news': 'Stay informed, stay ahead',
+            'radio': 'Tune in to great music',
+          };
+          newComp.props.subtitle = subtitles[template.id] || comp.props.subtitle;
+        }
+      }
+      
+      // Personalize headings that say "About Us" or company-related
+      if (comp.type === 'heading' && comp.props?.text) {
+        if (comp.props.text === 'About Us') {
+          newComp.props = { ...comp.props, text: `About ${appName}` };
+        }
+        if (comp.props.text === 'Contact Us') {
+          newComp.props = { ...comp.props, text: `Contact ${appName}` };
+        }
+      }
+      
+      // Recursively personalize children
+      if (comp.children) {
+        newComp.children = comp.children.map(personalizeComponent);
+      }
+      
+      return newComp;
+    };
+    
+    return clonedTemplate.screens.map((ts: TemplateScreen) => ({
+      id: ts.id,
+      name: ts.name,
+      icon: ts.icon,
+      isHome: ts.isHome,
+      components: ts.components.map(personalizeComponent) as EditorComponent[],
+    }));
+  }, []);
+
   // Load saved screens from app OR initialize from industry template OR create default
   useEffect(() => {
     if (!app || templatesLoaded) return;
     
+    console.log('[Visual Editor] Loading screens for app:', app.name, 'Industry:', app.industry);
+    
     // Check for existing saved screens with actual content
-    if (app.editorScreens && app.editorScreens.length > 0) {
-      const hasContent = app.editorScreens.some((s: EditorScreen) => s.components && s.components.length > 0);
+    if (app.editorScreens && Array.isArray(app.editorScreens) && app.editorScreens.length > 0) {
+      const hasContent = app.editorScreens.some((s: EditorScreen) => 
+        s.components && Array.isArray(s.components) && s.components.length > 0
+      );
       
       if (hasContent) {
+        console.log('[Visual Editor] Loading saved screens:', app.editorScreens.length);
         setScreens(app.editorScreens);
         const homeScreen = app.editorScreens.find((s: EditorScreen) => s.isHome);
         setActiveScreenId(homeScreen?.id || app.editorScreens[0].id);
@@ -841,31 +907,34 @@ export default function VisualEditor() {
     }
     
     // Load industry template if available
-    if (app.industry) {
+    if (app.industry && app.industry !== 'custom') {
+      console.log('[Visual Editor] Looking for template:', app.industry);
       const template = getTemplateById(app.industry);
+      
       if (template) {
-        const clonedTemplate = cloneTemplate(template);
-        const templateScreens: EditorScreen[] = clonedTemplate.screens.map((ts: TemplateScreen) => ({
-          id: ts.id,
-          name: ts.name,
-          icon: ts.icon,
-          isHome: ts.isHome,
-          components: ts.components as EditorComponent[],
-        }));
+        console.log('[Visual Editor] Found template:', template.name, 'with', template.screens.length, 'screens');
+        
+        // Personalize template with app name
+        const templateScreens = personalizeTemplateContent(template, app.name || 'My App');
+        
         setScreens(templateScreens);
         const homeScreen = templateScreens.find(s => s.isHome);
         setActiveScreenId(homeScreen?.id || templateScreens[0].id);
         setHasChanges(true);
         setTemplatesLoaded(true);
+        
         toast({
           title: "✨ Template loaded!",
-          description: `${template.name} template with ${templateScreens.length} screens ready to customize.`,
+          description: `${template.name} template personalized for ${app.name}. ${templateScreens.length} screens ready to customize.`,
         });
         return;
+      } else {
+        console.log('[Visual Editor] Template not found for:', app.industry);
       }
     }
     
     // Create default screens for apps without templates
+    console.log('[Visual Editor] Creating default screens for app:', app.name);
     const homeId = generateId();
     const defaultScreens: EditorScreen[] = [
         {
@@ -907,7 +976,7 @@ export default function VisualEditor() {
               id: generateId(),
               type: "heading",
               props: {
-                text: "About Us",
+                text: `About ${app.name || 'Us'}`,
                 level: 1,
                 color: "#1F2937"
               }
@@ -941,7 +1010,7 @@ export default function VisualEditor() {
               id: generateId(),
               type: "heading",
               props: {
-                text: "Contact Us",
+                text: `Contact ${app.name || 'Us'}`,
                 level: 1,
                 color: "#1F2937"
               }
@@ -982,7 +1051,7 @@ export default function VisualEditor() {
       setActiveScreenId(homeId);
       setHasChanges(true);
       setTemplatesLoaded(true);
-  }, [app, templatesLoaded, toast]);
+  }, [app, templatesLoaded, toast, personalizeTemplateContent]);
 
   // Ensure activeScreenId always points to a valid screen
   useEffect(() => {
