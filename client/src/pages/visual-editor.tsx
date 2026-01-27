@@ -19,6 +19,12 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -889,6 +895,48 @@ export default function VisualEditor() {
     if (!app || templatesLoaded) return;
     
     console.log('[Visual Editor] Loading screens for app:', app.name, 'Industry:', app.industry);
+
+    const normalizeIndustryId = (raw: string | undefined | null) => {
+      if (!raw) return null;
+      const v = String(raw).trim().toLowerCase();
+      const normalized = v
+        .replace(/&/g, "and")
+        .replace(/\s+/g, " ")
+        .replace(/[^a-z0-9 ]/g, "")
+        .trim();
+      // direct ids
+      if (getTemplateById(normalized)) return normalized;
+      // synonyms
+      if (normalized.includes("salon") || normalized.includes("spa") || normalized.includes("beauty")) return "salon";
+      if (normalized.includes("restaurant") || normalized.includes("food") || normalized.includes("cafe")) return "restaurant";
+      if (normalized.includes("ecommerce") || normalized.includes("e commerce") || normalized.includes("store") || normalized.includes("shop")) return "ecommerce";
+      if (normalized.includes("church") || normalized.includes("ministry")) return "church";
+      if (normalized.includes("fitness") || normalized.includes("gym")) return "fitness";
+      if (normalized.includes("education") || normalized.includes("school") || normalized.includes("college")) return "education";
+      if (normalized.includes("radio") || normalized.includes("station") || normalized.includes("podcast")) return "radio";
+      if (normalized.includes("health") || normalized.includes("clinic") || normalized.includes("medical") || normalized.includes("hospital")) return "healthcare";
+      if (normalized.includes("real estate") || normalized.includes("realestate") || normalized.includes("property")) return "realestate";
+      if (normalized.includes("photo") || normalized.includes("photography") || normalized.includes("studio")) return "photography";
+      if (normalized.includes("music") || normalized.includes("band") || normalized.includes("artist")) return "music";
+      if (normalized.includes("news") || normalized.includes("magazine") || normalized.includes("blog")) return "news";
+      if (normalized.includes("business") || normalized.includes("company") || normalized.includes("corporate")) return "business";
+      return null;
+    };
+
+    const isPlaceholderScreens = (maybeScreens: any[] | null | undefined) => {
+      if (!maybeScreens || !Array.isArray(maybeScreens) || maybeScreens.length === 0) return false;
+      try {
+        const allText = maybeScreens
+          .flatMap((s: any) => (s?.components || []).map((c: any) => JSON.stringify(c?.props || {})))
+          .join(" ")
+          .toLowerCase();
+        return allText.includes("your app is ready to customize") || allText.includes("start customizing your app");
+      } catch {
+        return false;
+      }
+    };
+
+    const normalizedIndustry = normalizeIndustryId(app.industry);
     
     // Check for existing saved screens with actual content
     if (app.editorScreens && Array.isArray(app.editorScreens) && app.editorScreens.length > 0) {
@@ -896,7 +944,8 @@ export default function VisualEditor() {
         s.components && Array.isArray(s.components) && s.components.length > 0
       );
       
-      if (hasContent) {
+      // If saved screens are just placeholders and we have an industry template, prefer the template.
+      if (hasContent && !(isPlaceholderScreens(app.editorScreens) && normalizedIndustry && getTemplateById(normalizedIndustry))) {
         console.log('[Visual Editor] Loading saved screens:', app.editorScreens.length);
         setScreens(app.editorScreens);
         const homeScreen = app.editorScreens.find((s: EditorScreen) => s.isHome);
@@ -907,9 +956,9 @@ export default function VisualEditor() {
     }
     
     // Load industry template if available
-    if (app.industry && app.industry !== 'custom') {
-      console.log('[Visual Editor] Looking for template:', app.industry);
-      const template = getTemplateById(app.industry);
+    if (normalizedIndustry && normalizedIndustry !== 'custom') {
+      console.log('[Visual Editor] Looking for template:', normalizedIndustry);
+      const template = getTemplateById(normalizedIndustry);
       
       if (template) {
         console.log('[Visual Editor] Found template:', template.name, 'with', template.screens.length, 'screens');
@@ -929,12 +978,127 @@ export default function VisualEditor() {
         });
         return;
       } else {
-        console.log('[Visual Editor] Template not found for:', app.industry);
+        console.log('[Visual Editor] Template not found for:', normalizedIndustry);
       }
     }
     
-    // Create default screens for apps without templates
-    console.log('[Visual Editor] Creating default screens for app:', app.name);
+    // Check if this is a website-based app (not native-only)
+    const isWebsiteApp = app.url && app.url !== "native://app" && app.url.startsWith("http");
+    
+    if (isWebsiteApp) {
+      // For website apps, create screens that complement the website
+      console.log('[Visual Editor] Creating website-complement screens for:', app.name);
+      const homeId = generateId();
+      const websiteScreens: EditorScreen[] = [
+        {
+          id: homeId,
+          name: "Home",
+          icon: "🏠",
+          isHome: true,
+          components: [
+            {
+              id: generateId(),
+              type: "hero",
+              props: {
+                title: app.name || "Welcome",
+                subtitle: "Native screens for your app",
+                backgroundImage: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800",
+                buttonText: "Explore",
+                buttonLink: "#",
+                height: 180
+              }
+            },
+            {
+              id: generateId(),
+              type: "text",
+              props: {
+                text: "💡 These are optional native screens for your website app. Your main content comes from your website. Use these screens for features like push notifications landing, offline content, or special promotions.",
+                fontSize: 13,
+                color: "#6B7280"
+              }
+            },
+            {
+              id: generateId(),
+              type: "button",
+              props: {
+                text: "🌐 View Website Mode",
+                variant: "outline",
+                action: "switch-to-website"
+              }
+            }
+          ]
+        },
+        {
+          id: generateId(),
+          name: "Notifications",
+          icon: "🔔",
+          isHome: false,
+          components: [
+            {
+              id: generateId(),
+              type: "heading",
+              props: {
+                text: "Notifications",
+                level: 1,
+                color: "#1F2937"
+              }
+            },
+            {
+              id: generateId(),
+              type: "text",
+              props: {
+                text: "Push notification landing screen. When users tap a notification, they can land here with relevant content.",
+                fontSize: 14,
+                color: "#6B7280"
+              }
+            }
+          ]
+        },
+        {
+          id: generateId(),
+          name: "Offline",
+          icon: "📴",
+          isHome: false,
+          components: [
+            {
+              id: generateId(),
+              type: "heading",
+              props: {
+                text: "You're Offline",
+                level: 1,
+                color: "#1F2937"
+              }
+            },
+            {
+              id: generateId(),
+              type: "text",
+              props: {
+                text: "This content is shown when the user has no internet connection. Customize it with helpful info or cached content.",
+                fontSize: 14,
+                color: "#6B7280"
+              }
+            },
+            {
+              id: generateId(),
+              type: "button",
+              props: {
+                text: "Try Again",
+                variant: "primary",
+                action: "refresh"
+              }
+            }
+          ]
+        }
+      ];
+      setScreens(websiteScreens);
+      setActiveScreenId(homeId);
+      setHasChanges(true);
+      setTemplatesLoaded(true);
+      return;
+    }
+    
+    // Create default screens for native-only apps without industry templates
+    console.log('[Visual Editor] Creating default screens for native app:', app.name);
     const homeId = generateId();
     const defaultScreens: EditorScreen[] = [
         {
@@ -1247,28 +1411,46 @@ export default function VisualEditor() {
 
           {/* Editor Mode Toggle - Only show for non-native apps */}
           {!isNativeApp && (
-            <div className="flex items-center gap-1 p-1 bg-slate-800/80 rounded-xl ml-4 border border-slate-700/50">
-              <Button
-                size="sm"
-                onClick={() => setEditorMode("website")}
-                className={`h-8 px-4 font-medium rounded-lg transition-all ${editorMode === "website" 
-                  ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/25" 
-                  : "bg-transparent hover:bg-slate-700/50 text-slate-400"}`}
-              >
-                <Globe className="h-4 w-4 mr-2" />
-                Website
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => setEditorMode("components")}
-                className={`h-8 px-4 font-medium rounded-lg transition-all ${editorMode === "components" 
-                  ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/25" 
-                  : "bg-transparent hover:bg-slate-700/50 text-slate-400"}`}
-              >
-                <Layout className="h-4 w-4 mr-2" />
-                Screens
-              </Button>
-            </div>
+            <TooltipProvider>
+              <div className="flex items-center gap-1 p-1 bg-slate-800/80 rounded-xl ml-4 border border-slate-700/50">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      onClick={() => setEditorMode("website")}
+                      className={`h-8 px-4 font-medium rounded-lg transition-all ${editorMode === "website" 
+                        ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/25" 
+                        : "bg-transparent hover:bg-slate-700/50 text-slate-400"}`}
+                    >
+                      <Globe className="h-4 w-4 mr-2" />
+                      Website
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs">
+                    <p className="font-medium">Website Mode</p>
+                    <p className="text-xs text-muted-foreground">Preview your actual website as it appears in the app</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      onClick={() => setEditorMode("components")}
+                      className={`h-8 px-4 font-medium rounded-lg transition-all ${editorMode === "components" 
+                        ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/25" 
+                        : "bg-transparent hover:bg-slate-700/50 text-slate-400"}`}
+                    >
+                      <Layout className="h-4 w-4 mr-2" />
+                      Screens
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs">
+                    <p className="font-medium">Native Screens</p>
+                    <p className="text-xs text-muted-foreground">Add extra native screens like push notification landing, offline content, or promotions</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </TooltipProvider>
           )}
         </div>
 

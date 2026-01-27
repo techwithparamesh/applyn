@@ -11,6 +11,7 @@ import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
+import { buildEditorScreensFromTemplate } from "@/lib/app-templates";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
@@ -286,8 +287,49 @@ export default function PromptCreate() {
         ? websiteUrl 
         : "native://app"; // Special URL to indicate native-only app
 
+      const normalizeIndustryId = (raw: string | undefined | null) => {
+        if (!raw) return undefined;
+        const v = String(raw).trim().toLowerCase();
+        const normalized = v
+          .replace(/&/g, "and")
+          .replace(/\s+/g, " ")
+          .replace(/[^a-z0-9 ]/g, "")
+          .trim();
+
+        // Direct template ids
+        const known = new Set(INDUSTRY_TEMPLATES.map(t => t.id));
+        if (known.has(normalized)) return normalized;
+
+        // Common synonyms/variants from AI
+        if (normalized.includes("salon") || normalized.includes("spa") || normalized.includes("beauty")) return "salon";
+        if (normalized.includes("restaurant") || normalized.includes("food") || normalized.includes("cafe")) return "restaurant";
+        if (normalized.includes("ecommerce") || normalized.includes("e commerce") || normalized.includes("store") || normalized.includes("shop")) return "ecommerce";
+        if (normalized.includes("church") || normalized.includes("ministry")) return "church";
+        if (normalized.includes("fitness") || normalized.includes("gym")) return "fitness";
+        if (normalized.includes("education") || normalized.includes("school") || normalized.includes("college")) return "education";
+        if (normalized.includes("radio") || normalized.includes("station") || normalized.includes("podcast")) return "radio";
+        if (normalized.includes("health") || normalized.includes("clinic") || normalized.includes("medical") || normalized.includes("hospital")) return "healthcare";
+        if (normalized.includes("real estate") || normalized.includes("realestate") || normalized.includes("property")) return "realestate";
+        if (normalized.includes("photo") || normalized.includes("photography") || normalized.includes("studio")) return "photography";
+        if (normalized.includes("music") || normalized.includes("band") || normalized.includes("artist")) return "music";
+        if (normalized.includes("news") || normalized.includes("magazine") || normalized.includes("blog")) return "news";
+        if (normalized.includes("business") || normalized.includes("company") || normalized.includes("corporate")) return "business";
+
+        return undefined;
+      };
+
+      const industryId =
+        normalizeIndustryId(generatedConfig.industry) ||
+        (selectedTemplate?.id !== "custom" ? selectedTemplate?.id : undefined) ||
+        "custom";
+
+      const resolvedAppName = creationMode === "scratch" ? appName : generatedConfig.appName;
+      const initialEditorScreens = industryId !== "custom"
+        ? buildEditorScreensFromTemplate(industryId, resolvedAppName || "My App")
+        : null;
+
       const appData = {
-        name: creationMode === "scratch" ? appName : generatedConfig.appName,
+        name: resolvedAppName,
         url: appUrl,
         icon: generatedConfig.icon,
         primaryColor: generatedConfig.primaryColor,
@@ -306,7 +348,9 @@ export default function PromptCreate() {
         // Flag to indicate creation mode
         isNativeOnly: creationMode === "scratch",
         // Industry template ID - used to load pre-built screens in visual editor
-        industry: generatedConfig.industry || selectedTemplate?.id || "custom",
+        industry: industryId,
+        // Seed the visual editor with real template screens when possible
+        editorScreens: initialEditorScreens || undefined,
       };
 
       const res = await apiRequest("POST", "/api/apps", appData);

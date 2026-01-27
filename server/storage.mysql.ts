@@ -341,6 +341,12 @@ export class MysqlStorage {
       primaryColor: apps.primaryColor,
       platform: apps.platform,
       status: apps.status,
+      plan: apps.plan,
+      industry: (apps as any).industry,
+      isNativeOnly: (apps as any).isNativeOnly,
+      generatedPrompt: (apps as any).generatedPrompt,
+      generatedScreens: (apps as any).generatedScreens,
+      editorScreens: (apps as any).editorScreens,
       features: apps.features,
       packageName: apps.packageName,
       versionCode: apps.versionCode,
@@ -350,6 +356,7 @@ export class MysqlStorage {
       buildLogs: apps.buildLogs,
       buildError: apps.buildError,
       lastBuildAt: apps.lastBuildAt,
+      apiSecret: apps.apiSecret,
       createdAt: apps.createdAt,
       updatedAt: apps.updatedAt,
     };
@@ -360,6 +367,9 @@ export class MysqlStorage {
     return {
       ...row,
       features: row.features ? JSON.parse(row.features) : null,
+      generatedScreens: row.generatedScreens ? (typeof row.generatedScreens === "string" ? JSON.parse(row.generatedScreens) : row.generatedScreens) : null,
+      editorScreens: row.editorScreens ? (typeof row.editorScreens === "string" ? JSON.parse(row.editorScreens) : row.editorScreens) : null,
+      isNativeOnly: row.isNativeOnly === 1 || row.isNativeOnly === true,
     } as App;
   }
 
@@ -401,6 +411,12 @@ export class MysqlStorage {
       primaryColor: app.primaryColor ?? "#2563EB",
       platform: app.platform ?? "android",
       status: app.status ?? "draft",
+      plan: (app as any).plan ?? null,
+      industry: (app as any).industry ?? null,
+      isNativeOnly: (app as any).isNativeOnly ? 1 : 0,
+      generatedPrompt: (app as any).generatedPrompt ?? null,
+      generatedScreens: (app as any).generatedScreens ? JSON.stringify((app as any).generatedScreens) : null,
+      editorScreens: (app as any).editorScreens ? JSON.stringify((app as any).editorScreens) : null,
       features: app.features ? JSON.stringify(app.features) : null,
       createdAt: now,
       updatedAt: now,
@@ -417,6 +433,15 @@ export class MysqlStorage {
     };
     if (patch.features && typeof patch.features === 'object') {
       patchData.features = JSON.stringify(patch.features);
+    }
+    if ((patch as any).generatedScreens && Array.isArray((patch as any).generatedScreens)) {
+      patchData.generatedScreens = JSON.stringify((patch as any).generatedScreens);
+    }
+    if ((patch as any).editorScreens && Array.isArray((patch as any).editorScreens)) {
+      patchData.editorScreens = JSON.stringify((patch as any).editorScreens);
+    }
+    if (typeof (patch as any).isNativeOnly === "boolean") {
+      patchData.isNativeOnly = (patch as any).isNativeOnly ? 1 : 0;
     }
     
     await getMysqlDb()

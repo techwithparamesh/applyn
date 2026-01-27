@@ -49,6 +49,15 @@ export const apps = mysqlTable("apps", {
   platform: varchar("platform", { length: 16 }).notNull().default("android"),
   status: varchar("status", { length: 16 }).notNull().default("draft"),
   plan: varchar("plan", { length: 16 }), // Plan tier: preview, starter, standard, pro, agency
+  industry: varchar("industry", { length: 50 }), // Industry template id (e.g. salon, ecommerce)
+  isNativeOnly: tinyint("is_native_only").notNull().default(0), // 1 for native-only apps
+  generatedPrompt: text("generated_prompt"),
+  generatedScreens: text("generated_screens"), // JSON array of strings
+  editorScreens: customType<{ data: string; driverData: string }>({
+    dataType() { return "mediumtext"; },
+    toDriver(value) { return value; },
+    fromDriver(value) { return value as string; },
+  })("editor_screens"), // JSON for visual editor screens
   // Native enhancement features as JSON: { bottomNav: boolean, pullToRefresh: boolean, offlineScreen: boolean, whatsappButton: boolean, whatsappNumber: string }
   features: text("features"), // JSON string for feature toggles
   packageName: varchar("package_name", { length: 200 }),

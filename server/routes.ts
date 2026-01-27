@@ -971,13 +971,10 @@ export async function registerRoutes(
       // Accept a simple buildNow flag instead.
       const createSchema = insertAppSchema.extend({
         buildNow: z.boolean().optional().default(true),
-        // Extra fields stored for reference but not in base schema validation
-        generatedPrompt: z.string().optional(),
-        generatedScreens: z.array(z.string()).optional(),
       });
 
       const parsed = createSchema.parse(req.body);
-      const { buildNow, generatedPrompt, generatedScreens, ...payload } = parsed;
+      const { buildNow, ...payload } = parsed;
 
       const created = await storage.createApp(user.id, {
         ...payload,

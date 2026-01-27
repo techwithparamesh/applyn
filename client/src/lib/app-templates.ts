@@ -2858,6 +2858,76 @@ export function getTemplateById(id: string): IndustryTemplate | null {
   return ALL_TEMPLATES[id] || null;
 }
 
+// Build initial editor screens payload (personalized) from a template id.
+// Returns a JSON-serializable structure compatible with the visual editor.
+export function buildEditorScreensFromTemplate(templateId: string, appName: string): any[] | null {
+  const template = getTemplateById(templateId);
+  if (!template) return null;
+
+  const clonedTemplate = cloneTemplate(template);
+
+  const subtitles: Record<string, string> = {
+    ecommerce: "Shop the best products online",
+    salon: "Book your perfect appointment",
+    restaurant: "Delicious food, delivered fresh",
+    church: "Join our community of faith",
+    fitness: "Transform your body and mind",
+    education: "Learn something new today",
+    healthcare: "Your health, our priority",
+    realestate: "Find your dream home",
+    photography: "Capturing moments that matter",
+    music: "Feel the rhythm",
+    business: "Professional services for you",
+    news: "Stay informed, stay ahead",
+    radio: "Tune in to great music",
+  };
+
+  const personalizeComponent = (comp: any): any => {
+    const newComp = { ...comp };
+
+    if (comp?.type === "hero" && comp?.props) {
+      if (typeof comp.props.title === "string" && (comp.props.title.includes("Fresh Products") || comp.props.title.includes("Welcome"))) {
+        newComp.props = { ...comp.props, title: appName };
+      }
+      if (comp.props.subtitle) {
+        newComp.props = { ...(newComp.props || comp.props), subtitle: subtitles[templateId] || comp.props.subtitle };
+      }
+    }
+
+    if (comp?.type === "heading" && comp?.props?.text) {
+      if (comp.props.text === "About Us") {
+        newComp.props = { ...comp.props, text: `About ${appName}` };
+      }
+      if (comp.props.text === "Contact Us") {
+        newComp.props = { ...comp.props, text: `Contact ${appName}` };
+      }
+    }
+
+    if (comp?.type === "text" && comp?.props?.text) {
+      if (comp.props.text === "About Us") {
+        newComp.props = { ...comp.props, text: `About ${appName}` };
+      }
+      if (comp.props.text === "Contact Us") {
+        newComp.props = { ...comp.props, text: `Contact ${appName}` };
+      }
+    }
+
+    if (comp?.children && Array.isArray(comp.children)) {
+      newComp.children = comp.children.map(personalizeComponent);
+    }
+
+    return newComp;
+  };
+
+  return clonedTemplate.screens.map((screen: TemplateScreen) => ({
+    id: screen.id,
+    name: screen.name,
+    icon: screen.icon,
+    isHome: screen.isHome,
+    components: (screen.components || []).map(personalizeComponent),
+  }));
+}
+
 // Get all template IDs
 export function getTemplateIds(): string[] {
   return Object.keys(ALL_TEMPLATES);

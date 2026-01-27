@@ -82,6 +82,11 @@ export const insertAppSchema = z.object({
   industry: z.string().max(50).optional(),
   // Flag to indicate this is a native-only app (no website URL)
   isNativeOnly: z.boolean().optional(),
+  // Initial visual editor data (stored as JSON)
+  editorScreens: z.array(z.any()).optional(),
+  // AI generation metadata (stored for reference)
+  generatedPrompt: z.string().optional(),
+  generatedScreens: z.array(z.string()).optional(),
 });
 
 export type InsertApp = z.infer<typeof insertAppSchema>;
@@ -100,6 +105,8 @@ export type App = {
   plan?: PlanId | null; // Plan tier for this app
   industry?: string | null; // Industry template ID
   isNativeOnly?: boolean | null; // True if app is native-only (no website)
+  generatedPrompt?: string | null;
+  generatedScreens?: string[] | null;
   packageName?: string | null;
   versionCode?: number | null;
   artifactPath?: string | null;
