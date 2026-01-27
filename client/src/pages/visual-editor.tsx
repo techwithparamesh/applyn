@@ -5,7 +5,7 @@
  * with components like Text, Image, Button, Gallery, Forms, etc.
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -1146,8 +1146,9 @@ export default function VisualEditor() {
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [deviceView, setDeviceView] = useState<"mobile" | "desktop">("mobile");
   const [editorMode, setEditorMode] = useState<"components" | "website">("components"); // Default to components for native apps
-  const [sidebarTab, setSidebarTab] = useState<"components" | "templates">("components");
   const [rightSidebarTab, setRightSidebarTab] = useState<"agent" | "properties" | "code" | "qr">("properties");
+  const [leftTab, setLeftTab] = useState<"pages" | "screens" | "components" | "sections">("screens");
+  const [websitePreviewUrl, setWebsitePreviewUrl] = useState<string>("");
   const [hasChanges, setHasChanges] = useState(false);
   const [showComponentTree, setShowComponentTree] = useState(true);
   const [templatesLoaded, setTemplatesLoaded] = useState(false);
@@ -1168,6 +1169,46 @@ export default function VisualEditor() {
       setEditorMode(isNative ? "components" : "website");
     }
   }, [app]);
+
+  const webviewPages = useMemo(() => {
+    const modules = (app as any)?.modules;
+    if (!Array.isArray(modules)) return [] as Array<{ id: string; label: string; url: string; icon?: string }>;
+    const webview = modules.find((m: any) => m?.type === "webviewPages");
+    const pages = webview?.config?.pages;
+    if (!Array.isArray(pages)) return [];
+    return pages
+      .filter((p: any) => p && typeof p.url === "string")
+      .map((p: any) => ({
+        id: String(p.id || p.url),
+        label: String(p.label || p.url),
+        url: String(p.url),
+        icon: typeof p.icon === "string" ? p.icon : "🌐",
+      }));
+  }, [app]);
+
+  // Keep a stable website preview URL (use imported pages when available)
+  useEffect(() => {
+    if (!app) return;
+    if (websitePreviewUrl) return;
+    if (webviewPages.length > 0) {
+      setWebsitePreviewUrl(webviewPages[0].url);
+      return;
+    }
+    if (typeof (app as any)?.url === "string" && (app as any).url !== "native://app") {
+      setWebsitePreviewUrl((app as any).url);
+    }
+  }, [app, webviewPages, websitePreviewUrl]);
+
+  // Keep left sidebar focused: website mode -> Pages tab for web apps
+  useEffect(() => {
+    if (!app) return;
+    const isNative = (app as any).isNativeOnly || (app as any).url === "native://app" || !(app as any).url;
+    if (isNative) {
+      if (leftTab === "pages") setLeftTab("screens");
+      return;
+    }
+    if (editorMode === "website") setLeftTab("pages");
+  }, [app, editorMode, leftTab]);
 
   // Helper function to personalize template content with app name
   const personalizeTemplateContent = useCallback((template: IndustryTemplate, appName: string): EditorScreen[] => {
@@ -1885,132 +1926,231 @@ export default function VisualEditor() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar - Components Panel */}
-        <aside className={`w-72 bg-slate-900/95 border-r border-slate-700/50 flex flex-col overflow-hidden shrink-0 ${editorMode === "website" ? "hidden" : ""}`}>
-          {/* Screens Section */}
-          <div className="p-4 border-b border-slate-700/50">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                <Layers className="h-3.5 w-3.5" /> 
-                Screens ({screens.length})
-              </h3>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-6 w-6 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10" 
-                onClick={addScreen}
+        <aside className="w-72 bg-slate-900/95 border-r border-slate-700/50 flex flex-col overflow-hidden shrink-0">
+          <Tabs value={leftTab} onValueChange={(v) => setLeftTab(v as any)} className="flex-1 flex flex-col">
+            <div className="p-3 border-b border-slate-700/50 shrink-0">
+              <TabsList
+                className={`grid w-full p-1 bg-slate-800/50 rounded-xl border border-slate-700/50 ${isNativeApp ? "grid-cols-3" : "grid-cols-4"}`}
               >
-                <Plus className="h-4 w-4" />
-              </Button>
+                {!isNativeApp && (
+                  <TabsTrigger value="pages" className="text-[11px] rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
+                    Pages
+                  </TabsTrigger>
+                )}
+                <TabsTrigger value="screens" className="text-[11px] rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white">
+                  Screens
+                </TabsTrigger>
+                <TabsTrigger value="components" className="text-[11px] rounded-lg data-[state=active]:bg-slate-700 data-[state=active]:text-white">
+                  Components
+                </TabsTrigger>
+                <TabsTrigger value="sections" className="text-[11px] rounded-lg data-[state=active]:bg-slate-700 data-[state=active]:text-white">
+                  Sections
+                </TabsTrigger>
+              </TabsList>
+
+              {!isNativeApp && leftTab === "pages" && (
+                <div className="mt-3 text-[11px] text-slate-500">
+                  Select a website page to preview.
+                </div>
+              )}
+              {leftTab === "screens" && (
+                <div className="mt-3 flex items-center justify-between">
+                  <p className="text-[11px] text-slate-500">Native screens ({screens.length})</p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
+                    onClick={addScreen}
+                    title="Add screen"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
             </div>
-            <div className="space-y-1">
-              {screens.map((screen) => (
-                <button
-                  key={screen.id}
-                  onClick={() => { setActiveScreenId(screen.id); setSelectedComponentId(null); }}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
-                    activeScreenId === screen.id 
-                      ? "bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-white border border-cyan-500/30" 
-                      : "text-slate-400 hover:bg-slate-800/50 hover:text-white border border-transparent"
-                  }`}
-                >
-                  <span className="text-base">{screen.icon}</span>
-                  <span className="flex-1 text-left">{screen.name}</span>
-                  {screen.isHome && (
-                    <Badge className="text-[10px] h-5 bg-cyan-500/20 text-cyan-400 border-0">Home</Badge>
-                  )}
-                  <span className="text-xs text-slate-500">{screen.components.length}</span>
-                </button>
-              ))}
-            </div>
-          </div>
 
-          {/* Components Palette */}
-          <Tabs value={sidebarTab} onValueChange={(v) => setSidebarTab(v as any)} className="flex-1 flex flex-col">
-            <TabsList className="grid w-full grid-cols-2 p-1 bg-slate-800/50 m-3 mb-0 rounded-xl shrink-0 border border-slate-700/50">
-              <TabsTrigger value="components" className="text-xs rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
-                Components
-              </TabsTrigger>
-              <TabsTrigger value="templates" className="text-xs rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white">
-                Sections
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="components" className="flex-1 overflow-auto p-3 m-0">
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-xs font-bold text-slate-500 uppercase px-1 mb-2">Basic</h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    {BASIC_COMPONENTS.map((comp) => (
-                      <button
-                        key={comp.type}
-                        onClick={() => addComponent(comp.type)}
-                        className="flex flex-col items-center gap-2 p-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all group"
-                      >
-                        <comp.icon className="h-5 w-5 text-slate-400 group-hover:text-cyan-400 transition-colors" />
-                        <span className="text-xs text-slate-400 group-hover:text-white transition-colors">{comp.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+            {!isNativeApp && (
+              <TabsContent value="pages" className="flex-1 m-0">
+                <ScrollArea className="h-full">
+                  <div className="p-3 space-y-2">
+                    {webviewPages.length > 0 ? (
+                      <div className="space-y-1">
+                        {webviewPages.slice(0, 30).map((p) => (
+                          <button
+                            key={p.id}
+                            onClick={() => {
+                              setWebsitePreviewUrl(p.url);
+                              setEditorMode("website");
+                            }}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all text-slate-400 hover:bg-slate-800/50 hover:text-white border border-transparent"
+                            title={p.url}
+                          >
+                            <span className="text-base">{p.icon || "🌐"}</span>
+                            <span className="flex-1 text-left truncate">{p.label}</span>
+                            <ChevronRight className="h-4 w-4 text-slate-600" />
+                          </button>
+                        ))}
 
-                <div>
-                  <h3 className="text-xs font-bold text-slate-500 uppercase px-1 mb-2">Form</h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    {FORM_COMPONENTS.map((comp) => (
-                      <button
-                        key={comp.type}
-                        onClick={() => addComponent(comp.type)}
-                        className="flex flex-col items-center gap-2 p-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all group"
-                      >
-                        <comp.icon className="h-5 w-5 text-slate-400 group-hover:text-cyan-400 transition-colors" />
-                        <span className="text-xs text-slate-400 group-hover:text-white transition-colors">{comp.name}</span>
-                      </button>
-                    ))}
+                        <div className="pt-2 flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setLocation(`/apps/${id}/import`)}
+                            className="border-slate-700 text-slate-200 hover:bg-slate-800/60"
+                          >
+                            <Link2 className="h-4 w-4 mr-2" /> Import
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setLocation(`/apps/${id}/structure`)}
+                            className="border-slate-700 text-slate-200 hover:bg-slate-800/60"
+                          >
+                            <ListTree className="h-4 w-4 mr-2" /> Structure
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-3">
+                        <p className="text-xs text-slate-300 font-medium">No website pages yet</p>
+                        <p className="text-[11px] text-slate-500 mt-1">Use Import to pull pages and create navigation.</p>
+                        <div className="pt-2">
+                          <Button
+                            size="sm"
+                            onClick={() => setLocation(`/apps/${id}/import`)}
+                            className="bg-gradient-to-r from-cyan-500 to-blue-500 text-white"
+                          >
+                            <Link2 className="h-4 w-4 mr-2" /> Import Website
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
+                </ScrollArea>
+              </TabsContent>
+            )}
 
-                <div>
-                  <h3 className="text-xs font-bold text-slate-500 uppercase px-1 mb-2">Media</h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    {MEDIA_COMPONENTS.map((comp) => (
-                      <button
-                        key={comp.type}
-                        onClick={() => addComponent(comp.type)}
-                        className="flex flex-col items-center gap-2 p-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all group"
-                      >
-                        <comp.icon className="h-5 w-5 text-slate-400 group-hover:text-cyan-400 transition-colors" />
-                        <span className="text-xs text-slate-400 group-hover:text-white transition-colors">{comp.name}</span>
-                      </button>
-                    ))}
-                  </div>
+            <TabsContent value="screens" className="flex-1 m-0">
+              <ScrollArea className="h-full">
+                <div className="p-3 space-y-1">
+                  {screens.map((screen) => (
+                    <button
+                      key={screen.id}
+                      onClick={() => {
+                        setActiveScreenId(screen.id);
+                        setSelectedComponentId(null);
+                        setEditorMode("components");
+                      }}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
+                        activeScreenId === screen.id
+                          ? "bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-white border border-cyan-500/30"
+                          : "text-slate-400 hover:bg-slate-800/50 hover:text-white border border-transparent"
+                      }`}
+                    >
+                      <span className="text-base">{screen.icon}</span>
+                      <span className="flex-1 text-left truncate">{screen.name}</span>
+                      {screen.isHome && (
+                        <Badge className="text-[10px] h-5 bg-cyan-500/20 text-cyan-400 border-0">Home</Badge>
+                      )}
+                      <span className="text-xs text-slate-500">{screen.components.length}</span>
+                    </button>
+                  ))}
                 </div>
-              </div>
+              </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="templates" className="flex-1 overflow-auto p-3 m-0">
-              <div className="space-y-2">
-                {SECTION_TEMPLATES.map((template) => (
-                  <button
-                    key={template.id}
-                    onClick={() => addTemplate(template)}
-                    className="w-full p-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:border-purple-500/50 hover:bg-purple-500/10 transition-all text-left group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-xl">{template.preview}</span>
-                      <span className="text-sm font-medium text-slate-400 group-hover:text-white transition-colors">{template.name}</span>
+            <TabsContent value="components" className="flex-1 m-0">
+              <ScrollArea className="h-full">
+                <div className="p-3 space-y-4">
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-500 uppercase px-1 mb-2">Basic</h3>
+                    <div className="grid grid-cols-2 gap-2">
+                      {BASIC_COMPONENTS.map((comp) => (
+                        <button
+                          key={comp.type}
+                          onClick={() => {
+                            setEditorMode("components");
+                            addComponent(comp.type);
+                          }}
+                          className="flex flex-col items-center gap-2 p-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all group"
+                        >
+                          <comp.icon className="h-5 w-5 text-slate-400 group-hover:text-cyan-400 transition-colors" />
+                          <span className="text-xs text-slate-400 group-hover:text-white transition-colors">{comp.name}</span>
+                        </button>
+                      ))}
                     </div>
-                  </button>
-                ))}
-              </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-500 uppercase px-1 mb-2">Form</h3>
+                    <div className="grid grid-cols-2 gap-2">
+                      {FORM_COMPONENTS.map((comp) => (
+                        <button
+                          key={comp.type}
+                          onClick={() => {
+                            setEditorMode("components");
+                            addComponent(comp.type);
+                          }}
+                          className="flex flex-col items-center gap-2 p-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all group"
+                        >
+                          <comp.icon className="h-5 w-5 text-slate-400 group-hover:text-cyan-400 transition-colors" />
+                          <span className="text-xs text-slate-400 group-hover:text-white transition-colors">{comp.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-500 uppercase px-1 mb-2">Media</h3>
+                    <div className="grid grid-cols-2 gap-2">
+                      {MEDIA_COMPONENTS.map((comp) => (
+                        <button
+                          key={comp.type}
+                          onClick={() => {
+                            setEditorMode("components");
+                            addComponent(comp.type);
+                          }}
+                          className="flex flex-col items-center gap-2 p-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all group"
+                        >
+                          <comp.icon className="h-5 w-5 text-slate-400 group-hover:text-cyan-400 transition-colors" />
+                          <span className="text-xs text-slate-400 group-hover:text-white transition-colors">{comp.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="sections" className="flex-1 m-0">
+              <ScrollArea className="h-full">
+                <div className="p-3 space-y-2">
+                  {SECTION_TEMPLATES.map((template) => (
+                    <button
+                      key={template.id}
+                      onClick={() => {
+                        setEditorMode("components");
+                        addTemplate(template);
+                      }}
+                      className="w-full p-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:border-purple-500/50 hover:bg-purple-500/10 transition-all text-left group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-xl">{template.preview}</span>
+                        <span className="text-sm font-medium text-slate-400 group-hover:text-white transition-colors">{template.name}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </ScrollArea>
             </TabsContent>
           </Tabs>
 
-          {/* Component Tree */}
-          {showComponentTree && activeScreen && activeScreen.components.length > 0 && (
+          {/* Component Tree - only relevant when editing native screens */}
+          {showComponentTree && editorMode === "components" && activeScreen && activeScreen.components.length > 0 && (
             <div className="border-t border-slate-700/50 p-3 max-h-48 overflow-auto shrink-0">
               <div className="flex items-center justify-between px-1 mb-2">
                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                  <GripVertical className="h-3.5 w-3.5" /> Layer Tree
+                  <GripVertical className="h-3.5 w-3.5" /> Layers
                 </h3>
               </div>
               <div className="space-y-1">
@@ -2019,8 +2159,8 @@ export default function VisualEditor() {
                     key={comp.id}
                     onClick={() => setSelectedComponentId(comp.id)}
                     className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all ${
-                      selectedComponentId === comp.id 
-                        ? "bg-cyan-500/20 text-cyan-400 font-medium border border-cyan-500/30" 
+                      selectedComponentId === comp.id
+                        ? "bg-cyan-500/20 text-cyan-400 font-medium border border-cyan-500/30"
                         : "text-slate-400 hover:bg-slate-800/50 hover:text-white border border-transparent"
                     }`}
                   >
@@ -2079,9 +2219,9 @@ export default function VisualEditor() {
 
                     {/* Website Content - Live iframe */}
                     <div className="flex-1 bg-white relative overflow-hidden">
-                      {app?.url && app.url !== "native://app" ? (
+                      {websitePreviewUrl && websitePreviewUrl !== "native://app" ? (
                         <iframe
-                          src={app.url}
+                          src={websitePreviewUrl}
                           className="w-full h-full border-0"
                           title="Website Preview"
                           sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
@@ -2128,15 +2268,15 @@ export default function VisualEditor() {
               </p>
               
               {/* Quick Info */}
-              {app?.url && app.url !== "native://app" && (
+              {websitePreviewUrl && websitePreviewUrl !== "native://app" && (
                 <a 
-                  href={app.url} 
+                  href={websitePreviewUrl} 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1.5 bg-slate-800/50 px-3 py-1.5 rounded-full border border-slate-700/50"
                 >
                   <Globe className="h-3 w-3" />
-                  {app.url.replace(/^https?:\/\//, "").replace(/\/$/, "").substring(0, 30)}
+                  {websitePreviewUrl.replace(/^https?:\/\//, "").replace(/\/$/, "").substring(0, 30)}
                   <ExternalLink className="h-3 w-3" />
                 </a>
               )}
