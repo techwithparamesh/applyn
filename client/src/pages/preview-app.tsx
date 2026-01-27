@@ -275,6 +275,7 @@ export default function PreviewApp() {
               appName={app.name}
               primaryColor={app.primaryColor}
               icon={app.iconUrl || app.icon}
+              preferLivePreview={true}
               screens={app.editorScreens}
               industry={app.industry}
               isNativeOnly={app.isNativeOnly || app.url?.startsWith("native://")}

@@ -62,6 +62,8 @@ interface DevicePreviewProps {
   appName?: string;
   primaryColor?: string;
   icon?: string;
+  /** Prefer a live iframe preview (more accurate/interactive) over screenshots for website apps */
+  preferLivePreview?: boolean;
   /** Native app screens for preview */
   screens?: NativeScreen[];
   /** Industry type for generating demo content */
@@ -92,6 +94,7 @@ export function DevicePreview({
   appName = "My App",
   primaryColor = "", // Empty = no custom color, show neutral
   icon = "📱",
+  preferLivePreview = false,
   screens,
   industry,
   isNativeOnly = false,
@@ -235,6 +238,7 @@ export function DevicePreview({
               onImageError={() => setImageError(true)}
               onRetry={handleRetry}
               isNativeApp={isNativeApp}
+              preferLivePreview={preferLivePreview}
               screens={screens}
               industry={industry}
               activeScreenIndex={activeScreenIndex}
@@ -254,6 +258,7 @@ export function DevicePreview({
               onImageError={() => setImageError(true)}
               onRetry={handleRetry}
               isNativeApp={isNativeApp}
+              preferLivePreview={preferLivePreview}
               screens={screens}
               industry={industry}
               activeScreenIndex={activeScreenIndex}
@@ -328,6 +333,7 @@ interface DeviceFrameProps {
   onRetry: () => void;
   // Native app props
   isNativeApp?: boolean;
+  preferLivePreview?: boolean;
   screens?: NativeScreen[];
   industry?: string;
   activeScreenIndex?: number;
@@ -347,6 +353,7 @@ function IOSDeviceFrame({
   onImageError,
   onRetry,
   isNativeApp,
+  preferLivePreview,
   screens,
   industry,
   activeScreenIndex,
@@ -422,6 +429,7 @@ function IOSDeviceFrame({
             isNativeApp={isNativeApp}
             appName={appName}
             primaryColor={primaryColor}
+            preferLivePreview={preferLivePreview}
             screens={screens}
             industry={industry}
             activeScreenIndex={activeScreenIndex}
@@ -470,6 +478,7 @@ function AndroidDeviceFrame({
   onImageError,
   onRetry,
   isNativeApp,
+  preferLivePreview,
   screens,
   industry,
   activeScreenIndex,
@@ -550,6 +559,7 @@ function AndroidDeviceFrame({
             isNativeApp={isNativeApp}
             appName={appName}
             primaryColor={primaryColor}
+            preferLivePreview={preferLivePreview}
             screens={screens}
             industry={industry}
             activeScreenIndex={activeScreenIndex}
@@ -592,6 +602,233 @@ interface NativeAppContentProps {
   onScreenChange: (index: number) => void;
 }
 
+function NativeComponentPreview({
+  component,
+  themeColor,
+  activeCategory,
+  setActiveCategory,
+}: {
+  component: NativeComponent;
+  themeColor: string;
+  activeCategory: string;
+  setActiveCategory: (category: string) => void;
+}) {
+  const render = () => {
+    switch (component.type) {
+      case "text":
+        return <p className="text-sm text-gray-700" style={{ color: component.props?.color }}>{component.props?.text}</p>;
+      case "heading": {
+        const level = component.props?.level || 2;
+        const text = component.props?.text;
+        const className = level === 1 ? "text-2xl font-bold" : level === 2 ? "text-xl font-bold" : "text-lg font-semibold";
+        return <div className={className} style={{ color: component.props?.color || "#111827" }}>{text}</div>;
+      }
+      case "image":
+        return component.props?.src ? (
+          <img src={component.props.src} alt={component.props?.alt || ""} className="w-full rounded-lg" />
+        ) : (
+          <div className="w-full h-32 bg-gray-100 rounded-lg" />
+        );
+      case "button": {
+        const text: string = component.props?.text || "Button";
+        const isCategory = ["All", "Vegetables", "Fruits", "Dairy"].includes(text);
+        const isActive = isCategory && text === activeCategory;
+        return (
+          <button
+            onClick={() => {
+              if (isCategory) setActiveCategory(text);
+            }}
+            className={
+              "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors " +
+              (isActive
+                ? "text-white border-transparent"
+                : "bg-white text-gray-700 border-gray-200")
+            }
+            style={isActive ? { backgroundColor: themeColor } : undefined}
+          >
+            {text}
+          </button>
+        );
+      }
+      case "container":
+        return (
+          <div className="rounded-lg" style={{ padding: component.props?.padding ?? 0, backgroundColor: component.props?.backgroundColor }}>
+            {component.children?.map((child) => (
+              <NativeComponentPreview
+                key={child.id}
+                component={child}
+                themeColor={themeColor}
+                activeCategory={activeCategory}
+                setActiveCategory={setActiveCategory}
+              />
+            ))}
+          </div>
+        );
+      case "grid": {
+        const cols = component.props?.columns || 2;
+        const gap = component.props?.gap ?? 8;
+        return (
+          <div className="grid" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gap }}>
+            {component.children?.map((child) => (
+              <NativeComponentPreview
+                key={child.id}
+                component={child}
+                themeColor={themeColor}
+                activeCategory={activeCategory}
+                setActiveCategory={setActiveCategory}
+              />
+            ))}
+          </div>
+        );
+      }
+      case "section":
+        return (
+          <div className="rounded-lg" style={{ padding: component.props?.padding ?? 0 }}>
+            {component.props?.title && <div className="text-lg font-semibold mb-2">{component.props.title}</div>}
+            {component.children?.map((child) => (
+              <NativeComponentPreview
+                key={child.id}
+                component={child}
+                themeColor={themeColor}
+                activeCategory={activeCategory}
+                setActiveCategory={setActiveCategory}
+              />
+            ))}
+          </div>
+        );
+      case "list": {
+        const items: any[] = Array.isArray(component.props?.items) ? component.props.items : [];
+        return (
+          <div className="space-y-2">
+            {items.map((item, idx) => (
+              <div key={idx} className="text-sm text-gray-700">
+                {typeof item === "string" ? item : item?.label || item?.name || item?.title}
+              </div>
+            ))}
+          </div>
+        );
+      }
+      case "input":
+        return (
+          <input
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+            placeholder={component.props?.placeholder}
+            type={component.props?.type || "text"}
+          />
+        );
+      case "hero":
+        return (
+          <div
+            className="relative rounded-xl overflow-hidden"
+            style={{
+              backgroundImage: component.props?.backgroundImage ? `url(${component.props.backgroundImage})` : undefined,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              height: component.props?.height || 180,
+              backgroundColor: component.props?.backgroundImage ? undefined : themeColor,
+            }}
+          >
+            <div className="absolute inset-0" style={{ backgroundColor: component.props?.overlayColor || "rgba(0,0,0,0.35)" }} />
+            <div className="relative z-10 h-full p-4 flex flex-col justify-end text-white">
+              <div className="text-xl font-bold">{component.props?.title}</div>
+              {component.props?.subtitle && <div className="text-xs text-white/80 mt-1">{component.props.subtitle}</div>}
+              {component.props?.buttonText && (
+                <div className="mt-3">
+                  <button className="px-4 py-2 bg-white text-gray-900 rounded-full text-xs font-semibold">{component.props.buttonText}</button>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      case "productGrid": {
+        const products: any[] = Array.isArray(component.props?.products) ? component.props.products : [];
+        const columns = component.props?.columns || 2;
+        const categoryLower = String(activeCategory || "All").toLowerCase();
+        const filtered = categoryLower === "all"
+          ? products
+          : products.filter((p) => String(p?.category || "").toLowerCase() === categoryLower);
+        const visible = filtered.length > 0 ? filtered : products;
+
+        return (
+          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
+            {visible.slice(0, 6).map((product, idx) => (
+              <div key={idx} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                {product.image && <img src={product.image} alt={product.name} className="w-full h-24 object-cover" />}
+                <div className="p-2">
+                  <div className="text-xs font-medium truncate">{product.name}</div>
+                  <div className="flex items-center justify-between mt-1">
+                    <div className="text-sm font-bold" style={{ color: themeColor }}>{product.price}</div>
+                    {product.rating && <div className="text-[10px] text-amber-600">★ {product.rating}</div>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      }
+      default:
+        return null;
+    }
+  };
+
+  // Avoid extra wrappers when component renderer returns null.
+  const rendered = render();
+  if (!rendered) return null;
+  return <div className="space-y-2">{rendered}</div>;
+}
+
+function NativeScreensPreview({
+  screens,
+  themeColor,
+  activeScreenIndex,
+  onScreenChange,
+}: {
+  screens: NativeScreen[];
+  themeColor: string;
+  activeScreenIndex: number;
+  onScreenChange: (index: number) => void;
+}) {
+  const [activeCategory, setActiveCategory] = useState("All");
+  const activeScreen = screens[activeScreenIndex] || screens[0];
+
+  return (
+    <div className="h-full flex flex-col bg-white overflow-hidden">
+      <div className="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-gray-50 to-white">
+        <div className="space-y-4">
+          {activeScreen?.components?.map((component) => (
+            <NativeComponentPreview
+              key={component.id}
+              component={component}
+              themeColor={themeColor}
+              activeCategory={activeCategory}
+              setActiveCategory={setActiveCategory}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Native-style bottom navigation */}
+      <div className="h-14 bg-white border-t border-gray-200 flex items-center justify-around px-2 shrink-0">
+        {screens.slice(0, 4).map((screen, i) => (
+          <button
+            key={screen.id}
+            onClick={() => onScreenChange(i)}
+            className="flex flex-col items-center gap-0.5 min-w-0"
+          >
+            <span className="text-lg">{screen.icon || "📄"}</span>
+            <span
+              className={"text-[10px] font-medium truncate max-w-[64px] " + (i === activeScreenIndex ? "" : "text-gray-400")}
+              style={i === activeScreenIndex ? { color: themeColor } : undefined}
+            >
+              {screen.name}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function NativeAppContent({
   appName,
   primaryColor,
@@ -601,6 +838,18 @@ function NativeAppContent({
   onScreenChange,
 }: NativeAppContentProps) {
   const themeColor = primaryColor || "#2563EB";
+
+  // If real native screens exist, preview those (matches Visual Editor output)
+  if (screens && Array.isArray(screens) && screens.length > 0) {
+    return (
+      <NativeScreensPreview
+        screens={screens}
+        themeColor={themeColor}
+        activeScreenIndex={activeScreenIndex}
+        onScreenChange={onScreenChange}
+      />
+    );
+  }
   
   // Generate demo content based on app name and industry
   const getDemoContent = () => {
@@ -795,6 +1044,7 @@ interface PreviewContentProps {
   isNativeApp?: boolean;
   appName?: string;
   primaryColor?: string;
+  preferLivePreview?: boolean;
   screens?: NativeScreen[];
   industry?: string;
   activeScreenIndex?: number;
@@ -814,12 +1064,13 @@ function PreviewContent({
   isNativeApp = false,
   appName = "My App",
   primaryColor = "#2563EB",
+  preferLivePreview = false,
   screens,
   industry,
   activeScreenIndex = 0,
   onScreenChange,
 }: PreviewContentProps) {
-  const [useIframe, setUseIframe] = useState(false);
+  const [useIframe, setUseIframe] = useState(preferLivePreview);
   const [iframeLoaded, setIframeLoaded] = useState(false);
   
   // For native apps, show native content
@@ -842,9 +1093,14 @@ function PreviewContent({
   // Get the full URL for iframe - use url prop if available, otherwise build from domain
   const fullUrl = url || (domain ? (domain.startsWith("http") ? domain : `https://${domain}`) : "");
 
+  useEffect(() => {
+    setIframeLoaded(false);
+  }, [fullUrl]);
+
   // Auto-switch to iframe if screenshot fails or takes too long
   useEffect(() => {
     if (!isValidUrl) return;
+    if (preferLivePreview) return;
     
     // After 5 seconds, if still loading, switch to iframe
     const timeout = setTimeout(() => {
@@ -897,7 +1153,7 @@ function PreviewContent({
             src={fullUrl}
             className={`w-full h-full border-0 transition-opacity duration-300 ${iframeLoaded ? 'opacity-100' : 'opacity-0'}`}
             onLoad={() => setIframeLoaded(true)}
-            sandbox="allow-scripts allow-same-origin"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-top-navigation-by-user-activation"
             title={`Preview of ${domain}`}
           />
         </>

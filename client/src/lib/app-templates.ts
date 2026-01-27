@@ -198,12 +198,14 @@ export const ecommerceTemplate: IndustryTemplate = {
           props: {
             columns: 2,
             products: [
-              { id: "1", name: "Organic Tomatoes", price: "$4.99", originalPrice: "$5.99", image: "https://images.unsplash.com/photo-1546470427-227c7369a9b8?w=400", rating: 4.5, badge: "Sale" },
-              { id: "2", name: "Fresh Spinach", price: "$3.49", image: "https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=400", rating: 4.8 },
-              { id: "3", name: "Free Range Eggs", price: "$6.99", image: "https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=400", rating: 4.9, badge: "Best Seller" },
-              { id: "4", name: "Artisan Cheese", price: "$8.99", image: "https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=400", rating: 4.7 },
-              { id: "5", name: "Fresh Carrots", price: "$2.99", image: "https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=400", rating: 4.6 },
-              { id: "6", name: "Organic Milk", price: "$5.49", image: "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400", rating: 4.8 },
+              { id: "1", name: "Organic Tomatoes", price: "$4.99", originalPrice: "$5.99", image: "https://images.unsplash.com/photo-1546470427-227c7369a9b8?w=400", rating: 4.5, badge: "Sale", category: "Vegetables" },
+              { id: "2", name: "Fresh Spinach", price: "$3.49", image: "https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=400", rating: 4.8, category: "Vegetables" },
+              { id: "3", name: "Free Range Eggs", price: "$6.99", image: "https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=400", rating: 4.9, badge: "Best Seller", category: "Dairy" },
+              { id: "4", name: "Artisan Cheese", price: "$8.99", image: "https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=400", rating: 4.7, category: "Dairy" },
+              { id: "5", name: "Fresh Carrots", price: "$2.99", image: "https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=400", rating: 4.6, category: "Vegetables" },
+              { id: "6", name: "Organic Milk", price: "$5.49", image: "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400", rating: 4.8, category: "Dairy" },
+              { id: "7", name: "Fresh Apples", price: "$3.99", image: "https://images.unsplash.com/photo-1567306226416-28f0efdc88ce?w=400", rating: 4.7, category: "Fruits" },
+              { id: "8", name: "Sweet Bananas", price: "$2.49", image: "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=400", rating: 4.6, category: "Fruits" },
             ]
           }
         }

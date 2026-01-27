@@ -247,12 +247,37 @@ const getDefaultProps = (type: ComponentType): Record<string, any> => {
 };
 
 // Component renderer for preview
-function ComponentPreview({ component, isSelected, onClick }: { 
-  component: EditorComponent; 
-  isSelected: boolean;
-  onClick: () => void;
+type PreviewInteraction = {
+  activeCategory?: string;
+  setActiveCategory?: (category: string) => void;
+  setEditorMode?: (mode: "components" | "website") => void;
+};
+
+function ComponentPreview({
+  component,
+  selectedComponentId,
+  onSelect,
+  interaction,
+}: {
+  component: EditorComponent;
+  selectedComponentId: string | null;
+  onSelect: (id: string) => void;
+  interaction?: PreviewInteraction;
 }) {
+  const isSelected = selectedComponentId === component.id;
   const baseClass = `relative cursor-pointer transition-all ${isSelected ? 'ring-2 ring-cyan-500 ring-offset-2' : 'hover:ring-1 hover:ring-cyan-500/50'}`;
+
+  const handleSelect = (e: any) => {
+    e.stopPropagation?.();
+    onSelect(component.id);
+  };
+
+  const categoryOptions = ["All", "Vegetables", "Fruits", "Dairy"];
+  const isCategoryButton =
+    component.type === "button" &&
+    typeof component.props?.text === "string" &&
+    categoryOptions.includes(component.props.text);
+  const activeCategory = interaction?.activeCategory || "All";
   
   const renderComponent = () => {
     switch (component.type) {
@@ -283,17 +308,38 @@ function ComponentPreview({ component, isSelected, onClick }: {
           </div>
         );
       case "button":
-        return (
-          <button 
-            className={`px-6 py-2 rounded-lg font-medium ${
-              component.props.variant === 'primary' 
-                ? 'bg-cyan-500 text-white' 
-                : 'bg-slate-200 text-slate-800'
-            }`}
-          >
-            {component.props.text}
-          </button>
-        );
+        {
+          const size = component.props.size;
+          const paddingClass = size === "sm" ? "px-3 py-1.5 text-xs" : "px-6 py-2 text-sm";
+
+          const variant = isCategoryButton
+            ? (component.props.text === activeCategory ? "primary" : "outline")
+            : component.props.variant;
+
+          const className = `${paddingClass} rounded-lg font-medium transition-colors ${
+            variant === 'primary' 
+              ? 'bg-cyan-500 text-white' 
+              : 'bg-slate-200 text-slate-800'
+          }`;
+
+          return (
+            <button
+              className={className}
+              onClick={(e) => {
+                handleSelect(e);
+
+                if (isCategoryButton) {
+                  interaction?.setActiveCategory?.(component.props.text);
+                }
+                if (component.props.action === "switch-to-website") {
+                  interaction?.setEditorMode?.("website");
+                }
+              }}
+            >
+              {component.props.text}
+            </button>
+          );
+        }
       case "container":
         return (
           <div 
@@ -301,7 +347,13 @@ function ComponentPreview({ component, isSelected, onClick }: {
             className="border border-dashed border-slate-300 rounded min-h-[60px]"
           >
             {component.children?.map((child) => (
-              <ComponentPreview key={child.id} component={child} isSelected={false} onClick={() => {}} />
+              <ComponentPreview
+                key={child.id}
+                component={child}
+                selectedComponentId={selectedComponentId}
+                onSelect={onSelect}
+                interaction={interaction}
+              />
             ))}
             {(!component.children || component.children.length === 0) && (
               <div className="text-center text-slate-400 py-4 text-sm">Drop components here</div>
@@ -312,7 +364,13 @@ function ComponentPreview({ component, isSelected, onClick }: {
         return (
           <div className="grid gap-4 min-h-[60px]" style={{ gridTemplateColumns: `repeat(${component.props.columns}, 1fr)` }}>
             {component.children?.map((child) => (
-              <ComponentPreview key={child.id} component={child} isSelected={false} onClick={() => {}} />
+              <ComponentPreview
+                key={child.id}
+                component={child}
+                selectedComponentId={selectedComponentId}
+                onSelect={onSelect}
+                interaction={interaction}
+              />
             ))}
             {(!component.children || component.children.length === 0) && (
               <div className="col-span-full text-center text-slate-400 py-4 text-sm border border-dashed rounded">Drop components here</div>
@@ -332,7 +390,13 @@ function ComponentPreview({ component, isSelected, onClick }: {
           <div style={{ padding: component.props.padding }} className="bg-slate-50 rounded-lg">
             <h2 className="text-xl font-bold mb-4 text-slate-900">{component.props.title}</h2>
             {component.children?.map((child) => (
-              <ComponentPreview key={child.id} component={child} isSelected={false} onClick={() => {}} />
+              <ComponentPreview
+                key={child.id}
+                component={child}
+                selectedComponentId={selectedComponentId}
+                onSelect={onSelect}
+                interaction={interaction}
+              />
             ))}
           </div>
         );
@@ -365,7 +429,13 @@ function ComponentPreview({ component, isSelected, onClick }: {
         return (
           <form className="space-y-4 p-4 bg-white rounded-lg border">
             {component.children?.map((child) => (
-              <ComponentPreview key={child.id} component={child} isSelected={false} onClick={() => {}} />
+              <ComponentPreview
+                key={child.id}
+                component={child}
+                selectedComponentId={selectedComponentId}
+                onSelect={onSelect}
+                interaction={interaction}
+              />
             ))}
           </form>
         );
@@ -435,24 +505,36 @@ function ComponentPreview({ component, isSelected, onClick }: {
         );
         
       case "productGrid":
-        return (
-          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${component.props.columns || 2}, 1fr)` }}>
-            {component.props.products?.slice(0, 4).map((product: any, i: number) => (
-              <div key={i} className="bg-white rounded-lg border overflow-hidden">
-                {product.image && (
-                  <img src={product.image} alt={product.name} className="w-full h-24 object-cover" />
-                )}
-                <div className="p-2">
-                  <p className="font-medium text-xs truncate">{product.name}</p>
-                  <div className="flex items-center justify-between mt-1">
-                    <p className="text-sm font-bold text-green-600">{product.price}</p>
-                    {product.rating && <span className="text-xs text-amber-500">★ {product.rating}</span>}
+        {
+          const products: any[] = Array.isArray(component.props.products) ? component.props.products : [];
+          const categoryLower = String(activeCategory || "All").toLowerCase();
+          const filtered = categoryLower === "all"
+            ? products
+            : products.filter((p) => String(p?.category || "").toLowerCase() === categoryLower);
+          const visible = filtered.length > 0 ? filtered : products;
+
+          return (
+            <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${component.props.columns || 2}, 1fr)` }}>
+              {visible.slice(0, 6).map((product: any, i: number) => (
+                <div key={i} className="bg-white rounded-lg border overflow-hidden">
+                  {product.image && (
+                    <img src={product.image} alt={product.name} className="w-full h-24 object-cover" />
+                  )}
+                  <div className="p-2">
+                    <p className="font-medium text-xs truncate">{product.name}</p>
+                    <div className="flex items-center justify-between mt-1">
+                      <p className="text-sm font-bold text-green-600">{product.price}</p>
+                      {product.rating && <span className="text-xs text-amber-500">★ {product.rating}</span>}
+                    </div>
+                    {product.category && (
+                      <p className="text-[10px] text-slate-500 mt-1">{product.category}</p>
+                    )}
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        );
+              ))}
+            </div>
+          );
+        }
         
       case "carousel":
         return (
@@ -550,7 +632,7 @@ function ComponentPreview({ component, isSelected, onClick }: {
   };
 
   return (
-    <div className={baseClass} onClick={onClick}>
+    <div className={baseClass} onClick={handleSelect}>
       {renderComponent()}
       {isSelected && (
         <div className="absolute -top-3 -left-3 bg-cyan-500 text-white text-xs px-2 py-0.5 rounded z-20">
@@ -588,6 +670,28 @@ function PropertiesPanel({
 
   const renderPropsEditor = () => {
     switch (component.type) {
+      case "container":
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label className={labelClass}>Padding (px)</Label>
+              <Input
+                type="number"
+                value={component.props.padding ?? 0}
+                onChange={(e) => onUpdate({ ...component.props, padding: parseInt(e.target.value || "0") })}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <Label className={labelClass}>Background</Label>
+              <Input
+                value={component.props.backgroundColor ?? "transparent"}
+                onChange={(e) => onUpdate({ ...component.props, backgroundColor: e.target.value })}
+                className={`${inputClass} font-mono`}
+              />
+            </div>
+          </div>
+        );
       case "text":
         return (
           <div className="space-y-4">
@@ -812,6 +916,7 @@ export default function VisualEditor() {
   const [hasChanges, setHasChanges] = useState(false);
   const [showComponentTree, setShowComponentTree] = useState(true);
   const [templatesLoaded, setTemplatesLoaded] = useState(false);
+  const [activeCategoryByScreen, setActiveCategoryByScreen] = useState<Record<string, string>>({});
 
   // Fetch app data
   const { data: app, isLoading } = useQuery<any>({
@@ -1231,6 +1336,11 @@ export default function VisualEditor() {
 
   // Get active screen - use memoized lookup
   const activeScreen = screens.find(s => s.id === activeScreenId) || screens[0];
+
+  const activeCategory = activeCategoryByScreen[activeScreenId] || "All";
+  const setActiveCategory = useCallback((category: string) => {
+    setActiveCategoryByScreen((prev) => ({ ...prev, [activeScreenId]: category }));
+  }, [activeScreenId]);
   
   // Find component by ID recursively
   const findComponent = (components: EditorComponent[], targetId: string): EditorComponent | null => {
@@ -1828,8 +1938,13 @@ export default function VisualEditor() {
                             >
                               <ComponentPreview
                                 component={component}
-                                isSelected={selectedComponentId === component.id}
-                                onClick={() => setSelectedComponentId(component.id)}
+                                selectedComponentId={selectedComponentId}
+                                onSelect={setSelectedComponentId}
+                                interaction={{
+                                  activeCategory,
+                                  setActiveCategory,
+                                  setEditorMode,
+                                }}
                               />
                             </Reorder.Item>
                           ))}
