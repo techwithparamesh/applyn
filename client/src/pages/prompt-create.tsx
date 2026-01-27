@@ -374,6 +374,7 @@ export default function PromptCreate() {
   const generateMutation = useMutation({
     mutationFn: async (prompt: string) => {
       const template = selectedTemplate || INDUSTRY_TEMPLATES[INDUSTRY_TEMPLATES.length - 1];
+      const lockedIndustry = selectedTemplate?.id && selectedTemplate.id !== "custom" ? selectedTemplate.id : null;
       
       // Try to use real AI parsing
       try {
@@ -392,7 +393,8 @@ export default function PromptCreate() {
             primaryColor: aiResult.primaryColor || getTemplateColor(template.id),
             secondaryColor: aiResult.secondaryColor || getTemplateSecondaryColor(template.id),
             icon: aiResult.icon || getTemplateEmoji(template.id),
-            industry: aiResult.industry || template.id,
+            // If the user explicitly chose an industry template, do NOT let AI override it.
+            industry: lockedIndustry || aiResult.industry || template.id,
             fullScreens: aiResult.suggestedScreens,
             targetAudience: aiResult.targetAudience,
             monetization: aiResult.monetization,
@@ -422,14 +424,20 @@ export default function PromptCreate() {
         primaryColor: getTemplateColor(template.id),
         secondaryColor: getTemplateSecondaryColor(template.id),
         icon: getTemplateEmoji(template.id),
-        industry: template.id,
+        industry: lockedIndustry || template.id,
         aiGenerated: false,
       };
     },
     onSuccess: (data) => {
-      setGeneratedConfig(data);
-      setBusinessCaps(defaultCapabilitiesForIndustry(data?.industry));
-      setCapsSeedIndustry(String(data?.industry || ""));
+      const lockedIndustry = selectedTemplate?.id && selectedTemplate.id !== "custom" ? selectedTemplate.id : null;
+      const industry = String(lockedIndustry || data?.industry || "");
+
+      setGeneratedConfig({
+        ...data,
+        industry,
+      });
+      setBusinessCaps(defaultCapabilitiesForIndustry(industry));
+      setCapsSeedIndustry(industry);
       setStep("preview");
     },
     onError: (err: any) => {
@@ -505,8 +513,9 @@ export default function PromptCreate() {
       };
 
       const industryId =
-        normalizeIndustryId(generatedConfig.industry) ||
+        // If a template is selected (non-custom), it always wins.
         (selectedTemplate?.id !== "custom" ? selectedTemplate?.id : undefined) ||
+        normalizeIndustryId(generatedConfig.industry) ||
         "custom";
 
       const promptContext = (customPrompt || selectedTemplate?.prompt || "").trim();
