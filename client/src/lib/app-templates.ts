@@ -804,6 +804,404 @@ export const restaurantTemplate: IndustryTemplate = {
 };
 
 // ============================================
+// BIRYANI RESTAURANT (ORDERING) TEMPLATE
+// ============================================
+export const biryaniRestaurantTemplate: IndustryTemplate = {
+  id: "restaurant_biryani",
+  name: "Biriyani Restaurant",
+  description: "Biriyani menu, cart, checkout, tracking, profile",
+  primaryColor: "#7A1020", // royal maroon
+  secondaryColor: "#D4AF37", // gold
+  icon: "👑",
+  features: ["bottomNav", "pushNotifications", "whatsappButton", "deepLinking"],
+  screens: [
+    {
+      id: "home",
+      name: "Home",
+      icon: "🏠",
+      isHome: true,
+      components: [
+        {
+          id: uid(),
+          type: "hero",
+          props: {
+            title: "KARNA",
+            subtitle: "The King of Biriyanis",
+            buttonText: "Order Now",
+            buttonAction: "navigate:menu",
+            backgroundImage: "https://images.unsplash.com/photo-1596797038530-2c107229654b?w=1000",
+            overlayColor: "rgba(122,16,32,0.65)",
+            height: 300,
+          },
+        },
+        {
+          id: uid(),
+          type: "section",
+          props: { title: "Popular Biriyanis", padding: 16 },
+          children: [
+            {
+              id: uid(),
+              type: "productGrid",
+              props: {
+                columns: 2,
+                products: [
+                  {
+                    name: "Special KARNA Chicken Biriyani",
+                    price: "₹299",
+                    category: "Chicken",
+                    image: "https://images.unsplash.com/photo-1604908177225-6d3b5b6dfc61?w=600",
+                    rating: 4.8,
+                  },
+                  {
+                    name: "Mutton Dum Biriyani",
+                    price: "₹399",
+                    category: "Mutton",
+                    image: "https://images.unsplash.com/photo-1631515242808-497c3fbd3972?w=600",
+                    rating: 4.7,
+                  },
+                  {
+                    name: "Paneer Biriyani",
+                    price: "₹249",
+                    category: "Veg",
+                    image: "https://images.unsplash.com/photo-1604908177448-0d7b4c4f3d1d?w=600",
+                    rating: 4.5,
+                  },
+                  {
+                    name: "Family Pack Biriyani (Serves 4)",
+                    price: "₹899",
+                    category: "Special",
+                    image: "https://images.unsplash.com/photo-1604908177300-7f1d7b7f6f8b?w=600",
+                    rating: 4.6,
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          id: uid(),
+          type: "section",
+          props: { title: "Customer Reviews", padding: 16 },
+          children: [
+            {
+              id: uid(),
+              type: "testimonial",
+              props: {
+                reviews: [
+                  { name: "Ayesha", rating: 5, text: "Best biriyani in Hyderabad. Perfect spice & aroma!" },
+                  { name: "Rahul", rating: 5, text: "KARNA special chicken biriyani is a must-try." },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          id: uid(),
+          type: "section",
+          props: { title: "Visit Us", padding: 16 },
+          children: [
+            { id: uid(), type: "text", props: { text: "📍 Hyderabad, India", fontSize: 14, color: "#6b7280" } },
+            { id: uid(), type: "text", props: { text: "🕐 11:00 AM – 11:30 PM", fontSize: 14, color: "#6b7280" } },
+            { id: uid(), type: "text", props: { text: "☎️ +91-9000000000", fontSize: 14, color: "#6b7280" } },
+          ],
+        },
+      ],
+    },
+    {
+      id: "menu",
+      name: "Menu",
+      icon: "📋",
+      components: [
+        {
+          id: uid(),
+          type: "section",
+          props: { title: "Chicken Biriyani", padding: 16 },
+          children: [
+            {
+              id: uid(),
+              type: "list",
+              props: {
+                variant: "menu-item",
+                items: [
+                  {
+                    name: "Chicken Dum Biriyani",
+                    description: "Classic Hyderabadi dum biriyani with tender chicken",
+                    price: "₹259",
+                    badge: "Non-Veg",
+                    image: "https://images.unsplash.com/photo-1604908177225-6d3b5b6dfc61?w=400",
+                  },
+                  {
+                    name: "Chicken Fry Piece Biriyani",
+                    description: "Spicy fry piece layered with fragrant basmati rice",
+                    price: "₹279",
+                    badge: "Non-Veg",
+                    image: "https://images.unsplash.com/photo-1596797038530-2c107229654b?w=400",
+                  },
+                  {
+                    name: "Chicken Boneless Biriyani",
+                    description: "Boneless chicken, bold spices, extra flavor",
+                    price: "₹289",
+                    badge: "Non-Veg",
+                    image: "https://images.unsplash.com/photo-1604908177300-7f1d7b7f6f8b?w=400",
+                  },
+                  {
+                    name: "Chicken 65 Biriyani",
+                    description: "Crispy chicken 65 tossed with biriyani masala",
+                    price: "₹299",
+                    badge: "Non-Veg",
+                    image: "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=400",
+                  },
+                  {
+                    name: "Special KARNA Chicken Biriyani",
+                    description: "Signature house special, royal spice blend",
+                    price: "₹319",
+                    badge: "Non-Veg",
+                    image: "https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400",
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          id: uid(),
+          type: "section",
+          props: { title: "Mutton Biriyani", padding: 16 },
+          children: [
+            {
+              id: uid(),
+              type: "list",
+              props: {
+                variant: "menu-item",
+                items: [
+                  {
+                    name: "Mutton Dum Biriyani",
+                    description: "Slow-cooked mutton dum with aromatic rice",
+                    price: "₹399",
+                    badge: "Non-Veg",
+                    image: "https://images.unsplash.com/photo-1631515242808-497c3fbd3972?w=400",
+                  },
+                  {
+                    name: "Mutton Fry Piece Biriyani",
+                    description: "Juicy fry mutton layered with spicy biriyani",
+                    price: "₹419",
+                    badge: "Non-Veg",
+                    image: "https://images.unsplash.com/photo-1604908177448-0d7b4c4f3d1d?w=400",
+                  },
+                  {
+                    name: "Mutton Kheema Biriyani",
+                    description: "Kheema masala biriyani, rich and flavorful",
+                    price: "₹379",
+                    badge: "Non-Veg",
+                    image: "https://images.unsplash.com/photo-1617196034183-421b4917c92c?w=400",
+                  },
+                  {
+                    name: "Special KARNA Mutton Biriyani",
+                    description: "House special mutton biriyani, royal indulgence",
+                    price: "₹449",
+                    badge: "Non-Veg",
+                    image: "https://images.unsplash.com/photo-1626082913490-45b9d0be9c36?w=400",
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          id: uid(),
+          type: "section",
+          props: { title: "Veg Biriyani", padding: 16 },
+          children: [
+            {
+              id: uid(),
+              type: "list",
+              props: {
+                variant: "menu-item",
+                items: [
+                  {
+                    name: "Veg Dum Biriyani",
+                    description: "Seasonal veggies, dum cooked with spices",
+                    price: "₹199",
+                    badge: "Veg",
+                    image: "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=400",
+                  },
+                  {
+                    name: "Paneer Biriyani",
+                    description: "Paneer chunks, rich masala, fragrant rice",
+                    price: "₹249",
+                    badge: "Veg",
+                    image: "https://images.unsplash.com/photo-1604908177300-7f1d7b7f6f8b?w=400",
+                  },
+                  {
+                    name: "Mushroom Biriyani",
+                    description: "Mushrooms sautéed and dum cooked",
+                    price: "₹239",
+                    badge: "Veg",
+                    image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400",
+                  },
+                  {
+                    name: "Mixed Veg Biriyani",
+                    description: "Mixed veg biriyani with a mild royal touch",
+                    price: "₹219",
+                    badge: "Veg",
+                    image: "https://images.unsplash.com/photo-1604908177225-6d3b5b6dfc61?w=400",
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          id: uid(),
+          type: "section",
+          props: { title: "Special Biriyani", padding: 16 },
+          children: [
+            {
+              id: uid(),
+              type: "list",
+              props: {
+                variant: "menu-item",
+                items: [
+                  {
+                    name: "Prawns Biriyani",
+                    description: "Juicy prawns with coastal spices",
+                    price: "₹429",
+                    badge: "Non-Veg",
+                    image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400",
+                  },
+                  {
+                    name: "Fish Biriyani",
+                    description: "Fish biriyani with tangy spice profile",
+                    price: "₹409",
+                    badge: "Non-Veg",
+                    image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400",
+                  },
+                  {
+                    name: "Egg Biriyani",
+                    description: "Egg biriyani with masala gravy",
+                    price: "₹189",
+                    badge: "Non-Veg",
+                    image: "https://images.unsplash.com/photo-1604908177448-0d7b4c4f3d1d?w=400",
+                  },
+                  {
+                    name: "Family Pack Biriyani (Serves 4)",
+                    description: "Big pack for family & friends",
+                    price: "₹899",
+                    badge: "Non-Veg",
+                    image: "https://images.unsplash.com/photo-1596797038530-2c107229654b?w=400",
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          id: uid(),
+          type: "text",
+          props: { text: "Minimum order: ₹150 • Delivery fee: ₹40 • Estimated time: 30–45 mins", fontSize: 12, color: "#6b7280" },
+        },
+      ],
+    },
+    {
+      id: "cart",
+      name: "Cart",
+      icon: "🛒",
+      components: [
+        {
+          id: uid(),
+          type: "section",
+          props: { title: "Your Cart", padding: 16 },
+          children: [
+            {
+              id: uid(),
+              type: "list",
+              props: {
+                variant: "cart",
+                items: [
+                  { name: "Special KARNA Chicken Biriyani", quantity: 1, price: "₹319", image: "https://images.unsplash.com/photo-1604908177225-6d3b5b6dfc61?w=200" },
+                  { name: "Egg Biriyani", quantity: 1, price: "₹189", image: "https://images.unsplash.com/photo-1604908177448-0d7b4c4f3d1d?w=200" },
+                ],
+              },
+            },
+            { id: uid(), type: "divider", props: { thickness: 1, color: "#e5e7eb" } },
+            { id: uid(), type: "text", props: { text: "Subtotal: ₹508", fontSize: 14, color: "#111827" } },
+            { id: uid(), type: "text", props: { text: "GST (5%): ₹25.40", fontSize: 14, color: "#111827" } },
+            { id: uid(), type: "text", props: { text: "Delivery Fee: ₹40", fontSize: 14, color: "#111827" } },
+            { id: uid(), type: "heading", props: { text: "Total: ₹573.40", level: 3, color: "#111827" } },
+            { id: uid(), type: "button", props: { text: "Proceed to Checkout", variant: "primary" } },
+          ],
+        },
+      ],
+    },
+    {
+      id: "orders",
+      name: "Orders",
+      icon: "📦",
+      components: [
+        {
+          id: uid(),
+          type: "section",
+          props: { title: "Order Tracking", padding: 16 },
+          children: [
+            {
+              id: uid(),
+              type: "list",
+              props: {
+                variant: "orders",
+                items: [
+                  { name: "#KARNA-1024", status: "Preparing", total: "₹573.40", image: "https://images.unsplash.com/photo-1596797038530-2c107229654b?w=200" },
+                  { name: "#KARNA-1019", status: "Delivered", total: "₹299", image: "https://images.unsplash.com/photo-1604908177225-6d3b5b6dfc61?w=200" },
+                ],
+              },
+            },
+            { id: uid(), type: "spacer", props: { height: 8 } },
+            { id: uid(), type: "text", props: { text: "Status steps: Order Placed → Preparing → Out for Delivery → Delivered", fontSize: 12, color: "#6b7280" } },
+          ],
+        },
+      ],
+    },
+    {
+      id: "profile",
+      name: "Profile",
+      icon: "👤",
+      components: [
+        {
+          id: uid(),
+          type: "hero",
+          props: {
+            title: "Welcome back",
+            subtitle: "Manage your addresses and past orders",
+            backgroundImage: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800",
+            overlayColor: "rgba(17,24,39,0.55)",
+            height: 200,
+          },
+        },
+        {
+          id: uid(),
+          type: "section",
+          props: { title: "Quick Links", padding: 16 },
+          children: [
+            {
+              id: uid(),
+              type: "list",
+              props: {
+                variant: "menu",
+                items: [
+                  { icon: "📍", label: "Saved Addresses", action: "navigate:addresses" },
+                  { icon: "🧾", label: "Past Orders", action: "navigate:orders" },
+                  { icon: "🎟️", label: "Coupons", action: "navigate:coupons" },
+                  { icon: "⚙️", label: "Settings", action: "navigate:settings" },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+// ============================================
 // CHURCH TEMPLATE
 // ============================================
 export const churchTemplate: IndustryTemplate = {
@@ -2843,6 +3241,7 @@ export const ALL_TEMPLATES: Record<string, IndustryTemplate> = {
   ecommerce: ecommerceTemplate,
   salon: salonTemplate,
   restaurant: restaurantTemplate,
+  restaurant_biryani: biryaniRestaurantTemplate,
   church: churchTemplate,
   fitness: fitnessTemplate,
   education: educationTemplate,
@@ -2862,7 +3261,11 @@ export function getTemplateById(id: string): IndustryTemplate | null {
 
 // Build initial editor screens payload (personalized) from a template id.
 // Returns a JSON-serializable structure compatible with the visual editor.
-export function buildEditorScreensFromTemplate(templateId: string, appName: string): any[] | null {
+export function buildEditorScreensFromTemplate(
+  templateId: string,
+  appName: string,
+  opts?: { prompt?: string }
+): any[] | null {
   const template = getTemplateById(templateId);
   if (!template) return null;
 

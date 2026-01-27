@@ -94,6 +94,98 @@ export const apps = mysqlTable("apps", {
   statusIdx: index("apps_status_idx").on(table.status),
 }));
 
+// --- App Runtime (end-user) tables ---
+
+export const appCustomers = mysqlTable("app_customers", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  appId: varchar("app_id", { length: 36 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  password: text("password").notNull(),
+  role: varchar("role", { length: 16 }).notNull().default("customer"),
+  name: varchar("name", { length: 200 }),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  appIdIdx: index("app_customers_app_id_idx").on(table.appId),
+  appEmailIdx: index("app_customers_app_email_idx").on(table.appId, table.email),
+}));
+
+export const appProducts = mysqlTable("app_products", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  appId: varchar("app_id", { length: 36 }).notNull(),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
+  imageUrl: text("image_url"),
+  currency: varchar("currency", { length: 8 }).notNull().default("INR"),
+  priceCents: int("price_cents").notNull(),
+  active: tinyint("active").notNull().default(1),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  appIdIdx: index("app_products_app_id_idx").on(table.appId),
+  activeIdx: index("app_products_active_idx").on(table.appId, table.active),
+}));
+
+export const appOrders = mysqlTable("app_orders", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  appId: varchar("app_id", { length: 36 }).notNull(),
+  customerId: varchar("customer_id", { length: 36 }),
+  status: varchar("status", { length: 24 }).notNull().default("created"),
+  currency: varchar("currency", { length: 8 }).notNull().default("INR"),
+  totalCents: int("total_cents").notNull().default(0),
+  paymentProvider: varchar("payment_provider", { length: 16 }),
+  paymentStatus: varchar("payment_status", { length: 16 }).notNull().default("pending"),
+  paymentRef: varchar("payment_ref", { length: 128 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  appIdIdx: index("app_orders_app_id_idx").on(table.appId),
+  customerIdx: index("app_orders_customer_idx").on(table.appId, table.customerId),
+  statusIdx: index("app_orders_status_idx").on(table.appId, table.status),
+}));
+
+export const appOrderItems = mysqlTable("app_order_items", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  orderId: varchar("order_id", { length: 36 }).notNull(),
+  productId: varchar("product_id", { length: 36 }),
+  name: varchar("name", { length: 200 }).notNull(),
+  quantity: int("quantity").notNull().default(1),
+  unitPriceCents: int("unit_price_cents").notNull(),
+  lineTotalCents: int("line_total_cents").notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  orderIdx: index("app_order_items_order_idx").on(table.orderId),
+}));
+
+export const appEvents = mysqlTable("app_events", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  appId: varchar("app_id", { length: 36 }).notNull(),
+  customerId: varchar("customer_id", { length: 36 }),
+  name: varchar("name", { length: 64 }).notNull(),
+  properties: text("properties"), // JSON
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  appIdx: index("app_events_app_idx").on(table.appId),
+  nameIdx: index("app_events_name_idx").on(table.appId, table.name),
+  createdAtIdx: index("app_events_created_at_idx").on(table.createdAt),
+}));
+
+export const appWebhooks = mysqlTable("app_webhooks", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  appId: varchar("app_id", { length: 36 }).notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  url: text("url").notNull(),
+  secret: varchar("secret", { length: 128 }),
+  events: text("events"), // JSON array of event names
+  enabled: tinyint("enabled").notNull().default(1),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  appIdIdx: index("app_webhooks_app_id_idx").on(table.appId),
+  enabledIdx: index("app_webhooks_enabled_idx").on(table.appId, table.enabled),
+}));
+
 export const buildJobs = mysqlTable("build_jobs", {
   id: varchar("id", { length: 36 }).primaryKey(),
   appId: varchar("app_id", { length: 36 }).notNull(),

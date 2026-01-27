@@ -26,6 +26,16 @@ import { storage } from "./storage";
 import { hashPassword, sanitizeUser, verifyPassword } from "./auth";
 import { sendPasswordResetEmail, isEmailConfigured, sendTeamMemberWelcomeEmail, sendEmailVerificationEmail, sendBuildCompleteEmail, sendAccountLockedEmail } from "./email";
 import crypto from "crypto";
+import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { getMysqlDb } from "./db-mysql";
+import {
+  appCustomers,
+  appEvents,
+  appOrderItems,
+  appOrders,
+  appProducts,
+  appWebhooks,
+} from "@shared/db.mysql";
 import {
   isLLMConfigured,
   getLLMProvider,
@@ -100,6 +110,166 @@ function sanitizeAppForViewer(app: any, viewer: User | null) {
     copy.buildError = "Build failed. Please contact support.";
   }
   return copy;
+}
+
+function base64UrlEncode(buf: Buffer) {
+  return buf
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function base64UrlEncodeJson(obj: any) {
+  return base64UrlEncode(Buffer.from(JSON.stringify(obj)));
+}
+
+function base64UrlDecodeToString(s: string) {
+  const padded = s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4);
+  return Buffer.from(padded, "base64").toString("utf8");
+}
+
+function runtimeTokenSecret(appId: string) {
+  const base =
+    process.env.APP_CUSTOMER_TOKEN_SECRET ||
+    process.env.SESSION_SECRET ||
+    "dev-secret-change-me";
+  return `${base}:${appId}`;
+}
+
+function signRuntimeToken(appId: string, payload: any, ttlSeconds = 60 * 60 * 24 * 30) {
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: "HS256", typ: "JWT" };
+  const fullPayload = {
+    ...payload,
+    appId,
+    iat: now,
+    exp: now + ttlSeconds,
+  };
+  const h = base64UrlEncodeJson(header);
+  const p = base64UrlEncodeJson(fullPayload);
+  const data = `${h}.${p}`;
+  const sig = crypto.createHmac("sha256", runtimeTokenSecret(appId)).update(data).digest();
+  return `${data}.${base64UrlEncode(sig)}`;
+}
+
+function verifyRuntimeToken(appId: string, token: string): any | null {
+  const parts = (token || "").split(".");
+  if (parts.length !== 3) return null;
+  const [h, p, s] = parts;
+  const data = `${h}.${p}`;
+  const expected = crypto.createHmac("sha256", runtimeTokenSecret(appId)).update(data).digest();
+  const got = Buffer.from((s || "").replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4), "base64");
+  if (got.length !== expected.length) return null;
+  if (!crypto.timingSafeEqual(got, expected)) return null;
+
+  try {
+    const payload = JSON.parse(base64UrlDecodeToString(p));
+    const now = Math.floor(Date.now() / 1000);
+    if (payload?.exp && typeof payload.exp === "number" && now > payload.exp) return null;
+    if (payload?.appId !== appId) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+async function emitAppEvent(appId: string, customerId: string | null, name: string, properties?: any) {
+  try {
+    if (!process.env.DATABASE_URL?.startsWith("mysql://")) return;
+    const db = getMysqlDb();
+    const eventId = crypto.randomUUID();
+    const createdAt = new Date();
+    await db.insert(appEvents).values({
+      id: eventId,
+      appId,
+      customerId: customerId ?? null,
+      name,
+      properties: properties ? JSON.stringify(properties) : null,
+      createdAt,
+    } as any);
+
+    // Best-effort webhook fanout (async; never block core flows)
+    setImmediate(() => {
+      void deliverAppWebhooks(appId, {
+        id: eventId,
+        appId,
+        customerId: customerId ?? null,
+        name,
+        properties: properties ?? null,
+        createdAt: createdAt.toISOString(),
+      });
+    });
+  } catch {
+    // Best-effort analytics; never block core flows.
+  }
+}
+
+function safeJsonParse<T>(raw: unknown): T | null {
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+function webhookWantsEvent(hook: any, eventName: string) {
+  const events = safeJsonParse<string[]>(hook?.events);
+  if (!Array.isArray(events) || events.length === 0) return true;
+  return events.includes(eventName);
+}
+
+async function deliverAppWebhooks(appId: string, payload: any, onlyWebhookId?: string) {
+  try {
+    if (!process.env.DATABASE_URL?.startsWith("mysql://")) return;
+    const db = getMysqlDb();
+
+    const hooks = await db
+      .select()
+      .from(appWebhooks)
+      .where(and(eq(appWebhooks.appId, appId), eq(appWebhooks.enabled, 1)));
+
+    const targets = (hooks as any[])
+      .filter((h) => (!onlyWebhookId ? true : String(h.id) === String(onlyWebhookId)))
+      .filter((h) => isHttpishUrl(String(h.url || "")))
+      .filter((h) => webhookWantsEvent(h, String(payload?.name || "")));
+
+    if (!targets.length) return;
+
+    const body = JSON.stringify(payload);
+    await Promise.allSettled(
+      targets.map(async (h) => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 8000);
+        try {
+          const headers: Record<string, string> = {
+            "content-type": "application/json",
+            "x-app-id": String(appId),
+            "x-app-event": String(payload?.name || ""),
+            "x-app-delivery-id": String(payload?.id || ""),
+          };
+
+          const secret = typeof h.secret === "string" ? h.secret : "";
+          if (secret) {
+            const sig = crypto.createHmac("sha256", secret).update(body).digest("hex");
+            headers["x-app-signature"] = sig;
+          }
+
+          await fetch(String(h.url), {
+            method: "POST",
+            headers,
+            body,
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+      }),
+    );
+  } catch {
+    // Best-effort; ignore.
+  }
 }
 
 function requireAuth(req: any, res: any, next: any) {
@@ -1005,6 +1175,956 @@ export async function registerRoutes(
         isNativeOnly: (appItem as any).isNativeOnly ?? false,
         editorScreens: (appItem as any).editorScreens ?? null,
         status: appItem.status,
+      });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Runtime (end-user) auth ---
+  app.post("/api/runtime/:appId/auth/register", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Runtime auth requires MySQL storage" });
+      }
+
+      const schema = z
+        .object({
+          email: z.string().email().max(320),
+          password: z.string().min(8).max(200),
+          name: z.string().min(1).max(200).optional(),
+        })
+        .strict();
+
+      const { email, password, name } = schema.parse(req.body);
+      const db = getMysqlDb();
+
+      const existing = await db
+        .select()
+        .from(appCustomers)
+        .where(and(eq(appCustomers.appId, appId), eq(appCustomers.email, email.toLowerCase())))
+        .limit(1);
+      if (existing[0]) {
+        return res.status(409).json({ message: "Account already exists" });
+      }
+
+      const id = crypto.randomUUID();
+      const now = new Date();
+      const hashed = await hashPassword(password);
+      await db.insert(appCustomers).values({
+        id,
+        appId,
+        email: email.toLowerCase(),
+        password: hashed,
+        role: "customer",
+        name: name ?? null,
+        createdAt: now,
+        updatedAt: now,
+      } as any);
+
+      await emitAppEvent(appId, id, "customer.signup", { email: email.toLowerCase() });
+
+      const token = signRuntimeToken(appId, { sub: id, role: "customer" });
+      return res.status(201).json({
+        token,
+        customer: { id, appId, email: email.toLowerCase(), role: "customer", name: name ?? null },
+      });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.post("/api/runtime/:appId/auth/login", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Runtime auth requires MySQL storage" });
+      }
+
+      const schema = z
+        .object({
+          email: z.string().email().max(320),
+          password: z.string().min(1).max(200),
+        })
+        .strict();
+
+      const { email, password } = schema.parse(req.body);
+      const db = getMysqlDb();
+
+      const rows = await db
+        .select()
+        .from(appCustomers)
+        .where(and(eq(appCustomers.appId, appId), eq(appCustomers.email, email.toLowerCase())))
+        .limit(1);
+      const row: any = rows[0];
+      if (!row) return res.status(401).json({ message: "Invalid credentials" });
+
+      const ok = await verifyPassword(password, row.password);
+      if (!ok) return res.status(401).json({ message: "Invalid credentials" });
+
+      await emitAppEvent(appId, row.id, "customer.login", { email: row.email });
+      const token = signRuntimeToken(appId, { sub: row.id, role: row.role || "customer" });
+      return res.json({
+        token,
+        customer: { id: row.id, appId, email: row.email, role: row.role || "customer", name: row.name ?? null },
+      });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.get("/api/runtime/:appId/auth/me", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      const auth = String(req.headers.authorization || "");
+      const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+      const payload = token ? verifyRuntimeToken(appId, token) : null;
+      if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Runtime auth requires MySQL storage" });
+      }
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select()
+        .from(appCustomers)
+        .where(and(eq(appCustomers.appId, appId), eq(appCustomers.id, String(payload.sub))))
+        .limit(1);
+      const row: any = rows[0];
+      if (!row) return res.status(401).json({ message: "Unauthorized" });
+
+      return res.json({ id: row.id, appId, email: row.email, role: row.role || "customer", name: row.name ?? null });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Runtime (optional) analytics events ---
+  app.post("/api/runtime/:appId/events", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      const schema = z
+        .object({
+          name: z.string().min(1).max(64),
+          properties: z.any().optional(),
+        })
+        .strict();
+      const { name, properties } = schema.parse(req.body);
+
+      const auth = String(req.headers.authorization || "");
+      const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+      const payload = token ? verifyRuntimeToken(appId, token) : null;
+      const customerId = payload?.sub ? String(payload.sub) : null;
+
+      await emitAppEvent(appId, customerId, name, properties);
+      return res.status(201).json({ ok: true });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Runtime (public) products ---
+  app.get("/api/runtime/:appId/products", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Catalog requires MySQL storage" });
+      }
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select()
+        .from(appProducts)
+        .where(and(eq(appProducts.appId, appId), eq(appProducts.active, 1)))
+        .orderBy(desc(appProducts.updatedAt));
+
+      return res.json(
+        rows.map((p: any) => ({
+          id: p.id,
+          appId: p.appId,
+          name: p.name,
+          description: p.description ?? "",
+          imageUrl: p.imageUrl ?? null,
+          currency: p.currency ?? "INR",
+          priceCents: Number(p.priceCents || 0),
+          active: p.active === 1 || p.active === true,
+        })),
+      );
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Runtime (customer) orders ---
+  app.post("/api/runtime/:appId/orders", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Orders require MySQL storage" });
+      }
+
+      const auth = String(req.headers.authorization || "");
+      const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+      const payload = token ? verifyRuntimeToken(appId, token) : null;
+      if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
+
+      const schema = z
+        .object({
+          items: z
+            .array(
+              z
+                .object({
+                  productId: z.string().min(1),
+                  quantity: z.number().int().min(1).max(999),
+                })
+                .strict(),
+            )
+            .min(1),
+          notes: z.string().max(2000).optional(),
+          paymentProvider: z.enum(["cod", "razorpay", "stripe"]).optional().default("cod"),
+        })
+        .strict();
+
+      const { items, notes, paymentProvider } = schema.parse(req.body);
+      const db = getMysqlDb();
+
+      const productIds = items
+        .map((i) => i.productId)
+        .filter((id, idx, arr) => arr.indexOf(id) === idx);
+      const products = await db
+        .select()
+        .from(appProducts)
+        .where(and(eq(appProducts.appId, appId), inArray(appProducts.id, productIds)));
+
+      const byId = new Map(products.map((p: any) => [String(p.id), p]));
+      const missing = items.find((i) => !byId.has(String(i.productId)));
+      if (missing) return res.status(400).json({ message: "Invalid product" });
+
+      const orderId = crypto.randomUUID();
+      const now = new Date();
+      let totalCents = 0;
+
+      const lineRows = items.map((i) => {
+        const p: any = byId.get(String(i.productId));
+        const unit = Number(p.priceCents || 0);
+        const line = unit * i.quantity;
+        totalCents += line;
+        return {
+          id: crypto.randomUUID(),
+          orderId,
+          productId: String(p.id),
+          name: String(p.name),
+          quantity: i.quantity,
+          unitPriceCents: unit,
+          lineTotalCents: line,
+          createdAt: now,
+        };
+      });
+
+      await db.insert(appOrders).values({
+        id: orderId,
+        appId,
+        customerId: String(payload.sub),
+        status: "created",
+        currency: "INR",
+        totalCents,
+        paymentProvider,
+        paymentStatus: paymentProvider === "cod" ? "completed" : "pending",
+        notes: notes ?? null,
+        createdAt: now,
+        updatedAt: now,
+      } as any);
+
+      await db.insert(appOrderItems).values(lineRows as any);
+      await emitAppEvent(appId, String(payload.sub), "order.created", { orderId, totalCents, paymentProvider });
+
+      return res.status(201).json({
+        id: orderId,
+        status: "created",
+        totalCents,
+        currency: "INR",
+        paymentProvider,
+        paymentStatus: paymentProvider === "cod" ? "completed" : "pending",
+      });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Initiate Razorpay payment for an order (runtime)
+  app.post("/api/runtime/:appId/orders/:orderId/pay/razorpay", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const orderId = String(req.params.orderId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Payments require MySQL storage" });
+      }
+
+      const authz = String(req.headers.authorization || "");
+      const token = authz.toLowerCase().startsWith("bearer ") ? authz.slice(7).trim() : "";
+      const payload = token ? verifyRuntimeToken(appId, token) : null;
+      if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
+
+      if (!isRazorpayConfigured()) {
+        return res.status(503).json({ message: "Payment gateway not configured" });
+      }
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select()
+        .from(appOrders)
+        .where(and(eq(appOrders.appId, appId), eq(appOrders.id, orderId), eq(appOrders.customerId, String(payload.sub))))
+        .limit(1);
+      const order: any = rows[0];
+      if (!order) return res.status(404).json({ message: "Order not found" });
+      if ((order.paymentProvider || "") !== "razorpay") {
+        return res.status(400).json({ message: "Order is not configured for Razorpay" });
+      }
+      if ((order.currency || "INR") !== "INR") {
+        return res.status(400).json({ message: "Only INR is supported for Razorpay" });
+      }
+      if (order.paymentStatus === "completed") {
+        return res.status(400).json({ message: "Order is already paid" });
+      }
+
+      const amountInPaise = Number(order.totalCents || 0);
+      if (!Number.isFinite(amountInPaise) || amountInPaise <= 0) {
+        return res.status(400).json({ message: "Invalid order amount" });
+      }
+
+      const orderPayload = {
+        amount: amountInPaise,
+        currency: "INR",
+        receipt: `runtime_order_${appId}_${orderId}_${Date.now()}`,
+        notes: {
+          kind: "runtime_order",
+          appId,
+          orderId,
+          customerId: String(payload.sub),
+        },
+      };
+
+      const auth = Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString("base64");
+      const rzpRes = await fetch("https://api.razorpay.com/v1/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Basic ${auth}`,
+        },
+        body: JSON.stringify(orderPayload),
+      });
+
+      if (!rzpRes.ok) {
+        const errText = await rzpRes.text();
+        console.error("[Runtime Razorpay] order creation failed:", errText);
+        return res.status(502).json({ message: "Payment gateway error" });
+      }
+
+      const rzpOrder = (await rzpRes.json()) as { id: string; amount: number; currency: string };
+      await db
+        .update(appOrders)
+        .set({ paymentRef: rzpOrder.id, paymentStatus: "pending", updatedAt: new Date() } as any)
+        .where(and(eq(appOrders.appId, appId), eq(appOrders.id, orderId)));
+
+      await emitAppEvent(appId, String(payload.sub), "payment.razorpay.created", { orderId, razorpayOrderId: rzpOrder.id });
+
+      return res.json({
+        provider: "razorpay",
+        keyId: razorpayKeyId,
+        order: rzpOrder,
+      });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.post("/api/runtime/:appId/orders/:orderId/pay/razorpay/verify", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const orderId = String(req.params.orderId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Payments require MySQL storage" });
+      }
+
+      const authz = String(req.headers.authorization || "");
+      const token = authz.toLowerCase().startsWith("bearer ") ? authz.slice(7).trim() : "";
+      const payload = token ? verifyRuntimeToken(appId, token) : null;
+      if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
+
+      if (!isRazorpayConfigured()) {
+        return res.status(503).json({ message: "Payment gateway not configured" });
+      }
+
+      const schema = z
+        .object({
+          razorpay_order_id: z.string().min(1),
+          razorpay_payment_id: z.string().min(1),
+          razorpay_signature: z.string().min(1),
+        })
+        .strict();
+      const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = schema.parse(req.body);
+
+      const expectedSignature = crypto
+        .createHmac("sha256", razorpayKeySecret)
+        .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+        .digest("hex");
+
+      const sigBuffer = Buffer.from(razorpay_signature, "utf8");
+      const expectedBuffer = Buffer.from(expectedSignature, "utf8");
+      if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
+        return res.status(400).json({ message: "Invalid signature" });
+      }
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select()
+        .from(appOrders)
+        .where(and(eq(appOrders.appId, appId), eq(appOrders.id, orderId), eq(appOrders.customerId, String(payload.sub))))
+        .limit(1);
+      const order: any = rows[0];
+      if (!order) return res.status(404).json({ message: "Order not found" });
+
+      await db
+        .update(appOrders)
+        .set({ paymentStatus: "completed", paymentRef: razorpay_order_id, updatedAt: new Date() } as any)
+        .where(and(eq(appOrders.appId, appId), eq(appOrders.id, orderId)));
+
+      await emitAppEvent(appId, String(payload.sub), "order.paid", {
+        orderId,
+        razorpayOrderId: razorpay_order_id,
+        razorpayPaymentId: razorpay_payment_id,
+      });
+
+      return res.json({ ok: true });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.get("/api/runtime/:appId/orders", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Orders require MySQL storage" });
+      }
+
+      const auth = String(req.headers.authorization || "");
+      const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+      const payload = token ? verifyRuntimeToken(appId, token) : null;
+      if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select()
+        .from(appOrders)
+        .where(and(eq(appOrders.appId, appId), eq(appOrders.customerId, String(payload.sub))))
+        .orderBy(desc(appOrders.createdAt));
+
+      return res.json(
+        rows.map((o: any) => ({
+          id: o.id,
+          status: o.status,
+          totalCents: Number(o.totalCents || 0),
+          currency: o.currency || "INR",
+          paymentProvider: o.paymentProvider ?? null,
+          paymentStatus: o.paymentStatus,
+          createdAt: o.createdAt,
+          updatedAt: o.updatedAt,
+        })),
+      );
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Owner Admin (CRUD) for products and orders ---
+  app.get("/api/apps/:id/admin/products", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Admin products require MySQL storage" });
+      }
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select()
+        .from(appProducts)
+        .where(eq(appProducts.appId, appId))
+        .orderBy(desc(appProducts.updatedAt));
+      return res.json(rows);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.post("/api/apps/:id/admin/products", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Admin products require MySQL storage" });
+      }
+
+      const schema = z
+        .object({
+          name: z.string().min(1).max(200),
+          description: z.string().max(5000).optional(),
+          imageUrl: z.string().max(2000).optional(),
+          priceCents: z.number().int().min(0).max(10_000_00),
+          currency: z.string().max(8).optional().default("INR"),
+          active: z.boolean().optional().default(true),
+        })
+        .strict();
+
+      const payload = schema.parse(req.body);
+      const db = getMysqlDb();
+      const id = crypto.randomUUID();
+      const now = new Date();
+
+      await db.insert(appProducts).values({
+        id,
+        appId,
+        name: payload.name,
+        description: payload.description ?? null,
+        imageUrl: payload.imageUrl ?? null,
+        currency: payload.currency,
+        priceCents: payload.priceCents,
+        active: payload.active ? 1 : 0,
+        createdAt: now,
+        updatedAt: now,
+      } as any);
+
+      return res.status(201).json({ id });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.patch("/api/apps/:id/admin/products/:productId", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const productId = String(req.params.productId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Admin products require MySQL storage" });
+      }
+
+      const schema = z
+        .object({
+          name: z.string().min(1).max(200).optional(),
+          description: z.string().max(5000).optional().nullable(),
+          imageUrl: z.string().max(2000).optional().nullable(),
+          priceCents: z.number().int().min(0).max(10_000_00).optional(),
+          currency: z.string().max(8).optional(),
+          active: z.boolean().optional(),
+        })
+        .strict();
+      const patch = schema.parse(req.body);
+      const db = getMysqlDb();
+
+      const update: any = { ...patch, updatedAt: new Date() };
+      if (typeof patch.active === "boolean") update.active = patch.active ? 1 : 0;
+
+      await db
+        .update(appProducts)
+        .set(update)
+        .where(and(eq(appProducts.appId, appId), eq(appProducts.id, productId)));
+
+      return res.json({ ok: true });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.get("/api/apps/:id/admin/orders", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Admin orders require MySQL storage" });
+      }
+
+      const db = getMysqlDb();
+      const orders = await db
+        .select()
+        .from(appOrders)
+        .where(eq(appOrders.appId, appId))
+        .orderBy(desc(appOrders.createdAt));
+
+      return res.json(orders);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.patch("/api/apps/:id/admin/orders/:orderId", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const orderId = String(req.params.orderId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Admin orders require MySQL storage" });
+      }
+
+      const schema = z
+        .object({
+          status: z
+            .enum(["created", "accepted", "preparing", "out_for_delivery", "delivered", "cancelled"])
+            .optional(),
+        })
+        .strict();
+      const patch = schema.parse(req.body);
+      const db = getMysqlDb();
+
+      await db
+        .update(appOrders)
+        .set({ ...patch, updatedAt: new Date() } as any)
+        .where(and(eq(appOrders.appId, appId), eq(appOrders.id, orderId)));
+
+      return res.json({ ok: true });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Owner Admin (Integrations) webhooks ---
+  app.get("/api/apps/:id/admin/webhooks", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Webhooks require MySQL storage" });
+      }
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select()
+        .from(appWebhooks)
+        .where(eq(appWebhooks.appId, appId))
+        .orderBy(desc(appWebhooks.updatedAt));
+      return res.json(rows);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.post("/api/apps/:id/admin/webhooks", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Webhooks require MySQL storage" });
+      }
+
+      const schema = z
+        .object({
+          name: z.string().min(1).max(100),
+          url: z.string().min(1).max(2000),
+          secret: z.string().max(128).optional(),
+          enabled: z.boolean().optional().default(true),
+          events: z.array(z.string().min(1).max(64)).optional().default([]),
+        })
+        .strict();
+
+      const body = schema.parse(req.body);
+      if (!isHttpishUrl(body.url)) return res.status(400).json({ message: "Invalid webhook URL" });
+
+      const db = getMysqlDb();
+      const now = new Date();
+      const id = crypto.randomUUID();
+      await db.insert(appWebhooks).values({
+        id,
+        appId,
+        name: body.name,
+        url: body.url,
+        secret: body.secret ?? null,
+        events: JSON.stringify(body.events || []),
+        enabled: body.enabled ? 1 : 0,
+        createdAt: now,
+        updatedAt: now,
+      } as any);
+
+      return res.status(201).json({ id });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.patch("/api/apps/:id/admin/webhooks/:hookId", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const hookId = String(req.params.hookId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Webhooks require MySQL storage" });
+      }
+
+      const schema = z
+        .object({
+          name: z.string().min(1).max(100).optional(),
+          url: z.string().min(1).max(2000).optional(),
+          secret: z.string().max(128).optional().nullable(),
+          enabled: z.boolean().optional(),
+          events: z.array(z.string().min(1).max(64)).optional(),
+        })
+        .strict();
+      const patch = schema.parse(req.body);
+      if (patch.url && !isHttpishUrl(patch.url)) return res.status(400).json({ message: "Invalid webhook URL" });
+
+      const db = getMysqlDb();
+      const update: any = { updatedAt: new Date() };
+      if (typeof patch.name === "string") update.name = patch.name;
+      if (typeof patch.url === "string") update.url = patch.url;
+      if (typeof patch.secret !== "undefined") update.secret = patch.secret;
+      if (typeof patch.enabled === "boolean") update.enabled = patch.enabled ? 1 : 0;
+      if (typeof patch.events !== "undefined") update.events = JSON.stringify(patch.events || []);
+
+      await db
+        .update(appWebhooks)
+        .set(update)
+        .where(and(eq(appWebhooks.appId, appId), eq(appWebhooks.id, hookId)));
+
+      return res.json({ ok: true });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.delete("/api/apps/:id/admin/webhooks/:hookId", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const hookId = String(req.params.hookId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Webhooks require MySQL storage" });
+      }
+
+      const db = getMysqlDb();
+      await db.delete(appWebhooks).where(and(eq(appWebhooks.appId, appId), eq(appWebhooks.id, hookId)));
+      return res.json({ ok: true });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.post("/api/apps/:id/admin/webhooks/:hookId/test", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const hookId = String(req.params.hookId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Webhooks require MySQL storage" });
+      }
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select()
+        .from(appWebhooks)
+        .where(and(eq(appWebhooks.appId, appId), eq(appWebhooks.id, hookId)))
+        .limit(1);
+      const hook: any = rows[0];
+      if (!hook) return res.status(404).json({ message: "Webhook not found" });
+
+      await deliverAppWebhooks(appId, {
+        id: crypto.randomUUID(),
+        appId,
+        customerId: null,
+        name: "webhook.test",
+        properties: { hookId },
+        createdAt: new Date().toISOString(),
+      }, hookId);
+
+      return res.json({ ok: true });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Owner Admin runtime analytics (events + orders) ---
+  app.get("/api/apps/:id/admin/runtime-analytics", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Runtime analytics require MySQL storage" });
+      }
+
+      const range = String((req.query as any)?.range || "7d");
+      const days = range === "90d" ? 90 : range === "30d" ? 30 : 7;
+      const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+      const db = getMysqlDb();
+
+      const [{ count: customersTotal } = { count: 0 }] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(appCustomers)
+        .where(eq(appCustomers.appId, appId));
+
+      const [{ count: ordersCount, revenueCents } = { count: 0, revenueCents: 0 }] = await db
+        .select({
+          count: sql<number>`count(*)`,
+          revenueCents: sql<number>`coalesce(sum(${appOrders.totalCents}), 0)`,
+        })
+        .from(appOrders)
+        .where(and(eq(appOrders.appId, appId), gte(appOrders.createdAt, since)));
+
+      const topEvents = await db
+        .select({ name: appEvents.name, count: sql<number>`count(*)` })
+        .from(appEvents)
+        .where(and(eq(appEvents.appId, appId), gte(appEvents.createdAt, since)))
+        .groupBy(appEvents.name)
+        .orderBy(desc(sql`count(*)`))
+        .limit(20);
+
+      const dayExpr = sql<string>`date(${appEvents.createdAt})`;
+      const eventsByDay = await db
+        .select({ day: dayExpr, count: sql<number>`count(*)` })
+        .from(appEvents)
+        .where(and(eq(appEvents.appId, appId), gte(appEvents.createdAt, since)))
+        .groupBy(dayExpr)
+        .orderBy(asc(dayExpr));
+
+      return res.json({
+        range: `${days}d`,
+        since: since.toISOString(),
+        customersTotal: Number(customersTotal || 0),
+        ordersCount: Number(ordersCount || 0),
+        revenueCents: Number(revenueCents || 0),
+        topEvents: (topEvents as any[]).map((r) => ({ name: r.name, count: Number((r as any).count || 0) })),
+        eventsByDay: (eventsByDay as any[]).map((r) => ({ day: String((r as any).day), count: Number((r as any).count || 0) })),
+      });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Publish pack export (store metadata) ---
+  app.get("/api/apps/:id/publish-pack", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const appItem: any = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+
+      const modules = Array.isArray(appItem.modules) ? appItem.modules : [];
+      const publishing = modules.find((m: any) => m?.type === "publishing");
+      const storeAssets = publishing?.config?.storeAssets || {};
+
+      const features = {
+        auth: modules.some((m: any) => m?.type === "auth"),
+        payments: modules.some((m: any) => m?.type === "payments"),
+        analytics: modules.some((m: any) => m?.type === "analytics"),
+        push: modules.some((m: any) => m?.type === "notifications"),
+      };
+
+      return res.json({
+        generatedAt: new Date().toISOString(),
+        app: {
+          id: appItem.id,
+          name: appItem.name,
+          url: appItem.url,
+          packageName: appItem.packageName ?? null,
+          iconUrl: appItem.iconUrl ?? null,
+          primaryColor: appItem.primaryColor ?? null,
+        },
+        storeAssets: {
+          supportEmail: storeAssets.supportEmail ?? "",
+          privacyPolicyUrl: storeAssets.privacyPolicyUrl ?? "",
+          termsUrl: storeAssets.termsUrl ?? "",
+          shortDescription: storeAssets.shortDescription ?? "",
+          fullDescription: storeAssets.fullDescription ?? "",
+          screenshots: Array.isArray(storeAssets.screenshots) ? storeAssets.screenshots : [],
+        },
+        features,
+        checklist: Array.isArray(publishing?.config?.checklist) ? publishing.config.checklist : [],
       });
     } catch (err) {
       return next(err);
@@ -2153,6 +3273,27 @@ export async function registerRoutes(
       if (event.event === "payment.captured") {
         const payment = event.payload?.payment?.entity;
         if (payment?.order_id && payment?.id && payment?.status === "captured") {
+          // Runtime order payments
+          const notes: any = payment?.notes || {};
+          if (notes?.kind === "runtime_order" && typeof notes.appId === "string" && typeof notes.orderId === "string") {
+            try {
+              if (process.env.DATABASE_URL?.startsWith("mysql://")) {
+                const db = getMysqlDb();
+                await db
+                  .update(appOrders)
+                  .set({ paymentStatus: "completed", updatedAt: new Date() } as any)
+                  .where(and(eq(appOrders.appId, notes.appId), eq(appOrders.id, notes.orderId)));
+                await emitAppEvent(notes.appId, notes.customerId ? String(notes.customerId) : null, "order.paid", {
+                  orderId: notes.orderId,
+                  razorpayOrderId: payment.order_id,
+                  razorpayPaymentId: payment.id,
+                });
+              }
+            } catch (e) {
+              console.error("[Razorpay Webhook] Failed to update runtime order:", e);
+            }
+          }
+
           // Find payment by order ID
           const existingPayments = await storage.listPaymentsByUser("all"); // Get all to find by order
           const dbPayment = Array.from(existingPayments).find(
@@ -2170,6 +3311,26 @@ export async function registerRoutes(
       if (event.event === "payment.failed") {
         const payment = event.payload?.payment?.entity;
         if (payment?.order_id) {
+          // Runtime order payments
+          const notes: any = payment?.notes || {};
+          if (notes?.kind === "runtime_order" && typeof notes.appId === "string" && typeof notes.orderId === "string") {
+            try {
+              if (process.env.DATABASE_URL?.startsWith("mysql://")) {
+                const db = getMysqlDb();
+                await db
+                  .update(appOrders)
+                  .set({ paymentStatus: "failed", updatedAt: new Date() } as any)
+                  .where(and(eq(appOrders.appId, notes.appId), eq(appOrders.id, notes.orderId)));
+                await emitAppEvent(notes.appId, notes.customerId ? String(notes.customerId) : null, "order.payment_failed", {
+                  orderId: notes.orderId,
+                  razorpayOrderId: payment.order_id,
+                });
+              }
+            } catch (e) {
+              console.error("[Razorpay Webhook] Failed to update runtime order:", e);
+            }
+          }
+
           const existingPayments = await storage.listPaymentsByUser("all");
           const dbPayment = Array.from(existingPayments).find(
             (p: any) => p.providerOrderId === payment.order_id && p.status === "pending"

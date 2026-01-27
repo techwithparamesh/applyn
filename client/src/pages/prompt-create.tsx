@@ -13,6 +13,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
 import { buildEditorScreensFromTemplate } from "@/lib/app-templates";
 import { motion, AnimatePresence } from "framer-motion";
+import type { AppModule } from "@shared/schema";
 import {
   ArrowRight,
   Sparkles,
@@ -187,6 +188,167 @@ const INDUSTRY_TEMPLATES = [
 type CreationMode = "website" | "scratch" | null;
 type Step = "mode" | "template" | "prompt" | "generating" | "preview";
 
+type BusinessCapabilities = {
+  auth: boolean;
+  payments: boolean;
+  admin: boolean;
+  analytics: boolean;
+  notifications: boolean;
+  publishingChecklist: boolean;
+};
+
+function newId(prefix: string) {
+  const c: any = (globalThis as any).crypto;
+  const uuid = typeof c?.randomUUID === "function" ? c.randomUUID() : null;
+  return uuid ? `${prefix}_${uuid}` : `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
+function defaultCapabilitiesForIndustry(industryId: string | undefined | null): BusinessCapabilities {
+  const id = String(industryId || "").toLowerCase();
+  // Baseline: every real app needs publishing readiness + basic analytics.
+  const base: BusinessCapabilities = {
+    auth: true,
+    payments: false,
+    admin: true,
+    analytics: true,
+    notifications: false,
+    publishingChecklist: true,
+  };
+
+  if (id.includes("ecommerce") || id.includes("store") || id.includes("shop")) {
+    return { ...base, payments: true, notifications: true };
+  }
+  if (id.includes("restaurant")) {
+    return { ...base, payments: true, notifications: true };
+  }
+  if (id.includes("salon") || id.includes("spa") || id.includes("booking")) {
+    return { ...base, payments: true, notifications: true };
+  }
+  if (id.includes("education")) {
+    return { ...base, payments: false, notifications: true };
+  }
+  if (id.includes("news") || id.includes("blog") || id.includes("radio") || id.includes("music")) {
+    return { ...base, payments: false, notifications: true, admin: true };
+  }
+
+  return base;
+}
+
+function buildBusinessModules(args: {
+  capabilities: BusinessCapabilities;
+  appName: string;
+  prompt: string;
+}) {
+  const { capabilities, appName, prompt } = args;
+
+  const modules: AppModule[] = [];
+  const push = (m: AppModule) => modules.push(m);
+
+  if (capabilities.auth) {
+    push({
+      id: newId("mod_auth"),
+      type: "auth",
+      name: "Authentication",
+      enabled: true,
+      config: {
+        providers: ["email"],
+        roles: ["owner", "admin", "staff", "customer"],
+      },
+    });
+  }
+
+  if (capabilities.payments) {
+    push({
+      id: newId("mod_pay"),
+      type: "payments",
+      name: "Payments",
+      enabled: true,
+      config: {
+        currency: "INR",
+        providers: ["razorpay", "stripe"],
+        mode: "one_time_and_subscription",
+      },
+    });
+  }
+
+  if (capabilities.notifications) {
+    push({
+      id: newId("mod_notif"),
+      type: "notifications",
+      name: "Notifications",
+      enabled: true,
+      config: {
+        provider: "fcm",
+        templatesEnabled: true,
+      },
+    });
+  }
+
+  if (capabilities.analytics) {
+    push({
+      id: newId("mod_analytics"),
+      type: "analytics",
+      name: "Analytics",
+      enabled: true,
+      config: {
+        events: ["signup", "login", "view_screen", "add_to_cart", "checkout", "purchase"],
+      },
+    });
+  }
+
+  if (capabilities.admin) {
+    push({
+      id: newId("mod_admin"),
+      type: "admin",
+      name: "Admin Panel",
+      enabled: true,
+      config: {
+        sections: ["content", "catalog", "orders", "users", "settings"],
+      },
+    });
+  }
+
+  if (capabilities.publishingChecklist) {
+    push({
+      id: newId("mod_publish"),
+      type: "publishing",
+      name: "Publish Checklist",
+      enabled: true,
+      config: {
+        version: 1,
+        appName,
+        prompt,
+        checklist: [
+          { key: "identity.appName", label: "App name finalized", required: true, done: !!appName },
+          { key: "identity.icon", label: "App icon uploaded", required: true, done: false },
+          { key: "identity.colors", label: "Brand colors set", required: true, done: false },
+          { key: "legal.privacyPolicy", label: "Privacy Policy URL", required: true, done: false },
+          { key: "legal.terms", label: "Terms URL", required: false, done: false },
+          { key: "store.play.shortDesc", label: "Play Store short description", required: true, done: false },
+          { key: "store.play.fullDesc", label: "Play Store full description", required: true, done: false },
+          { key: "store.screenshots", label: "Screenshots (all required sizes)", required: true, done: false },
+          { key: "qa.testAccount", label: "Test account credentials (if login)", required: false, done: false },
+        ],
+        storeAssets: {
+          supportEmail: "",
+          privacyPolicyUrl: "",
+          termsUrl: "",
+          shortDescription: "",
+          fullDescription: "",
+          screenshots: [],
+        },
+      },
+    });
+  }
+
+  return modules;
+}
+
+function hasBiryaniKeywords(text: string): boolean {
+  const t = (text || "").toLowerCase();
+  return t.includes("biryani") || t.includes("biriyani") || t.includes("biryani") || t.includes("dum biryani") || t.includes("biriyani") || t.includes("biriyani") || t.includes("biriyan") || t.includes("briyani") || t.includes("hyderabadi biryani") || t.includes("hyderabadi biriyani");
+}
+
 export default function PromptCreate() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -197,6 +359,10 @@ export default function PromptCreate() {
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [appName, setAppName] = useState("");
   const [generatedConfig, setGeneratedConfig] = useState<any>(null);
+  const [businessCaps, setBusinessCaps] = useState<BusinessCapabilities>(() =>
+    defaultCapabilitiesForIndustry(undefined),
+  );
+  const [capsSeedIndustry, setCapsSeedIndustry] = useState<string | null>(null);
 
   // Auth check
   const { data: me, isLoading: authLoading } = useQuery({
@@ -262,6 +428,8 @@ export default function PromptCreate() {
     },
     onSuccess: (data) => {
       setGeneratedConfig(data);
+      setBusinessCaps(defaultCapabilitiesForIndustry(data?.industry));
+      setCapsSeedIndustry(String(data?.industry || ""));
       setStep("preview");
     },
     onError: (err: any) => {
@@ -341,10 +509,22 @@ export default function PromptCreate() {
         (selectedTemplate?.id !== "custom" ? selectedTemplate?.id : undefined) ||
         "custom";
 
+      const promptContext = (customPrompt || selectedTemplate?.prompt || "").trim();
+      const resolvedIndustryId =
+        industryId === "restaurant" && hasBiryaniKeywords(promptContext)
+          ? "restaurant_biryani"
+          : industryId;
+
       const resolvedAppName = creationMode === "scratch" ? appName : generatedConfig.appName;
-      const initialEditorScreens = industryId !== "custom"
-        ? buildEditorScreensFromTemplate(industryId, resolvedAppName || "My App")
+      const initialEditorScreens = resolvedIndustryId !== "custom"
+        ? buildEditorScreensFromTemplate(resolvedIndustryId, resolvedAppName || "My App", { prompt: promptContext })
         : null;
+
+      const modules = buildBusinessModules({
+        capabilities: businessCaps,
+        appName: resolvedAppName || generatedConfig.appName || "My App",
+        prompt: promptContext,
+      });
 
       const appData = {
         name: resolvedAppName,
@@ -360,13 +540,14 @@ export default function PromptCreate() {
           whatsappButton: generatedConfig.suggestedFeatures.includes("whatsappButton"),
           whatsappNumber: "",
         },
+        modules,
         // Store generated config for later use
         generatedPrompt: customPrompt || selectedTemplate?.prompt,
         generatedScreens: generatedConfig.suggestedScreens,
         // Flag to indicate creation mode
         isNativeOnly: creationMode === "scratch",
         // Industry template ID - used to load pre-built screens in visual editor
-        industry: industryId,
+        industry: resolvedIndustryId,
         // Seed the visual editor with real template screens when possible
         editorScreens: initialEditorScreens || undefined,
       };
@@ -482,6 +663,15 @@ export default function PromptCreate() {
       }
     }
   }, [me]);
+
+  // If a new generation produced a different industry, re-seed capability defaults.
+  useEffect(() => {
+    if (!generatedConfig) return;
+    const next = String(generatedConfig?.industry || "");
+    if (capsSeedIndustry === next) return;
+    setBusinessCaps(defaultCapabilitiesForIndustry(next));
+    setCapsSeedIndustry(next);
+  }, [generatedConfig, capsSeedIndustry]);
 
   return (
     <div className="min-h-screen bg-background bg-mesh selection:bg-primary/30">
@@ -1067,6 +1257,94 @@ export default function PromptCreate() {
                         ))}
                       </div>
                     </div>
+
+                    {/* Business-Ready Capabilities */}
+                    <div className="pt-2">
+                      <h4 className="text-sm font-medium text-white mb-2">Business-Ready Capabilities</h4>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        These make the generated app closer to AppyPie-style “prompt → publish”.
+                      </p>
+
+                      <div className="grid gap-2">
+                        <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
+                          <div>
+                            <div className="text-sm text-white">Authentication & Profiles</div>
+                            <div className="text-xs text-muted-foreground">Login, roles, member-only screens</div>
+                          </div>
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4"
+                            checked={businessCaps.auth}
+                            onChange={(e) => setBusinessCaps((p) => ({ ...p, auth: e.target.checked }))}
+                          />
+                        </label>
+
+                        <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
+                          <div>
+                            <div className="text-sm text-white">Payments</div>
+                            <div className="text-xs text-muted-foreground">Checkout, subscriptions, order payments</div>
+                          </div>
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4"
+                            checked={businessCaps.payments}
+                            onChange={(e) => setBusinessCaps((p) => ({ ...p, payments: e.target.checked }))}
+                          />
+                        </label>
+
+                        <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
+                          <div>
+                            <div className="text-sm text-white">Admin Panel</div>
+                            <div className="text-xs text-muted-foreground">Manage catalog, orders, users</div>
+                          </div>
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4"
+                            checked={businessCaps.admin}
+                            onChange={(e) => setBusinessCaps((p) => ({ ...p, admin: e.target.checked }))}
+                          />
+                        </label>
+
+                        <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
+                          <div>
+                            <div className="text-sm text-white">Analytics</div>
+                            <div className="text-xs text-muted-foreground">Track activation, retention, conversions</div>
+                          </div>
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4"
+                            checked={businessCaps.analytics}
+                            onChange={(e) => setBusinessCaps((p) => ({ ...p, analytics: e.target.checked }))}
+                          />
+                        </label>
+
+                        <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
+                          <div>
+                            <div className="text-sm text-white">Push Notifications</div>
+                            <div className="text-xs text-muted-foreground">Announcements, order updates, reminders</div>
+                          </div>
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4"
+                            checked={businessCaps.notifications}
+                            onChange={(e) => setBusinessCaps((p) => ({ ...p, notifications: e.target.checked }))}
+                          />
+                        </label>
+
+                        <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
+                          <div>
+                            <div className="text-sm text-white">Publish Checklist</div>
+                            <div className="text-xs text-muted-foreground">Store assets, privacy policy, screenshots</div>
+                          </div>
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4"
+                            checked={businessCaps.publishingChecklist}
+                            onChange={(e) => setBusinessCaps((p) => ({ ...p, publishingChecklist: e.target.checked }))}
+                          />
+                        </label>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -1139,6 +1417,7 @@ function getTemplateColor(id: string): string {
     ecommerce: "#F97316",
     salon: "#EC4899",
     restaurant: "#EF4444",
+    restaurant_biryani: "#7A1020",
     church: "#8B5CF6",
     radio: "#06B6D4",
     fitness: "#10B981",
@@ -1159,6 +1438,7 @@ function getTemplateEmoji(id: string): string {
     ecommerce: "🛒",
     salon: "💇",
     restaurant: "🍽️",
+    restaurant_biryani: "👑",
     church: "⛪",
     radio: "📻",
     fitness: "💪",
@@ -1193,6 +1473,7 @@ function getTemplateSecondaryColor(id: string): string {
     ecommerce: "#FCD34D",
     salon: "#F472B6",
     restaurant: "#FBBF24",
+    restaurant_biryani: "#D4AF37",
     church: "#A78BFA",
     radio: "#22D3EE",
     fitness: "#34D399",

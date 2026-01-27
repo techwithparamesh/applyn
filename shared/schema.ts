@@ -63,6 +63,12 @@ export const appModuleTypeSchema = z.enum([
   "booking",
   "contactForm",
   "notifications",
+  // Business-ready capabilities (AppyPie-like)
+  "auth",
+  "payments",
+  "analytics",
+  "admin",
+  "publishing",
 ]);
 
 export const appModuleSchema = z.object({

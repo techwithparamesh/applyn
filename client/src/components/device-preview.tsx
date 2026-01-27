@@ -698,6 +698,89 @@ function NativeComponentPreview({
         );
       case "list": {
         const items: any[] = Array.isArray(component.props?.items) ? component.props.items : [];
+        const variant = component.props?.variant;
+
+        if (variant === "menu") {
+          return (
+            <div className="bg-white rounded-lg divide-y divide-gray-100 border border-gray-200">
+              {items.map((item, idx) => (
+                <div key={idx} className="flex items-center gap-3 p-3">
+                  <span className="text-lg">{item?.icon || "➡️"}</span>
+                  <span className="text-sm flex-1 truncate">{item?.label || item?.name || item?.title}</span>
+                  <span className="text-gray-400">›</span>
+                </div>
+              ))}
+            </div>
+          );
+        }
+
+        if (variant === "menu-item") {
+          return (
+            <div className="space-y-3">
+              {items.map((item, idx) => (
+                <div key={idx} className="flex gap-3 p-3 bg-white rounded-lg border border-gray-200">
+                  {item?.image ? (
+                    <img src={item.image} alt={item?.name || "Item"} className="w-16 h-16 rounded-md object-cover" />
+                  ) : (
+                    <div className="w-16 h-16 rounded-md bg-gray-100" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="text-sm font-semibold truncate">{item?.name || "Untitled"}</div>
+                      <div className="text-sm font-semibold whitespace-nowrap" style={{ color: themeColor }}>
+                        {item?.price || ""}
+                      </div>
+                    </div>
+                    {item?.description && (
+                      <div className="text-[11px] text-gray-500 mt-1 line-clamp-2">{item.description}</div>
+                    )}
+                    <div className="flex items-center gap-2 mt-2">
+                      {item?.badge && (
+                        <span
+                          className={
+                            "text-[10px] px-2 py-0.5 rounded-full border " +
+                            (String(item.badge).toLowerCase().includes("veg")
+                              ? "bg-green-50 text-green-700 border-green-200"
+                              : "bg-red-50 text-red-700 border-red-200")
+                          }
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                      <button className="ml-auto text-[11px] px-3 py-1 rounded-full text-white" style={{ backgroundColor: themeColor }}>
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        }
+
+        if (variant === "cart" || variant === "orders") {
+          return (
+            <div className="space-y-3">
+              {items.map((item, idx) => (
+                <div key={idx} className="flex items-center gap-3 p-2 bg-white rounded-lg border border-gray-200">
+                  {item?.image ? (
+                    <img src={item.image} alt={item?.name || "Item"} className="w-14 h-14 rounded object-cover" />
+                  ) : (
+                    <div className="w-14 h-14 rounded bg-gray-100" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{item?.name || item?.label || "Item"}</div>
+                    <div className="text-[11px] text-gray-500">
+                      {item?.quantity ? `Qty: ${item.quantity}` : item?.status || ""}
+                    </div>
+                  </div>
+                  <div className="text-sm font-semibold whitespace-nowrap">{item?.price || item?.total || ""}</div>
+                </div>
+              ))}
+            </div>
+          );
+        }
+
         return (
           <div className="space-y-2">
             {items.map((item, idx) => (

@@ -1075,6 +1075,18 @@ export default function Dashboard() {
                         <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/visual-editor`)}>
                           <Settings className="mr-2 h-4 w-4" /> Edit App
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/publish`)}>
+                          <Package className="mr-2 h-4 w-4" /> Publish Checklist
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/store-admin`)}>
+                          <Package className="mr-2 h-4 w-4" /> Store Admin
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setLocation(`/runtime/${app.id}`)}>
+                          <Smartphone className="mr-2 h-4 w-4" /> Runtime Preview
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/integrations`)}>
+                          <Activity className="mr-2 h-4 w-4" /> Integrations
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/push`)}>
                           Push Notifications
                         </DropdownMenuItem>

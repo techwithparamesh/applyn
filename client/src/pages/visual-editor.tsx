@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   Tooltip,
   TooltipContent,
@@ -507,6 +508,45 @@ function ComponentPreview({
             </div>
           );
         }
+
+        if (component.props.variant === 'menu-item') {
+          return (
+            <div className="space-y-3">
+              {component.props.items?.map((item: any, i: number) => (
+                <div key={i} className="flex gap-3 p-3 bg-white rounded-lg border">
+                  {item.image ? (
+                    <img src={item.image} alt={item.name} className="w-16 h-16 rounded-md object-cover" />
+                  ) : (
+                    <div className="w-16 h-16 rounded-md bg-slate-100" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-semibold text-sm truncate">{item.name}</p>
+                      <p className="font-semibold text-sm whitespace-nowrap">{item.price}</p>
+                    </div>
+                    {item.description && <p className="text-xs text-slate-500 mt-1 line-clamp-2">{item.description}</p>}
+                    <div className="flex items-center gap-2 mt-2">
+                      {item.badge && (
+                        <span className={
+                          "text-[10px] px-2 py-0.5 rounded-full border " +
+                          (String(item.badge).toLowerCase().includes("veg")
+                            ? "bg-green-50 text-green-700 border-green-200"
+                            : "bg-red-50 text-red-700 border-red-200")
+                        }>
+                          {item.badge}
+                        </span>
+                      )}
+                      <button className="ml-auto text-xs px-3 py-1 rounded-full bg-cyan-600 text-white">
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        }
+
         if (component.props.variant === 'cart' || component.props.variant === 'orders') {
           return (
             <div className="space-y-3">
@@ -573,11 +613,27 @@ function ComponentPreview({
         
       // ---- Extended Template Components ----
       case "hero":
+        {
+          const title = typeof component.props.title === "string" && component.props.title.trim()
+            ? component.props.title
+            : "Your App";
+          const subtitle = typeof component.props.subtitle === "string" && component.props.subtitle.trim()
+            ? component.props.subtitle
+            : "";
+
+          const backgroundImage = typeof component.props.backgroundImage === "string" && component.props.backgroundImage.trim()
+            ? component.props.backgroundImage
+            : "";
+
+          const buttonText = typeof component.props.buttonText === "string" && component.props.buttonText.trim()
+            ? component.props.buttonText
+            : "";
+
         return (
           <div 
             className="relative rounded-lg overflow-hidden"
             style={{ 
-              backgroundImage: component.props.backgroundImage ? `url(${component.props.backgroundImage})` : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              backgroundImage: backgroundImage ? `url(${backgroundImage})` : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               height: component.props.height || 200
@@ -585,16 +641,17 @@ function ComponentPreview({
           >
             <div className="absolute inset-0" style={{ backgroundColor: component.props.overlayColor || 'rgba(0,0,0,0.4)' }} />
             <div className="relative z-10 flex flex-col justify-center items-center h-full text-center p-4">
-              <h2 className="text-xl font-bold text-white mb-2">{component.props.title}</h2>
-              {component.props.subtitle && <p className="text-sm text-white/80 mb-4">{component.props.subtitle}</p>}
-              {component.props.buttonText && (
+              <h2 className="text-xl font-bold text-white mb-2">{title}</h2>
+              {subtitle && <p className="text-sm text-white/80 mb-4">{subtitle}</p>}
+              {buttonText && (
                 <button className="px-6 py-2 bg-white text-gray-900 rounded-full font-medium text-sm">
-                  {component.props.buttonText}
+                  {buttonText}
                 </button>
               )}
             </div>
           </div>
         );
+        }
         
       case "productGrid":
         {
@@ -609,11 +666,15 @@ function ComponentPreview({
             <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${component.props.columns || 2}, 1fr)` }}>
               {visible.slice(0, 6).map((product: any, i: number) => (
                 <div key={i} className="bg-white rounded-lg border overflow-hidden">
-                  {product.image && (
-                    <img src={product.image} alt={product.name} className="w-full h-24 object-cover" />
+                  {product.image ? (
+                    <img src={product.image} alt={product.name || "Product"} className="w-full h-24 object-cover" />
+                  ) : (
+                    <div className="w-full h-24 bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-400 text-xs">
+                      No image
+                    </div>
                   )}
                   <div className="p-2">
-                    <p className="font-medium text-xs truncate">{product.name}</p>
+                    <p className="font-medium text-xs truncate">{product.name || "Unnamed"}</p>
                     <div className="flex items-center justify-between mt-1">
                       <p className="text-sm font-bold text-green-600">{product.price}</p>
                       {product.rating && <span className="text-xs text-amber-500">★ {product.rating}</span>}
@@ -629,19 +690,29 @@ function ComponentPreview({
         }
         
       case "carousel":
-        return (
-          <div className="flex gap-3 overflow-x-auto pb-2">
-            {component.props.items?.map((item: any, i: number) => (
-              <div key={i} className="flex-shrink-0 w-48 rounded-lg overflow-hidden bg-white border">
-                {item.image && <img src={item.image} alt={item.title} className="w-full h-24 object-cover" />}
-                <div className="p-2">
-                  <p className="font-medium text-sm">{item.title}</p>
-                  <p className="text-xs text-gray-500">{item.subtitle}</p>
+        {
+          const items: any[] = Array.isArray(component.props.items) ? component.props.items : [];
+          return (
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {items.map((item: any, i: number) => (
+                <div key={i} className="flex-shrink-0 w-48 rounded-lg overflow-hidden bg-white border">
+                  {item.image ? (
+                    <img src={item.image} alt={item.title || "Item"} className="w-full h-24 object-cover" />
+                  ) : (
+                    <div className="w-full h-24 bg-gradient-to-br from-slate-100 to-slate-200" />
+                  )}
+                  <div className="p-2">
+                    <p className="font-medium text-sm">{item.title || "Untitled"}</p>
+                    <p className="text-xs text-gray-500">{item.subtitle || ""}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        );
+              ))}
+              {items.length === 0 && (
+                <div className="text-xs text-slate-400 p-4">Add carousel items in Properties</div>
+              )}
+            </div>
+          );
+        }
         
       case "testimonial":
         return (
@@ -1147,7 +1218,7 @@ export default function VisualEditor() {
   const [deviceView, setDeviceView] = useState<"mobile" | "desktop">("mobile");
   const [editorMode, setEditorMode] = useState<"components" | "website">("components"); // Default to components for native apps
   const [rightSidebarTab, setRightSidebarTab] = useState<"agent" | "properties" | "code" | "qr">("properties");
-  const [leftTab, setLeftTab] = useState<"pages" | "screens" | "components" | "sections">("screens");
+  const [paletteSearch, setPaletteSearch] = useState<string>("");
   const [websitePreviewUrl, setWebsitePreviewUrl] = useState<string>("");
   const [hasChanges, setHasChanges] = useState(false);
   const [showComponentTree, setShowComponentTree] = useState(true);
@@ -1199,16 +1270,26 @@ export default function VisualEditor() {
     }
   }, [app, webviewPages, websitePreviewUrl]);
 
-  // Keep left sidebar focused: website mode -> Pages tab for web apps
-  useEffect(() => {
-    if (!app) return;
-    const isNative = (app as any).isNativeOnly || (app as any).url === "native://app" || !(app as any).url;
-    if (isNative) {
-      if (leftTab === "pages") setLeftTab("screens");
-      return;
-    }
-    if (editorMode === "website") setLeftTab("pages");
-  }, [app, editorMode, leftTab]);
+  const search = paletteSearch.trim().toLowerCase();
+  const componentGroups = useMemo(() => {
+    const groups: Array<{ title: string; items: Array<{ type: ComponentType; name: string; icon: any }> }> = [
+      { title: "Basic", items: BASIC_COMPONENTS.map((c) => ({ type: c.type, name: c.name, icon: c.icon })) },
+      { title: "Form", items: FORM_COMPONENTS },
+      { title: "Media", items: MEDIA_COMPONENTS },
+    ];
+    if (!search) return groups;
+    return groups
+      .map((g) => ({
+        ...g,
+        items: g.items.filter((i) => i.name.toLowerCase().includes(search) || String(i.type).toLowerCase().includes(search)),
+      }))
+      .filter((g) => g.items.length > 0);
+  }, [search]);
+
+  const filteredSections = useMemo(() => {
+    if (!search) return SECTION_TEMPLATES;
+    return SECTION_TEMPLATES.filter((t) => t.name.toLowerCase().includes(search) || String(t.id).toLowerCase().includes(search));
+  }, [search]);
 
   // Helper function to personalize template content with app name
   const personalizeTemplateContent = useCallback((template: IndustryTemplate, appName: string): EditorScreen[] => {
@@ -1927,250 +2008,209 @@ export default function VisualEditor() {
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar - Components Panel */}
         <aside className="w-72 bg-slate-900/95 border-r border-slate-700/50 flex flex-col overflow-hidden shrink-0">
-          <Tabs value={leftTab} onValueChange={(v) => setLeftTab(v as any)} className="flex-1 flex flex-col">
-            <div className="p-3 border-b border-slate-700/50 shrink-0">
-              <TabsList
-                className={`grid w-full p-1 bg-slate-800/50 rounded-xl border border-slate-700/50 ${isNativeApp ? "grid-cols-3" : "grid-cols-4"}`}
-              >
+          <div className="p-3 border-b border-slate-700/50 shrink-0">
+            <Label className="text-[11px] text-slate-500">Search</Label>
+            <Input
+              value={paletteSearch}
+              onChange={(e) => setPaletteSearch(e.target.value)}
+              placeholder="Pages, screens, components, sections..."
+              className="mt-1.5 bg-slate-800/50 border-slate-700/50 text-white placeholder:text-slate-500 focus:border-cyan-500/50 focus:ring-cyan-500/20"
+            />
+          </div>
+
+          <ScrollArea className="flex-1">
+            <div className="p-3">
+              <Accordion type="multiple" defaultValue={[!isNativeApp ? "pages" : "screens", "add", "layers"]} className="w-full">
                 {!isNativeApp && (
-                  <TabsTrigger value="pages" className="text-[11px] rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
-                    Pages
-                  </TabsTrigger>
+                  <AccordionItem value="pages" className="border-slate-700/50">
+                    <AccordionTrigger className="text-sm text-slate-200 hover:no-underline">Website Pages</AccordionTrigger>
+                    <AccordionContent>
+                      {webviewPages.length > 0 ? (
+                        <div className="space-y-1">
+                          {webviewPages
+                            .filter((p) => !search || p.label.toLowerCase().includes(search) || p.url.toLowerCase().includes(search))
+                            .slice(0, 30)
+                            .map((p) => (
+                              <button
+                                key={p.id}
+                                onClick={() => {
+                                  setWebsitePreviewUrl(p.url);
+                                  setEditorMode("website");
+                                }}
+                                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all text-slate-400 hover:bg-slate-800/50 hover:text-white border border-transparent"
+                                title={p.url}
+                              >
+                                <span className="text-base">{p.icon || "🌐"}</span>
+                                <span className="flex-1 text-left truncate">{p.label}</span>
+                                <ChevronRight className="h-4 w-4 text-slate-600" />
+                              </button>
+                            ))}
+                          <div className="pt-2 flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setLocation(`/apps/${id}/import`)}
+                              className="border-slate-700 text-slate-200 hover:bg-slate-800/60"
+                            >
+                              <Link2 className="h-4 w-4 mr-2" /> Import
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setLocation(`/apps/${id}/structure`)}
+                              className="border-slate-700 text-slate-200 hover:bg-slate-800/60"
+                            >
+                              <ListTree className="h-4 w-4 mr-2" /> Structure
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-3">
+                          <p className="text-xs text-slate-300 font-medium">No website pages yet</p>
+                          <p className="text-[11px] text-slate-500 mt-1">Import pages to build your app navigation.</p>
+                          <div className="pt-2">
+                            <Button
+                              size="sm"
+                              onClick={() => setLocation(`/apps/${id}/import`)}
+                              className="bg-gradient-to-r from-cyan-500 to-blue-500 text-white"
+                            >
+                              <Link2 className="h-4 w-4 mr-2" /> Import Website
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </AccordionContent>
+                  </AccordionItem>
                 )}
-                <TabsTrigger value="screens" className="text-[11px] rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white">
-                  Screens
-                </TabsTrigger>
-                <TabsTrigger value="components" className="text-[11px] rounded-lg data-[state=active]:bg-slate-700 data-[state=active]:text-white">
-                  Components
-                </TabsTrigger>
-                <TabsTrigger value="sections" className="text-[11px] rounded-lg data-[state=active]:bg-slate-700 data-[state=active]:text-white">
-                  Sections
-                </TabsTrigger>
-              </TabsList>
 
-              {!isNativeApp && leftTab === "pages" && (
-                <div className="mt-3 text-[11px] text-slate-500">
-                  Select a website page to preview.
-                </div>
-              )}
-              {leftTab === "screens" && (
-                <div className="mt-3 flex items-center justify-between">
-                  <p className="text-[11px] text-slate-500">Native screens ({screens.length})</p>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
-                    onClick={addScreen}
-                    title="Add screen"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {!isNativeApp && (
-              <TabsContent value="pages" className="flex-1 m-0">
-                <ScrollArea className="h-full">
-                  <div className="p-3 space-y-2">
-                    {webviewPages.length > 0 ? (
-                      <div className="space-y-1">
-                        {webviewPages.slice(0, 30).map((p) => (
+                <AccordionItem value="screens" className="border-slate-700/50">
+                  <AccordionTrigger className="text-sm text-slate-200 hover:no-underline">Native Screens</AccordionTrigger>
+                  <AccordionContent>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[11px] text-slate-500">{screens.length} screens</p>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
+                        onClick={addScreen}
+                        title="Add screen"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="space-y-1">
+                      {screens
+                        .filter((s) => !search || s.name.toLowerCase().includes(search) || s.id.toLowerCase().includes(search))
+                        .map((screen) => (
                           <button
-                            key={p.id}
+                            key={screen.id}
                             onClick={() => {
-                              setWebsitePreviewUrl(p.url);
-                              setEditorMode("website");
+                              setActiveScreenId(screen.id);
+                              setSelectedComponentId(null);
+                              setEditorMode("components");
                             }}
-                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all text-slate-400 hover:bg-slate-800/50 hover:text-white border border-transparent"
-                            title={p.url}
+                            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all ${
+                              activeScreenId === screen.id
+                                ? "bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-white border border-cyan-500/30"
+                                : "text-slate-400 hover:bg-slate-800/50 hover:text-white border border-transparent"
+                            }`}
                           >
-                            <span className="text-base">{p.icon || "🌐"}</span>
-                            <span className="flex-1 text-left truncate">{p.label}</span>
-                            <ChevronRight className="h-4 w-4 text-slate-600" />
+                            <span className="text-base">{screen.icon}</span>
+                            <span className="flex-1 text-left truncate">{screen.name}</span>
+                            {screen.isHome && (
+                              <Badge className="text-[10px] h-5 bg-cyan-500/20 text-cyan-400 border-0">Home</Badge>
+                            )}
+                            <span className="text-xs text-slate-500">{screen.components.length}</span>
                           </button>
                         ))}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
 
-                        <div className="pt-2 flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setLocation(`/apps/${id}/import`)}
-                            className="border-slate-700 text-slate-200 hover:bg-slate-800/60"
-                          >
-                            <Link2 className="h-4 w-4 mr-2" /> Import
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setLocation(`/apps/${id}/structure`)}
-                            className="border-slate-700 text-slate-200 hover:bg-slate-800/60"
-                          >
-                            <ListTree className="h-4 w-4 mr-2" /> Structure
-                          </Button>
+                <AccordionItem value="add" className="border-slate-700/50">
+                  <AccordionTrigger className="text-sm text-slate-200 hover:no-underline">Add Elements</AccordionTrigger>
+                  <AccordionContent>
+                    <div className="space-y-4">
+                      {componentGroups.map((group) => (
+                        <div key={group.title}>
+                          <h3 className="text-xs font-bold text-slate-500 uppercase px-1 mb-2">{group.title}</h3>
+                          <div className="grid grid-cols-2 gap-2">
+                            {group.items.map((comp) => (
+                              <button
+                                key={comp.type}
+                                onClick={() => {
+                                  setEditorMode("components");
+                                  addComponent(comp.type);
+                                }}
+                                className="flex flex-col items-center gap-2 p-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all group"
+                              >
+                                <comp.icon className="h-5 w-5 text-slate-400 group-hover:text-cyan-400 transition-colors" />
+                                <span className="text-xs text-slate-400 group-hover:text-white transition-colors">{comp.name}</span>
+                              </button>
+                            ))}
+                          </div>
                         </div>
+                      ))}
+
+                      <div>
+                        <h3 className="text-xs font-bold text-slate-500 uppercase px-1 mb-2">Sections</h3>
+                        <div className="space-y-2">
+                          {filteredSections.slice(0, 30).map((template) => (
+                            <button
+                              key={template.id}
+                              onClick={() => {
+                                setEditorMode("components");
+                                addTemplate(template);
+                              }}
+                              className="w-full p-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:border-purple-500/50 hover:bg-purple-500/10 transition-all text-left group"
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className="text-xl">{template.preview}</span>
+                                <span className="text-sm font-medium text-slate-400 group-hover:text-white transition-colors">{template.name}</span>
+                              </div>
+                            </button>
+                          ))}
+                          {filteredSections.length === 0 && (
+                            <p className="text-xs text-slate-500 px-1">No matching sections.</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="layers" className="border-slate-700/50">
+                  <AccordionTrigger className="text-sm text-slate-200 hover:no-underline">Layers</AccordionTrigger>
+                  <AccordionContent>
+                    {editorMode !== "components" ? (
+                      <p className="text-xs text-slate-500">Layers are available when editing native screens.</p>
+                    ) : activeScreen && activeScreen.components.length > 0 ? (
+                      <div className="space-y-1">
+                        {activeScreen.components
+                          .filter((c) => !search || String(c.type).toLowerCase().includes(search))
+                          .map((comp, index) => (
+                            <button
+                              key={comp.id}
+                              onClick={() => setSelectedComponentId(comp.id)}
+                              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all ${
+                                selectedComponentId === comp.id
+                                  ? "bg-cyan-500/20 text-cyan-400 font-medium border border-cyan-500/30"
+                                  : "text-slate-400 hover:bg-slate-800/50 hover:text-white border border-transparent"
+                              }`}
+                            >
+                              <span className="text-slate-500 w-4">{index + 1}</span>
+                              <span className="capitalize">{comp.type}</span>
+                            </button>
+                          ))}
                       </div>
                     ) : (
-                      <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-3">
-                        <p className="text-xs text-slate-300 font-medium">No website pages yet</p>
-                        <p className="text-[11px] text-slate-500 mt-1">Use Import to pull pages and create navigation.</p>
-                        <div className="pt-2">
-                          <Button
-                            size="sm"
-                            onClick={() => setLocation(`/apps/${id}/import`)}
-                            className="bg-gradient-to-r from-cyan-500 to-blue-500 text-white"
-                          >
-                            <Link2 className="h-4 w-4 mr-2" /> Import Website
-                          </Button>
-                        </div>
-                      </div>
+                      <p className="text-xs text-slate-500">No components on this screen yet.</p>
                     )}
-                  </div>
-                </ScrollArea>
-              </TabsContent>
-            )}
-
-            <TabsContent value="screens" className="flex-1 m-0">
-              <ScrollArea className="h-full">
-                <div className="p-3 space-y-1">
-                  {screens.map((screen) => (
-                    <button
-                      key={screen.id}
-                      onClick={() => {
-                        setActiveScreenId(screen.id);
-                        setSelectedComponentId(null);
-                        setEditorMode("components");
-                      }}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
-                        activeScreenId === screen.id
-                          ? "bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-white border border-cyan-500/30"
-                          : "text-slate-400 hover:bg-slate-800/50 hover:text-white border border-transparent"
-                      }`}
-                    >
-                      <span className="text-base">{screen.icon}</span>
-                      <span className="flex-1 text-left truncate">{screen.name}</span>
-                      {screen.isHome && (
-                        <Badge className="text-[10px] h-5 bg-cyan-500/20 text-cyan-400 border-0">Home</Badge>
-                      )}
-                      <span className="text-xs text-slate-500">{screen.components.length}</span>
-                    </button>
-                  ))}
-                </div>
-              </ScrollArea>
-            </TabsContent>
-
-            <TabsContent value="components" className="flex-1 m-0">
-              <ScrollArea className="h-full">
-                <div className="p-3 space-y-4">
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-500 uppercase px-1 mb-2">Basic</h3>
-                    <div className="grid grid-cols-2 gap-2">
-                      {BASIC_COMPONENTS.map((comp) => (
-                        <button
-                          key={comp.type}
-                          onClick={() => {
-                            setEditorMode("components");
-                            addComponent(comp.type);
-                          }}
-                          className="flex flex-col items-center gap-2 p-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all group"
-                        >
-                          <comp.icon className="h-5 w-5 text-slate-400 group-hover:text-cyan-400 transition-colors" />
-                          <span className="text-xs text-slate-400 group-hover:text-white transition-colors">{comp.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-500 uppercase px-1 mb-2">Form</h3>
-                    <div className="grid grid-cols-2 gap-2">
-                      {FORM_COMPONENTS.map((comp) => (
-                        <button
-                          key={comp.type}
-                          onClick={() => {
-                            setEditorMode("components");
-                            addComponent(comp.type);
-                          }}
-                          className="flex flex-col items-center gap-2 p-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all group"
-                        >
-                          <comp.icon className="h-5 w-5 text-slate-400 group-hover:text-cyan-400 transition-colors" />
-                          <span className="text-xs text-slate-400 group-hover:text-white transition-colors">{comp.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-500 uppercase px-1 mb-2">Media</h3>
-                    <div className="grid grid-cols-2 gap-2">
-                      {MEDIA_COMPONENTS.map((comp) => (
-                        <button
-                          key={comp.type}
-                          onClick={() => {
-                            setEditorMode("components");
-                            addComponent(comp.type);
-                          }}
-                          className="flex flex-col items-center gap-2 p-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all group"
-                        >
-                          <comp.icon className="h-5 w-5 text-slate-400 group-hover:text-cyan-400 transition-colors" />
-                          <span className="text-xs text-slate-400 group-hover:text-white transition-colors">{comp.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </ScrollArea>
-            </TabsContent>
-
-            <TabsContent value="sections" className="flex-1 m-0">
-              <ScrollArea className="h-full">
-                <div className="p-3 space-y-2">
-                  {SECTION_TEMPLATES.map((template) => (
-                    <button
-                      key={template.id}
-                      onClick={() => {
-                        setEditorMode("components");
-                        addTemplate(template);
-                      }}
-                      className="w-full p-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:border-purple-500/50 hover:bg-purple-500/10 transition-all text-left group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-xl">{template.preview}</span>
-                        <span className="text-sm font-medium text-slate-400 group-hover:text-white transition-colors">{template.name}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </ScrollArea>
-            </TabsContent>
-          </Tabs>
-
-          {/* Component Tree - only relevant when editing native screens */}
-          {showComponentTree && editorMode === "components" && activeScreen && activeScreen.components.length > 0 && (
-            <div className="border-t border-slate-700/50 p-3 max-h-48 overflow-auto shrink-0">
-              <div className="flex items-center justify-between px-1 mb-2">
-                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                  <GripVertical className="h-3.5 w-3.5" /> Layers
-                </h3>
-              </div>
-              <div className="space-y-1">
-                {activeScreen.components.map((comp, index) => (
-                  <button
-                    key={comp.id}
-                    onClick={() => setSelectedComponentId(comp.id)}
-                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all ${
-                      selectedComponentId === comp.id
-                        ? "bg-cyan-500/20 text-cyan-400 font-medium border border-cyan-500/30"
-                        : "text-slate-400 hover:bg-slate-800/50 hover:text-white border border-transparent"
-                    }`}
-                  >
-                    <span className="text-slate-500 w-4">{index + 1}</span>
-                    <span className="capitalize">{comp.type}</span>
-                  </button>
-                ))}
-              </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </div>
-          )}
+          </ScrollArea>
         </aside>
 
         {/* Canvas Area - Premium Dark Design */}

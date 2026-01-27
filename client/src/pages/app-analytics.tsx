@@ -23,6 +23,8 @@ import {
   Download, 
   Bell, 
   BarChart3,
+  DollarSign,
+  ShoppingCart,
   Clock,
   Globe,
   Activity,
@@ -56,6 +58,16 @@ type AnalyticsData = {
     installs: number;
     sessions: number;
   }>;
+};
+
+type RuntimeAnalyticsSummary = {
+  range: string;
+  since: string;
+  customersTotal: number;
+  ordersCount: number;
+  revenueCents: number;
+  topEvents: Array<{ name: string; count: number }>;
+  eventsByDay: Array<{ day: string; count: number }>;
 };
 
 export default function AppAnalytics() {
@@ -99,6 +111,18 @@ export default function AppAnalytics() {
     enabled: !!app,
   });
 
+  const { data: runtimeAnalytics } = useQuery<RuntimeAnalyticsSummary | null>({
+    queryKey: ["runtime-analytics", params.id, timeRange],
+    queryFn: async () => {
+      const res = await fetch(`/api/apps/${params.id}/admin/runtime-analytics?range=${encodeURIComponent(timeRange)}`, {
+        credentials: "include",
+      });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!app,
+  });
+
   if (meLoading || appLoading) {
     return (
       <div className="min-h-screen bg-background bg-mesh-subtle">
@@ -136,6 +160,9 @@ export default function AppAnalytics() {
   const totalDevices = tokens?.count || 0;
   const totalNotifications = notificationHistory?.length || 0;
   const deliveredCount = notificationHistory?.reduce((acc: number, n: any) => acc + (n.sentCount || 0), 0) || 0;
+  const runtimeOrders = runtimeAnalytics?.ordersCount ?? 0;
+  const runtimeRevenue = runtimeAnalytics ? (runtimeAnalytics.revenueCents / 100).toFixed(2) : "0.00";
+  const runtimeCustomers = runtimeAnalytics?.customersTotal ?? 0;
 
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle">
@@ -228,6 +255,40 @@ export default function AppAnalytics() {
             trend="neutral"
           />
         </motion.div>
+
+        {runtimeAnalytics && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"
+          >
+            <StatCard
+              title="Runtime Customers"
+              value={runtimeCustomers}
+              icon={<Users className="h-5 w-5" />}
+              color="cyan"
+              change={runtimeAnalytics.range}
+              trend="neutral"
+            />
+            <StatCard
+              title="Runtime Orders"
+              value={runtimeOrders}
+              icon={<ShoppingCart className="h-5 w-5" />}
+              color="green"
+              change={runtimeAnalytics.range}
+              trend="neutral"
+            />
+            <StatCard
+              title="Runtime Revenue"
+              value={runtimeRevenue}
+              icon={<DollarSign className="h-5 w-5" />}
+              color="purple"
+              change={runtimeAnalytics.range}
+              trend="neutral"
+            />
+          </motion.div>
+        )}
 
         {/* Main Content */}
         <div className="grid lg:grid-cols-3 gap-6">
@@ -360,6 +421,27 @@ export default function AppAnalytics() {
                 </Button>
               </CardContent>
             </Card>
+
+            {runtimeAnalytics?.topEvents?.length ? (
+              <Card className="glass border-white/10">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-white text-sm flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-cyan-400" />
+                    Runtime Events
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {runtimeAnalytics.topEvents.slice(0, 6).map((e) => (
+                      <div key={e.name} className="flex items-center justify-between text-sm">
+                        <span className="text-white truncate max-w-[220px]">{e.name}</span>
+                        <span className="text-muted-foreground">{e.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
 
             {/* Recent Activity */}
             <Card className="glass border-white/10">
