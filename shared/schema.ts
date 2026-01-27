@@ -56,6 +56,42 @@ export const appStatusSchema = z.enum([
 
 export const appPlatformSchema = z.enum(["android", "ios", "both"]);
 
+// --- App structure (AppyPie-style primitives) ---
+export const appModuleTypeSchema = z.enum([
+  "webviewPages",
+  "catalog",
+  "booking",
+  "contactForm",
+  "notifications",
+]);
+
+export const appModuleSchema = z.object({
+  id: z.string().min(1),
+  type: appModuleTypeSchema,
+  name: z.string().min(1).max(100),
+  enabled: z.boolean().optional().default(true),
+  config: z.record(z.any()).optional(),
+});
+
+export const appNavigationStyleSchema = z.enum(["bottom-tabs", "drawer"]);
+export const appNavigationItemSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1).max(80),
+  icon: z.string().max(32).optional(),
+  kind: z.enum(["screen", "webview", "module"]).default("screen"),
+  screenId: z.string().optional(),
+  url: z.string().optional(),
+  moduleId: z.string().optional(),
+});
+
+export const appNavigationSchema = z.object({
+  style: appNavigationStyleSchema.default("bottom-tabs"),
+  items: z.array(appNavigationItemSchema).default([]),
+});
+
+export type AppModule = z.infer<typeof appModuleSchema>;
+export type AppNavigation = z.infer<typeof appNavigationSchema>;
+
 // Native enhancement features schema
 export const appFeaturesSchema = z.object({
   bottomNav: z.boolean().optional().default(false),
@@ -84,6 +120,11 @@ export const insertAppSchema = z.object({
   isNativeOnly: z.boolean().optional(),
   // Initial visual editor data (stored as JSON)
   editorScreens: z.array(z.any()).optional(),
+  // App modules + navigation (stored as JSON)
+  modules: z.array(appModuleSchema).optional(),
+  navigation: appNavigationSchema.optional(),
+  // Screen history for restore/versioning (stored as JSON)
+  editorScreensHistory: z.array(z.any()).optional(),
   // AI generation metadata (stored for reference)
   generatedPrompt: z.string().optional(),
   generatedScreens: z.array(z.string()).optional(),
@@ -117,6 +158,9 @@ export type App = {
   lastBuildAt?: Date | null;
   apiSecret?: string | null; // For authenticating push token registration
   editorScreens?: any[] | null; // Visual editor screens data
+  modules?: AppModule[] | null;
+  navigation?: AppNavigation | null;
+  editorScreensHistory?: any[] | null;
   createdAt: Date;
   updatedAt: Date;
 };

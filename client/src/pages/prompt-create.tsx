@@ -302,8 +302,26 @@ export default function PromptCreate() {
 
         // Common synonyms/variants from AI
         if (normalized.includes("salon") || normalized.includes("spa") || normalized.includes("beauty")) return "salon";
-        if (normalized.includes("restaurant") || normalized.includes("food") || normalized.includes("cafe")) return "restaurant";
-        if (normalized.includes("ecommerce") || normalized.includes("e commerce") || normalized.includes("store") || normalized.includes("shop")) return "ecommerce";
+        // Ecommerce / grocery / marketplace
+        if (
+          normalized.includes("ecommerce") ||
+          normalized.includes("e commerce") ||
+          normalized.includes("store") ||
+          normalized.includes("shop") ||
+          normalized.includes("market") ||
+          normalized.includes("marketplace") ||
+          normalized.includes("grocery") ||
+          normalized.includes("supermarket") ||
+          normalized.includes("farm") ||
+          normalized.includes("produce") ||
+          normalized.includes("vegetable") ||
+          normalized.includes("fruit") ||
+          normalized.includes("dairy") ||
+          normalized.includes("delivery")
+        ) return "ecommerce";
+
+        // Restaurant / food service
+        if (normalized.includes("restaurant") || normalized.includes("cafe") || normalized.includes("menu") || normalized.includes("reservation")) return "restaurant";
         if (normalized.includes("church") || normalized.includes("ministry")) return "church";
         if (normalized.includes("fitness") || normalized.includes("gym")) return "fitness";
         if (normalized.includes("education") || normalized.includes("school") || normalized.includes("college")) return "education";

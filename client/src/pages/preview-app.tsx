@@ -11,12 +11,16 @@ import { QRCodeSVG } from "qrcode.react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { getAppUrlDisplay, isHttpUrl } from "@/lib/utils";
 
 type AppItem = {
   id: string;
   ownerId: string;
   name: string;
   url: string;
+  isNativeOnly?: boolean | null;
+  industry?: string | null;
+  editorScreens?: any[] | null;
   status: "draft" | "processing" | "live" | "failed" | string;
   platform: "android" | "ios" | "both" | string;
   plan?: "preview" | "starter" | "standard" | "pro" | "agency" | string;
@@ -198,7 +202,7 @@ export default function PreviewApp() {
                 </div>
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
                   <ExternalLink className="h-3 w-3" />
-                  {app.url}
+                  {getAppUrlDisplay(app.url, app.isNativeOnly)}
                 </p>
               </div>
             </div>
@@ -276,8 +280,8 @@ export default function PreviewApp() {
               primaryColor={app.primaryColor}
               icon={app.iconUrl || app.icon}
               preferLivePreview={true}
-              screens={app.editorScreens}
-              industry={app.industry}
+              screens={app.editorScreens || undefined}
+              industry={app.industry || undefined}
               isNativeOnly={app.isNativeOnly || app.url?.startsWith("native://")}
               availablePlatforms={getAvailablePlatforms()}
               defaultPlatform={app.platform === "ios" ? "ios" : "android"}
@@ -384,13 +388,15 @@ export default function PreviewApp() {
                 >
                   <RefreshCw className="mr-3 h-4 w-4" /> Push Notifications
                 </Button>
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-start text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl"
-                  onClick={() => window.open(app.url, "_blank")}
-                >
-                  <ExternalLink className="mr-3 h-4 w-4" /> Visit Website
-                </Button>
+                {isHttpUrl(app.url) && (
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl"
+                    onClick={() => window.open(app.url, "_blank", "noopener,noreferrer")}
+                  >
+                    <ExternalLink className="mr-3 h-4 w-4" /> Visit Website
+                  </Button>
+                )}
               </div>
             </div>
             

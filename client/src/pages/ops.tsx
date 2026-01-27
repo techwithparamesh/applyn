@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
+import { getAppUrlDisplay } from "@/lib/utils";
 import { 
   Clock, 
   Download, 
@@ -603,7 +604,7 @@ export default function Ops() {
                             </div>
                             <div className="min-w-0">
                               <div className="font-medium text-white truncate">{app.name}</div>
-                              <div className="text-xs text-muted-foreground truncate">{app.url}</div>
+                              <div className="text-xs text-muted-foreground truncate">{getAppUrlDisplay(app.url, (app as any).isNativeOnly)}</div>
                             </div>
                           </div>
 

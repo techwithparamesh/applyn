@@ -58,6 +58,24 @@ export const apps = mysqlTable("apps", {
     toDriver(value) { return value; },
     fromDriver(value) { return value as string; },
   })("editor_screens"), // JSON for visual editor screens
+
+  modules: customType<{ data: string; driverData: string }>({
+    dataType() { return "mediumtext"; },
+    toDriver(value) { return value; },
+    fromDriver(value) { return value as string; },
+  })("modules"), // JSON array of app modules
+
+  navigation: customType<{ data: string; driverData: string }>({
+    dataType() { return "mediumtext"; },
+    toDriver(value) { return value; },
+    fromDriver(value) { return value as string; },
+  })("navigation"), // JSON navigation model
+
+  editorScreensHistory: customType<{ data: string; driverData: string }>({
+    dataType() { return "mediumtext"; },
+    toDriver(value) { return value; },
+    fromDriver(value) { return value as string; },
+  })("editor_screens_history"), // JSON array of screen snapshots
   // Native enhancement features as JSON: { bottomNav: boolean, pullToRefresh: boolean, offlineScreen: boolean, whatsappButton: boolean, whatsappNumber: string }
   features: text("features"), // JSON string for feature toggles
   packageName: varchar("package_name", { length: 200 }),

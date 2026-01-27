@@ -107,6 +107,70 @@ function requireAuth(req: any, res: any, next: any) {
   return res.status(401).json({ message: "Unauthorized" });
 }
 
+function isHttpishUrl(raw: string) {
+  try {
+    const u = new URL(raw);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function normalizeImportedLink(hrefRaw: string, baseUrl: string): string | null {
+  const href = (hrefRaw || "").trim();
+  if (!href) return null;
+  if (href.startsWith("#")) return null;
+  const lower = href.toLowerCase();
+  if (lower.startsWith("mailto:") || lower.startsWith("tel:") || lower.startsWith("javascript:")) return null;
+
+  try {
+    const url = new URL(href, baseUrl);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    url.hash = "";
+    const s = url.toString();
+    if (s.length > 2000) return null;
+    return s;
+  } catch {
+    return null;
+  }
+}
+
+function stripHtml(s: string) {
+  return (s || "")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function rankLink(urlStr: string): number {
+  try {
+    const u = new URL(urlStr);
+    const path = (u.pathname || "/").toLowerCase();
+    if (path === "/" || path === "") return 1000;
+
+    let score = 0;
+    const keywords: Array<[RegExp, number]> = [
+      [/\b(pricing|plans|subscribe)\b/, 80],
+      [/\b(about|company|team|careers)\b/, 70],
+      [/\b(contact|support|help|faq)\b/, 70],
+      [/\b(services|service|solutions)\b/, 60],
+      [/\b(products|product|catalog|shop|store)\b/, 60],
+      [/\b(blog|news|articles)\b/, 40],
+      [/\b(login|signin|signup|register)\b/, 25],
+    ];
+    for (let i = 0; i < keywords.length; i++) {
+      const [re, w] = keywords[i];
+      if (re.test(path)) score += w;
+    }
+    score -= Math.min(30, path.split("/").filter(Boolean).length * 5);
+    return score;
+  } catch {
+    return 0;
+  }
+}
+
 // --- Plan-based limits configuration (UPDATED PRICING) ---
 // Starter: Preview only, NO Play Store
 // Standard: Play Store ready, NO iOS
@@ -404,11 +468,11 @@ export async function registerRoutes(
         action: assigneeId ? "ticket_assigned" : "ticket_unassigned",
         targetType: "ticket",
         targetId: existing.id,
-        metadata: JSON.stringify({ 
+        metadata: { 
           assigneeId, 
           previousAssignee: existing.assignedTo,
           ticketSubject: existing.subject 
-        }),
+        },
         ipAddress: req.ip || null,
         userAgent: req.get("User-Agent") || null,
       });
@@ -439,7 +503,7 @@ export async function registerRoutes(
         action: "ticket_resolved",
         targetType: "ticket",
         targetId: existing.id,
-        metadata: JSON.stringify({ ticketSubject: existing.subject }),
+        metadata: { ticketSubject: existing.subject },
         ipAddress: req.ip || null,
         userAgent: req.get("User-Agent") || null,
       });
@@ -525,10 +589,10 @@ export async function registerRoutes(
         action: "ticket_deleted",
         targetType: "ticket",
         targetId: existing.id,
-        metadata: JSON.stringify({ 
+        metadata: { 
           ticketSubject: existing.subject,
           requesterId: existing.requesterId,
-        }),
+        },
         ipAddress: req.ip || null,
         userAgent: req.get("User-Agent") || null,
       });
@@ -694,10 +758,10 @@ export async function registerRoutes(
         action: payload.isInternal ? "ticket_internal_note" : "ticket_reply",
         targetType: "ticket",
         targetId: ticket.id,
-        metadata: JSON.stringify({ 
+        metadata: { 
           ticketSubject: ticket.subject,
           messagePreview: payload.message.substring(0, 100),
-        }),
+        },
         ipAddress: req.ip || null,
         userAgent: req.get("User-Agent") || null,
       });
@@ -937,6 +1001,9 @@ export async function registerRoutes(
         icon: appItem.icon,
         iconUrl: appItem.iconUrl,
         primaryColor: appItem.primaryColor,
+        industry: (appItem as any).industry ?? null,
+        isNativeOnly: (appItem as any).isNativeOnly ?? false,
+        editorScreens: (appItem as any).editorScreens ?? null,
         status: appItem.status,
       });
     } catch (err) {
@@ -997,6 +1064,207 @@ export async function registerRoutes(
   const updateAppSchema = insertAppSchema.omit({ status: true }).partial().extend({
     editorScreens: z.array(z.any()).optional(),
   });
+
+  // --- Website import wizard (extract links) ---
+  app.get("/api/import/website-links", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const raw = typeof req.query.url === "string" ? req.query.url : "";
+      if (!raw || !isHttpishUrl(raw)) {
+        return res.status(400).json({ message: "Invalid url" });
+      }
+
+      const inputUrl = new URL(raw);
+      const baseUrl = `${inputUrl.protocol}//${inputUrl.host}`;
+
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 12_000);
+      const resp = await fetch(raw, {
+        signal: controller.signal,
+        redirect: "follow",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; SaaS-Architect/1.0; +https://example.com)",
+          Accept: "text/html,application/xhtml+xml",
+        },
+      }).finally(() => clearTimeout(t));
+
+      if (!resp.ok) {
+        return res.status(400).json({ message: `Fetch failed (${resp.status})` });
+      }
+
+      const contentType = resp.headers.get("content-type") || "";
+      if (!contentType.includes("text/html")) {
+        return res.status(400).json({ message: "URL did not return HTML" });
+      }
+
+      const htmlRaw = await resp.text();
+      const html = htmlRaw.length > 1_200_000 ? htmlRaw.slice(0, 1_200_000) : htmlRaw;
+
+      const seen: Record<string, boolean> = {};
+      const links: Array<{ title: string; url: string }> = [];
+
+      const aRe = /<a\s+[^>]*href\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))[^>]*>([\s\S]*?)<\/a>/gi;
+      let m: RegExpExecArray | null;
+      while ((m = aRe.exec(html)) && links.length < 200) {
+        const hrefCandidate = (m[2] || m[3] || m[4] || "").trim();
+        const titleRaw = m[5] || "";
+        const urlStr = normalizeImportedLink(hrefCandidate, baseUrl);
+        if (!urlStr) continue;
+
+        let u: URL;
+        try {
+          u = new URL(urlStr);
+        } catch {
+          continue;
+        }
+
+        // Keep same-host links only (reduces noise)
+        if (u.host !== inputUrl.host) continue;
+
+        const key = u.toString();
+        if (seen[key]) continue;
+        seen[key] = true;
+
+        const title = stripHtml(titleRaw).slice(0, 120);
+        links.push({ title, url: key });
+      }
+
+      // Always include homepage
+      if (!seen[baseUrl + "/"]) {
+        links.unshift({ title: "Home", url: baseUrl + "/" });
+      }
+
+      // Rank + take top N
+      links.sort((a, b) => rankLink(b.url) - rankLink(a.url));
+
+      const maxOut = 20;
+      const out: Array<{ title: string; url: string }> = [];
+      for (let i = 0; i < links.length && out.length < maxOut; i++) {
+        const item = links[i];
+        out.push({
+          title: item.title || new URL(item.url).pathname || item.url,
+          url: item.url,
+        });
+      }
+
+      return res.json({ baseUrl, links: out });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Apply an import result to an app (create webviewPages module + optional navigation)
+  app.post("/api/apps/:id/apply-import", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const appItem = await storage.getApp(req.params.id);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+
+      const schema = z.object({
+        baseUrl: z.string().url(),
+        createNav: z.boolean().optional().default(true),
+        links: z
+          .array(
+            z.object({
+              title: z.string().max(200).optional().default(""),
+              url: z.string().url(),
+            }),
+          )
+          .max(30),
+      });
+      const body = schema.parse(req.body);
+
+      const existingModules = (appItem as any).modules && Array.isArray((appItem as any).modules) ? (appItem as any).modules : [];
+      const modules = existingModules.slice();
+
+      let webviewModuleIndex = -1;
+      for (let i = 0; i < modules.length; i++) {
+        if (modules[i]?.type === "webviewPages") {
+          webviewModuleIndex = i;
+          break;
+        }
+      }
+
+      const webviewModule =
+        webviewModuleIndex >= 0
+          ? { ...modules[webviewModuleIndex] }
+          : {
+              id: crypto.randomUUID(),
+              type: "webviewPages",
+              name: "Webview Pages",
+              enabled: true,
+              config: { pages: [] },
+            };
+
+      const config = (webviewModule as any).config && typeof (webviewModule as any).config === "object" ? { ...(webviewModule as any).config } : {};
+      const existingPages: any[] = Array.isArray((config as any).pages) ? (config as any).pages.slice() : [];
+
+      const byUrl: Record<string, boolean> = {};
+      for (let i = 0; i < existingPages.length; i++) {
+        const u = typeof existingPages[i]?.url === "string" ? existingPages[i].url : "";
+        if (u) byUrl[u] = true;
+      }
+
+      const newPages: any[] = [];
+      for (let i = 0; i < body.links.length; i++) {
+        const link = body.links[i];
+        const normalized = normalizeImportedLink(link.url, body.baseUrl);
+        if (!normalized) continue;
+        if (byUrl[normalized]) continue;
+        byUrl[normalized] = true;
+        newPages.push({
+          id: crypto.randomUUID(),
+          label: (link.title || new URL(normalized).pathname || normalized).slice(0, 80),
+          url: normalized,
+          icon: "🌐",
+        });
+      }
+
+      (config as any).pages = existingPages.concat(newPages);
+      (webviewModule as any).config = config;
+      (webviewModule as any).enabled = true;
+
+      if (webviewModuleIndex >= 0) modules[webviewModuleIndex] = webviewModule;
+      else modules.push(webviewModule);
+
+      const existingNav = (appItem as any).navigation && typeof (appItem as any).navigation === "object" ? (appItem as any).navigation : null;
+      const navigation = existingNav
+        ? { ...existingNav, items: Array.isArray(existingNav.items) ? existingNav.items.slice() : [] }
+        : { style: "bottom-tabs", items: [] };
+
+      if (body.createNav) {
+        const navSeen: Record<string, boolean> = {};
+        for (let i = 0; i < navigation.items.length; i++) {
+          const u = typeof navigation.items[i]?.url === "string" ? navigation.items[i].url : "";
+          if (u) navSeen[u] = true;
+        }
+        for (let i = 0; i < newPages.length; i++) {
+          const p = newPages[i];
+          if (!p?.url || navSeen[p.url]) continue;
+          navSeen[p.url] = true;
+          navigation.items.push({
+            id: crypto.randomUUID(),
+            kind: "webview",
+            label: p.label,
+            icon: p.icon,
+            url: p.url,
+          });
+        }
+      }
+
+      const updated = await storage.updateApp(req.params.id, { modules, navigation } as any);
+      return res.json(updated ? sanitizeAppForViewer(updated as any, user) : updated);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
   app.patch("/api/apps/:id", requireAuth, async (req, res, next) => {
     try {
       const user = getAuthedUser(req);
@@ -3036,7 +3304,7 @@ export async function registerRoutes(
             /--wp--preset--color--secondary:\s*([#][0-9A-Fa-f]{3,6})/gi,
           ];
           for (const pattern of cssVarPatterns) {
-            const matches = html.matchAll(pattern);
+            const matches = Array.from(html.matchAll(pattern));
             for (const match of matches) {
               const normalized = normalizeHexColor(match[1]);
               if (normalized && !isGenericColor(normalized)) {
@@ -3050,7 +3318,7 @@ export async function registerRoutes(
           }
           // Extract secondary colors
           for (const pattern of secondaryCssPatterns) {
-            const matches = html.matchAll(pattern);
+            const matches = Array.from(html.matchAll(pattern));
             for (const match of matches) {
               const normalized = normalizeHexColor(match[1]);
               if (normalized && !isGenericColor(normalized) && normalized !== primaryColor) {
@@ -3068,7 +3336,7 @@ export async function registerRoutes(
         {
           // Extract all inline style colors (always, to build color palette)
           const inlineStyleColors: string[] = [];
-          const styleMatches = html.matchAll(/style=["'][^"']*(?:background(?:-color)?|color|border-color):\s*([#][0-9A-Fa-f]{3,6})[^"']*["']/gi);
+          const styleMatches = Array.from(html.matchAll(/style=["'][^"']*(?:background(?:-color)?|color|border-color):\s*([#][0-9A-Fa-f]{3,6})[^"']*["']/gi));
           for (const match of styleMatches) {
             const normalized = normalizeHexColor(match[1]);
             if (normalized && !isGenericColor(normalized)) {
@@ -3101,7 +3369,7 @@ export async function registerRoutes(
             /\.cta[^{]*{[^}]*background(?:-color)?:\s*([#][0-9A-Fa-f]{3,6})/gi,
           ];
           for (const pattern of bgColorPatterns) {
-            const matches = styleTagContent.matchAll(pattern);
+            const matches = Array.from(styleTagContent.matchAll(pattern));
             for (const match of matches) {
               const normalized = normalizeHexColor(match[1]);
               if (normalized && !isGenericColor(normalized)) {
@@ -3170,7 +3438,7 @@ export async function registerRoutes(
           // Look for any hex colors that appear multiple times
           const allHexColors = html.matchAll(/#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})\b/g);
           const colorCounts: Record<string, number> = {};
-          for (const match of allHexColors) {
+          for (const match of Array.from(allHexColors)) {
             const normalized = normalizeHexColor(`#${match[1]}`);
             if (normalized && !isGenericColor(normalized)) {
               colorCounts[normalized] = (colorCounts[normalized] || 0) + 1;
@@ -3206,7 +3474,7 @@ export async function registerRoutes(
                 const svgText = await logoRes.text();
                 // Extract colors from fill and stroke attributes
                 const svgColors: string[] = [];
-                const fillMatches = svgText.matchAll(/(?:fill|stroke)=["']#([0-9A-Fa-f]{3,6})["']/gi);
+                const fillMatches = Array.from(svgText.matchAll(/(?:fill|stroke)=["']#([0-9A-Fa-f]{3,6})["']/gi));
                 for (const match of fillMatches) {
                   const normalized = normalizeHexColor(`#${match[1]}`);
                   if (normalized && !isGenericColor(normalized)) {
@@ -3214,7 +3482,7 @@ export async function registerRoutes(
                   }
                 }
                 // Also check style attributes
-                const styleMatches = svgText.matchAll(/(?:fill|stroke):\s*#([0-9A-Fa-f]{3,6})/gi);
+                const styleMatches = Array.from(svgText.matchAll(/(?:fill|stroke):\s*#([0-9A-Fa-f]{3,6})/gi));
                 for (const match of styleMatches) {
                   const normalized = normalizeHexColor(`#${match[1]}`);
                   if (normalized && !isGenericColor(normalized)) {
@@ -3231,7 +3499,7 @@ export async function registerRoutes(
                 }
               }
               // For PNG/JPG/ICO, use sharp to extract dominant colors
-              const imageBuffer = Buffer.from(await logoResponse.arrayBuffer());
+              const imageBuffer = Buffer.from(await logoRes.arrayBuffer());
               try {
                 // Get raw pixel data from the image
                 const { data, info } = await sharp(imageBuffer)
@@ -3330,8 +3598,12 @@ export async function registerRoutes(
         // ===== DERIVE SECONDARY COLOR =====
         // If we didn't find a specific secondary color, pick from extracted colors
         if (!secondaryColor && allExtractedColors.length > 1) {
-          // Get unique colors that aren't the primary
-          const uniqueColors = [...new Set(allExtractedColors)].filter(c => c !== primaryColor);
+          // Get unique colors that aren't the primary (avoid downlevel Set iteration)
+          const uniqueColors: string[] = [];
+          for (const c of allExtractedColors) {
+            if (!c || c === primaryColor) continue;
+            if (!uniqueColors.includes(c)) uniqueColors.push(c);
+          }
           if (uniqueColors.length > 0) {
             secondaryColor = uniqueColors[0];
             secondaryColorSource = "derived";

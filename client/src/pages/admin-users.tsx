@@ -43,6 +43,7 @@ import {
   X,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { getAppUrlDisplay, isHttpUrl } from "@/lib/utils";
 
 type UserWithStats = {
   id: string;
@@ -464,7 +465,7 @@ export default function AdminUsers() {
                           </div>
                           <div>
                             <p className="text-sm font-medium text-white">{app.name}</p>
-                            <p className="text-xs text-muted-foreground truncate max-w-[200px]">{app.url}</p>
+                            <p className="text-xs text-muted-foreground truncate max-w-[200px]">{getAppUrlDisplay(app.url, (app as any).isNativeOnly)}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -482,14 +483,16 @@ export default function AdminUsers() {
                             {app.status === "failed" && <AlertCircle className="h-3 w-3 mr-1" />}
                             {app.status}
                           </Badge>
-                          <a 
-                            href={app.url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-muted-foreground hover:text-cyan-400 transition-colors"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
+                          {isHttpUrl(app.url) && (
+                            <a 
+                              href={app.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-muted-foreground hover:text-cyan-400 transition-colors"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                          )}
                         </div>
                       </div>
                     ))}

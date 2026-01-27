@@ -48,10 +48,12 @@ import {
   Monitor,
   Plus,
   Trash2,
+  Copy,
   Type,
   Image as ImageIcon,
   Square,
   Grid3X3,
+  Table,
   Heading1,
   AlignLeft,
   MousePointer,
@@ -70,7 +72,14 @@ import {
   Eye,
   Globe,
   Layout,
+  Code2,
+  QrCode,
+  Bot,
+  ListTree,
+  Link2,
 } from "lucide-react";
+
+import { QRCodeSVG } from "qrcode.react";
 
 // Component types for the editor (extended to support industry templates)
 type ComponentType = 
@@ -79,6 +88,7 @@ type ComponentType =
   | "image" 
   | "button" 
   | "container" 
+  | "fixedContainer"
   | "grid"
   | "gallery"
   | "section"
@@ -89,6 +99,7 @@ type ComponentType =
   | "list"
   | "form"
   | "input"
+  | "table"
   | "video"
   | "map"
   // Extended template components
@@ -129,10 +140,12 @@ const BASIC_COMPONENTS: { type: ComponentType; name: string; icon: any; descript
   { type: "image", name: "Image", icon: ImageIcon, description: "Image or photo" },
   { type: "button", name: "Button", icon: MousePointer, description: "Clickable button" },
   { type: "container", name: "Container", icon: Square, description: "Container for grouping" },
+  { type: "fixedContainer", name: "Fixed", icon: Layout, description: "Sticky container" },
   { type: "grid", name: "Grid", icon: Grid3X3, description: "Grid layout" },
   { type: "gallery", name: "Gallery", icon: ImageIcon, description: "Image gallery" },
   { type: "section", name: "Section", icon: AlignLeft, description: "Content section" },
   { type: "card", name: "Card", icon: Square, description: "Card with content" },
+  { type: "table", name: "Table", icon: Table, description: "Rows and columns" },
   { type: "divider", name: "Divider", icon: AlignLeft, description: "Horizontal line" },
   { type: "icon", name: "Icon", icon: Star, description: "Icon element" },
   { type: "list", name: "List", icon: List, description: "Bullet or numbered list" },
@@ -229,7 +242,8 @@ const getDefaultProps = (type: ComponentType): Record<string, any> => {
     case "heading": return { text: "Heading", level: 2, color: "#000000" };
     case "image": return { src: "", alt: "Image", width: "100%", height: "auto" };
     case "button": return { text: "Button", variant: "primary", action: "none" };
-    case "container": return { padding: 16, backgroundColor: "transparent" };
+    case "container": return { padding: 16, backgroundColor: "transparent", direction: "column", gap: 12 };
+    case "fixedContainer": return { padding: 12, backgroundColor: "#ffffff", direction: "row", gap: 12, top: 0, zIndex: 20, shadow: true };
     case "grid": return { columns: 2, gap: 16 };
     case "gallery": return { columns: 2, images: [] };
     case "section": return { title: "Section Title", padding: 20 };
@@ -240,6 +254,7 @@ const getDefaultProps = (type: ComponentType): Record<string, any> => {
     case "list": return { items: ["Item 1", "Item 2", "Item 3"], ordered: false };
     case "form": return { submitText: "Submit" };
     case "input": return { label: "Label", placeholder: "Enter value", type: "text", required: false };
+    case "table": return { columns: ["Item", "Price"], rows: [["Fresh Tomatoes", "$3.99"], ["Organic Apples", "$5.49"], ["Farm Eggs", "$4.25"]], striped: true };
     case "video": return { src: "", autoplay: false, controls: true };
     case "map": return { latitude: 0, longitude: 0, zoom: 15 };
     default: return {};
@@ -342,8 +357,14 @@ function ComponentPreview({
         }
       case "container":
         return (
-          <div 
-            style={{ padding: component.props.padding, backgroundColor: component.props.backgroundColor }}
+          <div
+            style={{
+              padding: component.props.padding,
+              backgroundColor: component.props.backgroundColor,
+              display: "flex",
+              flexDirection: component.props.direction || "column",
+              gap: component.props.gap ?? 0,
+            }}
             className="border border-dashed border-slate-300 rounded min-h-[60px]"
           >
             {component.children?.map((child) => (
@@ -357,6 +378,38 @@ function ComponentPreview({
             ))}
             {(!component.children || component.children.length === 0) && (
               <div className="text-center text-slate-400 py-4 text-sm">Drop components here</div>
+            )}
+          </div>
+        );
+      case "fixedContainer":
+        return (
+          <div
+            style={{
+              position: "sticky",
+              top: component.props.top ?? 0,
+              zIndex: component.props.zIndex ?? 20,
+              padding: component.props.padding,
+              backgroundColor: component.props.backgroundColor,
+              display: "flex",
+              flexDirection: component.props.direction || "row",
+              gap: component.props.gap ?? 0,
+            }}
+            className={`border border-dashed border-slate-300 rounded min-h-[60px] ${component.props.shadow ? "shadow-sm" : ""}`}
+          >
+            <div className="absolute -top-3 right-2 text-[10px] bg-slate-900 text-white px-2 py-0.5 rounded">
+              Fixed
+            </div>
+            {component.children?.map((child) => (
+              <ComponentPreview
+                key={child.id}
+                component={child}
+                selectedComponentId={selectedComponentId}
+                onSelect={onSelect}
+                interaction={interaction}
+              />
+            ))}
+            {(!component.children || component.children.length === 0) && (
+              <div className="text-center text-slate-400 py-4 text-sm flex-1">Drop components here</div>
             )}
           </div>
         );
@@ -478,6 +531,45 @@ function ComponentPreview({
             ))}
           </ul>
         );
+
+      case "table":
+        {
+          const columns: string[] = Array.isArray(component.props.columns) ? component.props.columns : [];
+          const rows: any[] = Array.isArray(component.props.rows) ? component.props.rows : [];
+          return (
+            <div className="overflow-hidden rounded-lg border bg-white">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50">
+                  <tr>
+                    {columns.map((c, i) => (
+                      <th key={i} className="text-left px-3 py-2 font-semibold text-slate-700">
+                        {c}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.slice(0, 20).map((r: any, i: number) => (
+                    <tr key={i} className={component.props.striped && i % 2 === 1 ? "bg-slate-50/60" : ""}>
+                      {(Array.isArray(r) ? r : []).slice(0, columns.length).map((cell: any, j: number) => (
+                        <td key={j} className="px-3 py-2 border-t text-slate-700">
+                          {String(cell ?? "")}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                  {rows.length === 0 && (
+                    <tr>
+                      <td className="px-3 py-6 text-center text-slate-400" colSpan={Math.max(columns.length, 1)}>
+                        Add rows in Properties
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
         
       // ---- Extended Template Components ----
       case "hero":
@@ -683,11 +775,100 @@ function PropertiesPanel({
               />
             </div>
             <div>
+              <Label className={labelClass}>Direction</Label>
+              <Select value={String(component.props.direction || "column")} onValueChange={(v) => onUpdate({ ...component.props, direction: v })}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="column">Column</SelectItem>
+                  <SelectItem value="row">Row</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className={labelClass}>Gap (px)</Label>
+              <Input
+                type="number"
+                value={component.props.gap ?? 0}
+                onChange={(e) => onUpdate({ ...component.props, gap: parseInt(e.target.value || "0") })}
+                className={inputClass}
+              />
+            </div>
+            <div>
               <Label className={labelClass}>Background</Label>
               <Input
                 value={component.props.backgroundColor ?? "transparent"}
                 onChange={(e) => onUpdate({ ...component.props, backgroundColor: e.target.value })}
                 className={`${inputClass} font-mono`}
+              />
+            </div>
+          </div>
+        );
+      case "fixedContainer":
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label className={labelClass}>Padding (px)</Label>
+              <Input
+                type="number"
+                value={component.props.padding ?? 0}
+                onChange={(e) => onUpdate({ ...component.props, padding: parseInt(e.target.value || "0") })}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <Label className={labelClass}>Top Offset (px)</Label>
+              <Input
+                type="number"
+                value={component.props.top ?? 0}
+                onChange={(e) => onUpdate({ ...component.props, top: parseInt(e.target.value || "0") })}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <Label className={labelClass}>Z-Index</Label>
+              <Input
+                type="number"
+                value={component.props.zIndex ?? 20}
+                onChange={(e) => onUpdate({ ...component.props, zIndex: parseInt(e.target.value || "0") })}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <Label className={labelClass}>Direction</Label>
+              <Select value={String(component.props.direction || "row")} onValueChange={(v) => onUpdate({ ...component.props, direction: v })}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="row">Row</SelectItem>
+                  <SelectItem value="column">Column</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className={labelClass}>Gap (px)</Label>
+              <Input
+                type="number"
+                value={component.props.gap ?? 0}
+                onChange={(e) => onUpdate({ ...component.props, gap: parseInt(e.target.value || "0") })}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <Label className={labelClass}>Background</Label>
+              <Input
+                value={component.props.backgroundColor ?? "#ffffff"}
+                onChange={(e) => onUpdate({ ...component.props, backgroundColor: e.target.value })}
+                className={`${inputClass} font-mono`}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className={labelClass}>Shadow</p>
+                <p className="text-[11px] text-slate-500">Adds subtle elevation</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={!!component.props.shadow}
+                onChange={(e) => onUpdate({ ...component.props, shadow: e.target.checked })}
               />
             </div>
           </div>
@@ -870,6 +1051,59 @@ function PropertiesPanel({
             </div>
           </div>
         );
+      case "table":
+        {
+          const columns = Array.isArray(component.props.columns) ? component.props.columns : [];
+          const rows = Array.isArray(component.props.rows) ? component.props.rows : [];
+          return (
+            <div className="space-y-4">
+              <div>
+                <Label className={labelClass}>Columns (comma-separated)</Label>
+                <Input
+                  value={columns.join(", ")}
+                  onChange={(e) => {
+                    const next = e.target.value
+                      .split(",")
+                      .map((s) => s.trim())
+                      .filter(Boolean);
+                    onUpdate({ ...component.props, columns: next });
+                  }}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <Label className={labelClass}>Rows (JSON array)</Label>
+                <Textarea
+                  value={JSON.stringify(rows, null, 2)}
+                  onChange={(e) => {
+                    try {
+                      const parsed = JSON.parse(e.target.value);
+                      if (Array.isArray(parsed)) {
+                        onUpdate({ ...component.props, rows: parsed });
+                      }
+                    } catch {
+                      // ignore invalid JSON while typing
+                    }
+                  }}
+                  rows={6}
+                  className={`${inputClass} font-mono text-xs`}
+                />
+                <p className="text-[11px] text-slate-500 mt-1">Example: [["Item","$1"],["Item2","$2"]]</p>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className={labelClass}>Striped Rows</p>
+                  <p className="text-[11px] text-slate-500">Alternating background</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={!!component.props.striped}
+                  onChange={(e) => onUpdate({ ...component.props, striped: e.target.checked })}
+                />
+              </div>
+            </div>
+          );
+        }
       default:
         return <div className="text-sm text-slate-400">Properties for {component.type}</div>;
     }
@@ -913,6 +1147,7 @@ export default function VisualEditor() {
   const [deviceView, setDeviceView] = useState<"mobile" | "desktop">("mobile");
   const [editorMode, setEditorMode] = useState<"components" | "website">("components"); // Default to components for native apps
   const [sidebarTab, setSidebarTab] = useState<"components" | "templates">("components");
+  const [rightSidebarTab, setRightSidebarTab] = useState<"agent" | "properties" | "code" | "qr">("properties");
   const [hasChanges, setHasChanges] = useState(false);
   const [showComponentTree, setShowComponentTree] = useState(true);
   const [templatesLoaded, setTemplatesLoaded] = useState(false);
@@ -1366,7 +1601,7 @@ export default function VisualEditor() {
       id: generateId(),
       type,
       props: getDefaultProps(type),
-      children: ["container", "grid", "section", "form"].includes(type) ? [] : undefined,
+      children: ["container", "fixedContainer", "grid", "section", "form"].includes(type) ? [] : undefined,
     };
 
     setScreens(prev => prev.map(screen => 
@@ -1377,6 +1612,15 @@ export default function VisualEditor() {
     setSelectedComponentId(newComponent.id);
     setHasChanges(true);
   }, [activeScreen, activeScreenId]);
+
+  const copyToClipboard = useCallback(async (text: string, successLabel: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: successLabel });
+    } catch {
+      toast({ title: "Copy failed", description: "Your browser blocked clipboard access." });
+    }
+  }, [toast]);
 
   // Add template section
   const addTemplate = useCallback((template: typeof SECTION_TEMPLATES[0]) => {
@@ -1600,6 +1844,26 @@ export default function VisualEditor() {
           
           <div className="h-6 w-px bg-slate-700" />
           
+          <Button 
+            variant="outline"
+            size="sm"
+            onClick={() => setLocation(`/apps/${id}/structure`)}
+            className="border-slate-600 text-slate-300 hover:bg-slate-700/50 hover:text-white"
+          >
+            <ListTree className="h-4 w-4 mr-2" /> Structure
+          </Button>
+
+          {!isNativeApp && (
+            <Button 
+              variant="outline"
+              size="sm"
+              onClick={() => setLocation(`/apps/${id}/import`)}
+              className="border-slate-600 text-slate-300 hover:bg-slate-700/50 hover:text-white"
+            >
+              <Link2 className="h-4 w-4 mr-2" /> Import
+            </Button>
+          )}
+
           <Button 
             variant="outline"
             size="sm"
@@ -1995,28 +2259,142 @@ export default function VisualEditor() {
           )}
         </main>
 
-        {/* Right Sidebar - Properties Panel */}
+        {/* Right Sidebar - Tools Panel (AppyPie-style) */}
         <aside className={`w-80 bg-slate-900/95 border-l border-slate-700/50 flex flex-col overflow-hidden shrink-0 ${editorMode === "website" ? "hidden" : ""}`}>
-          <div className="p-4 border-b border-slate-700/50 flex items-center gap-3 shrink-0">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center">
-              <Sparkles className="h-4 w-4 text-white" />
+          <Tabs value={rightSidebarTab} onValueChange={(v) => setRightSidebarTab(v as any)} className="flex-1 flex flex-col">
+            <div className="p-4 border-b border-slate-700/50 shrink-0">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center">
+                  <Sparkles className="h-4 w-4 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-sm font-semibold text-white">Tools</span>
+                  <p className="text-xs text-slate-400 truncate">
+                    {selectedComponent ? `Selected: ${selectedComponent.type}` : `${activeScreen?.name || "Screen"}`}
+                  </p>
+                </div>
+              </div>
+
+              <TabsList className="grid w-full grid-cols-4 p-1 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                <TabsTrigger value="agent" className="text-xs rounded-lg data-[state=active]:bg-slate-700 data-[state=active]:text-white">
+                  <Bot className="h-3.5 w-3.5 mr-1.5" /> Agent
+                </TabsTrigger>
+                <TabsTrigger value="properties" className="text-xs rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
+                  <Sparkles className="h-3.5 w-3.5 mr-1.5" /> Props
+                </TabsTrigger>
+                <TabsTrigger value="code" className="text-xs rounded-lg data-[state=active]:bg-slate-700 data-[state=active]:text-white">
+                  <Code2 className="h-3.5 w-3.5 mr-1.5" /> Code
+                </TabsTrigger>
+                <TabsTrigger value="qr" className="text-xs rounded-lg data-[state=active]:bg-slate-700 data-[state=active]:text-white">
+                  <QrCode className="h-3.5 w-3.5 mr-1.5" /> QR
+                </TabsTrigger>
+              </TabsList>
             </div>
-            <div>
-              <span className="text-sm font-semibold text-white">Properties</span>
-              <p className="text-xs text-slate-400">
-                {selectedComponent ? `Editing: ${selectedComponent.type}` : "Select an element"}
-              </p>
-            </div>
-          </div>
-          <ScrollArea className="flex-1 bg-slate-800/30">
-            <div className="p-4">
-              <PropertiesPanel
-                component={selectedComponent}
-                onUpdate={updateComponent}
-                onDelete={deleteComponent}
-              />
-            </div>
-          </ScrollArea>
+
+            <TabsContent value="properties" className="flex-1 m-0">
+              <ScrollArea className="h-full bg-slate-800/30">
+                <div className="p-4">
+                  <PropertiesPanel
+                    component={selectedComponent}
+                    onUpdate={updateComponent}
+                    onDelete={deleteComponent}
+                  />
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="code" className="flex-1 m-0">
+              <ScrollArea className="h-full bg-slate-800/30">
+                <div className="p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-slate-600 text-slate-200 hover:bg-slate-700/50"
+                      onClick={() => copyToClipboard(JSON.stringify(activeScreen, null, 2), "Copied screen JSON")}
+                    >
+                      <Copy className="h-4 w-4 mr-2" /> Screen
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-slate-600 text-slate-200 hover:bg-slate-700/50"
+                      onClick={() => copyToClipboard(JSON.stringify(screens, null, 2), "Copied all screens JSON")}
+                    >
+                      <Copy className="h-4 w-4 mr-2" /> All
+                    </Button>
+                    {selectedComponent && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-slate-600 text-slate-200 hover:bg-slate-700/50"
+                        onClick={() => copyToClipboard(JSON.stringify(selectedComponent, null, 2), "Copied component JSON")}
+                      >
+                        <Copy className="h-4 w-4 mr-2" /> Component
+                      </Button>
+                    )}
+                  </div>
+
+                  <Textarea
+                    value={JSON.stringify(selectedComponent || activeScreen, null, 2)}
+                    readOnly
+                    rows={18}
+                    className="bg-slate-900/60 border-slate-700/50 text-slate-100 font-mono text-xs"
+                  />
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="qr" className="flex-1 m-0">
+              <ScrollArea className="h-full bg-slate-800/30">
+                <div className="p-4 space-y-4">
+                  <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 flex flex-col items-center gap-3">
+                    <QRCodeSVG
+                      value={`${window.location.origin}/live-preview/${id}`}
+                      size={180}
+                      bgColor="#ffffff"
+                      fgColor="#111827"
+                      level="M"
+                    />
+                    <p className="text-xs text-slate-400 text-center">
+                      Scan to open live preview
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-slate-600 text-slate-200 hover:bg-slate-700/50"
+                        onClick={() => window.open(`/live-preview/${id}`, "_blank")}
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" /> Open
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-slate-600 text-slate-200 hover:bg-slate-700/50"
+                        onClick={() => copyToClipboard(`${window.location.origin}/live-preview/${id}`, "Copied preview link")}
+                      >
+                        <Copy className="h-4 w-4 mr-2" /> Copy
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="agent" className="flex-1 m-0">
+              <ScrollArea className="h-full bg-slate-800/30">
+                <div className="p-4">
+                  <div className="rounded-xl border border-slate-700/50 bg-slate-900/40 p-4">
+                    <p className="text-sm text-white font-medium">AI Agent</p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Coming next: “Describe what you want” → auto-add components and style.
+                    </p>
+                  </div>
+                </div>
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
         </aside>
       </div>
     </div>

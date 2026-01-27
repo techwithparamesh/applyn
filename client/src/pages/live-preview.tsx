@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { ExternalLink, Home, Share2, Download, ArrowUp, Smartphone, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
+import { DevicePreview } from "@/components/device-preview";
+import { isHttpUrl } from "@/lib/utils";
 
 type AppData = {
   id: string;
@@ -22,6 +24,9 @@ type AppData = {
   icon: string;
   iconUrl?: string | null;
   primaryColor: string;
+  industry?: string | null;
+  isNativeOnly?: boolean | null;
+  editorScreens?: any[] | null;
   status: string;
 };
 
@@ -81,9 +86,14 @@ export default function LivePreview() {
     );
   }
 
-  // Open the website in fullscreen mode
-  const openFullscreen = () => {
-    window.location.href = app.url;
+  const isWebsite = isHttpUrl(app.url);
+  const openApp = () => {
+    if (isWebsite) {
+      window.open(app.url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    // Native-only: you're already in the preview; just dismiss prompt.
+    setShowAddToHome(false);
   };
 
   return (
@@ -138,14 +148,22 @@ export default function LivePreview() {
       </header>
 
       {/* Preview Frame - Full remaining height iframe */}
-      <div className="flex-1 min-h-0 relative bg-white">
-        <iframe 
-          src={app.url}
-          className="absolute inset-0 w-full h-full border-0"
-          title={`${app.name} Preview`}
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-top-navigation"
-          allow="accelerometer; camera; encrypted-media; geolocation; gyroscope; microphone"
-        />
+      <div className="flex-1 min-h-0 relative overflow-auto">
+        <div className="min-h-full w-full flex items-center justify-center p-4">
+          <DevicePreview
+            url={app.url}
+            appName={app.name}
+            primaryColor={app.primaryColor}
+            icon={app.iconUrl || app.icon}
+            preferLivePreview={true}
+            screens={app.editorScreens || undefined}
+            industry={app.industry || undefined}
+            isNativeOnly={!!app.isNativeOnly || app.url?.startsWith("native://")}
+            availablePlatforms={["android", "ios"]}
+            defaultPlatform={isIOS ? "ios" : "android"}
+            showToggle={false}
+          />
+        </div>
       </div>
 
       {/* Add to Home Screen Prompt */}
@@ -182,9 +200,9 @@ export default function LivePreview() {
                     size="sm"
                     className="flex-1 text-xs"
                     style={{ backgroundColor: app.primaryColor }}
-                    onClick={openFullscreen}
+                    onClick={openApp}
                   >
-                    <Smartphone className="mr-1 h-3 w-3" /> Open App
+                    <Smartphone className="mr-1 h-3 w-3" /> {isWebsite ? "Open Website" : "Continue Preview"}
                   </Button>
                   <Button 
                     size="sm"

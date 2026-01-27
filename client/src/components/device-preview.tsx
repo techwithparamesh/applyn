@@ -1097,6 +1097,22 @@ function PreviewContent({
     setIframeLoaded(false);
   }, [fullUrl]);
 
+  // If we prefer live preview but the site blocks iframes, don't spin forever.
+  // After a short timeout, fall back to screenshot.
+  useEffect(() => {
+    if (!isValidUrl) return;
+    if (!preferLivePreview) return;
+    if (!useIframe) return;
+
+    const timeout = setTimeout(() => {
+      if (!iframeLoaded) {
+        setUseIframe(false);
+      }
+    }, 8000);
+
+    return () => clearTimeout(timeout);
+  }, [isValidUrl, preferLivePreview, useIframe, iframeLoaded, fullUrl]);
+
   // Auto-switch to iframe if screenshot fails or takes too long
   useEffect(() => {
     if (!isValidUrl) return;

@@ -50,6 +50,7 @@ import { formatDistanceToNow } from "date-fns";
 import { BuildLogsDialog } from "@/components/build-logs-dialog";
 import { motion } from "framer-motion";
 import { BuildErrorAnalyzer } from "@/components/ai-features";
+import { getAppUrlDisplay } from "@/lib/utils";
 
 type AppItem = {
   id: string;
@@ -1011,7 +1012,7 @@ export default function Dashboard() {
                       <div>
                         <CardTitle className="text-base text-white">{app.name}</CardTitle>
                         <CardDescription className="text-xs truncate max-w-[160px] text-muted-foreground">
-                          {app.url}
+                          {getAppUrlDisplay(app.url, (app as any).isNativeOnly)}
                         </CardDescription>
                       </div>
                     </div>

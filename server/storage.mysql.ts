@@ -347,6 +347,9 @@ export class MysqlStorage {
       generatedPrompt: (apps as any).generatedPrompt,
       generatedScreens: (apps as any).generatedScreens,
       editorScreens: (apps as any).editorScreens,
+      modules: (apps as any).modules,
+      navigation: (apps as any).navigation,
+      editorScreensHistory: (apps as any).editorScreensHistory,
       features: apps.features,
       packageName: apps.packageName,
       versionCode: apps.versionCode,
@@ -369,6 +372,9 @@ export class MysqlStorage {
       features: row.features ? JSON.parse(row.features) : null,
       generatedScreens: row.generatedScreens ? (typeof row.generatedScreens === "string" ? JSON.parse(row.generatedScreens) : row.generatedScreens) : null,
       editorScreens: row.editorScreens ? (typeof row.editorScreens === "string" ? JSON.parse(row.editorScreens) : row.editorScreens) : null,
+      modules: row.modules ? (typeof row.modules === "string" ? JSON.parse(row.modules) : row.modules) : null,
+      navigation: row.navigation ? (typeof row.navigation === "string" ? JSON.parse(row.navigation) : row.navigation) : null,
+      editorScreensHistory: row.editorScreensHistory ? (typeof row.editorScreensHistory === "string" ? JSON.parse(row.editorScreensHistory) : row.editorScreensHistory) : null,
       isNativeOnly: row.isNativeOnly === 1 || row.isNativeOnly === true,
     } as App;
   }
@@ -417,6 +423,9 @@ export class MysqlStorage {
       generatedPrompt: (app as any).generatedPrompt ?? null,
       generatedScreens: (app as any).generatedScreens ? JSON.stringify((app as any).generatedScreens) : null,
       editorScreens: (app as any).editorScreens ? JSON.stringify((app as any).editorScreens) : null,
+      modules: (app as any).modules ? JSON.stringify((app as any).modules) : null,
+      navigation: (app as any).navigation ? JSON.stringify((app as any).navigation) : null,
+      editorScreensHistory: (app as any).editorScreensHistory ? JSON.stringify((app as any).editorScreensHistory) : null,
       features: app.features ? JSON.stringify(app.features) : null,
       createdAt: now,
       updatedAt: now,
@@ -438,7 +447,32 @@ export class MysqlStorage {
       patchData.generatedScreens = JSON.stringify((patch as any).generatedScreens);
     }
     if ((patch as any).editorScreens && Array.isArray((patch as any).editorScreens)) {
+      // Append previous screens to history for easy restore
+      const current = await this.getApp(id);
+      if (current?.editorScreens) {
+        const history = Array.isArray((current as any).editorScreensHistory)
+          ? ([...(current as any).editorScreensHistory] as any[])
+          : ([] as any[]);
+
+        history.unshift({
+          ts: new Date().toISOString(),
+          editorScreens: current.editorScreens,
+        });
+
+        // Keep last 10 snapshots
+        patchData.editorScreensHistory = JSON.stringify(history.slice(0, 10));
+      }
+
       patchData.editorScreens = JSON.stringify((patch as any).editorScreens);
+    }
+    if ((patch as any).modules && Array.isArray((patch as any).modules)) {
+      patchData.modules = JSON.stringify((patch as any).modules);
+    }
+    if ((patch as any).navigation && typeof (patch as any).navigation === "object") {
+      patchData.navigation = JSON.stringify((patch as any).navigation);
+    }
+    if ((patch as any).editorScreensHistory && Array.isArray((patch as any).editorScreensHistory)) {
+      patchData.editorScreensHistory = JSON.stringify((patch as any).editorScreensHistory);
     }
     if (typeof (patch as any).isNativeOnly === "boolean") {
       patchData.isNativeOnly = (patch as any).isNativeOnly ? 1 : 0;
@@ -670,7 +704,7 @@ export class MysqlStorage {
     };
   }
 
-  async deleteSupportTicket(id: number): Promise<boolean> {
+  async deleteSupportTicket(id: string): Promise<boolean> {
     const result = await getMysqlDb()
       .delete(supportTickets)
       .where(eq(supportTickets.id, id));

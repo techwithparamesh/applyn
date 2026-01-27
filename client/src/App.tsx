@@ -32,6 +32,8 @@ import PreviewApp from "@/pages/preview-app";
 import LivePreview from "@/pages/live-preview";
 import AppAnalytics from "@/pages/app-analytics";
 import VisualEditor from "@/pages/visual-editor";
+import AppStructure from "@/pages/app-structure";
+import WebsiteImport from "@/pages/website-import";
 import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
 import VerifyEmail from "@/pages/verify-email";
@@ -64,6 +66,8 @@ function Router() {
       <Route path="/prompt-create" component={PromptCreate} />
       <Route path="/apps/:id/editor" component={AppEditor} />
       <Route path="/apps/:id/visual-editor" component={VisualEditor} />
+      <Route path="/apps/:id/structure" component={AppStructure} />
+      <Route path="/apps/:id/import" component={WebsiteImport} />
       <Route path="/apps/:id/edit" component={EditApp} />
       <Route path="/apps/:id/push" component={PushNotifications} />
       <Route path="/apps/:id/preview" component={PreviewApp} />
