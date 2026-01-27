@@ -561,22 +561,14 @@ export default function PromptCreate() {
     },
     onSuccess: (app) => {
       queryClient.invalidateQueries({ queryKey: ["/api/apps"] });
-      
-      if (creationMode === "scratch") {
-        // For scratch mode, go directly to visual editor to build screens
-        toast({
-          title: "🎉 App created!",
-          description: "Let's build your app screens...",
-        });
-        setLocation(`/apps/${app.id}/visual-editor`);
-      } else {
-        // For website mode, go to preview/settings
-        toast({
-          title: "🎉 App created!",
-          description: "Your app is ready! Customize it further...",
-        });
-        setLocation(`/apps/${app.id}/preview`);
-      }
+
+      toast({
+        title: "🎉 App created!",
+        description: "Build started in background. You can track progress on the dashboard.",
+      });
+
+      // Builds are async; take the user to the dashboard where they can see status (draft/processing/live/failed)
+      setLocation("/dashboard");
     },
     onError: (err: any) => {
       toast({
