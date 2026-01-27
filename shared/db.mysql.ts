@@ -186,6 +186,396 @@ export const appWebhooks = mysqlTable("app_webhooks", {
   enabledIdx: index("app_webhooks_enabled_idx").on(table.appId, table.enabled),
 }));
 
+// --- App Runtime (booking) tables ---
+
+export const appServices = mysqlTable("app_services", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  appId: varchar("app_id", { length: 36 }).notNull(),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
+  imageUrl: text("image_url"),
+  currency: varchar("currency", { length: 8 }).notNull().default("INR"),
+  priceCents: int("price_cents").notNull().default(0),
+  durationMinutes: int("duration_minutes").notNull().default(30),
+  active: tinyint("active").notNull().default(1),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  appIdIdx: index("app_services_app_id_idx").on(table.appId),
+  activeIdx: index("app_services_active_idx").on(table.appId, table.active),
+}));
+
+export const appAppointments = mysqlTable("app_appointments", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  appId: varchar("app_id", { length: 36 }).notNull(),
+  customerId: varchar("customer_id", { length: 36 }).notNull(),
+  serviceId: varchar("service_id", { length: 36 }).notNull(),
+  status: varchar("status", { length: 24 }).notNull().default("requested"),
+  currency: varchar("currency", { length: 8 }).notNull().default("INR"),
+  priceCents: int("price_cents").notNull().default(0),
+  startAt: timestamp("start_at", { mode: "date" }).notNull(),
+  endAt: timestamp("end_at", { mode: "date" }).notNull(),
+  notes: text("notes"),
+  paymentProvider: varchar("payment_provider", { length: 16 }),
+  paymentStatus: varchar("payment_status", { length: 16 }).notNull().default("pending"),
+  paymentRef: varchar("payment_ref", { length: 128 }),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  appIdIdx: index("app_appointments_app_id_idx").on(table.appId),
+  customerIdx: index("app_appointments_customer_idx").on(table.appId, table.customerId),
+  statusIdx: index("app_appointments_status_idx").on(table.appId, table.status),
+  startAtIdx: index("app_appointments_start_at_idx").on(table.appId, table.startAt),
+}));
+
+// --- App Runtime (content / posts) tables ---
+
+export const appPosts = mysqlTable(
+  "app_posts",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    type: varchar("type", { length: 24 }).notNull().default("post"), // post|news|sermon|event|offer|podcast
+    title: varchar("title", { length: 255 }).notNull(),
+    excerpt: text("excerpt"),
+    content: text("content"),
+    imageUrl: text("image_url"),
+    category: varchar("category", { length: 80 }),
+    active: tinyint("active").notNull().default(1),
+    publishedAt: timestamp("published_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdIdx: index("app_posts_app_id_idx").on(table.appId),
+    typeIdx: index("app_posts_type_idx").on(table.appId, table.type),
+    activeIdx: index("app_posts_active_idx").on(table.appId, table.active),
+    publishedAtIdx: index("app_posts_published_at_idx").on(table.appId, table.publishedAt),
+  }),
+);
+
+export const appPostBookmarks = mysqlTable(
+  "app_post_bookmarks",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    customerId: varchar("customer_id", { length: 36 }).notNull(),
+    postId: varchar("post_id", { length: 36 }).notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appCustomerIdx: index("app_post_bookmarks_app_customer_idx").on(table.appId, table.customerId),
+    appPostIdx: index("app_post_bookmarks_app_post_idx").on(table.appId, table.postId),
+  }),
+);
+
+// --- App Runtime (restaurant) tables ---
+
+export const appRestaurantReservations = mysqlTable(
+  "app_restaurant_reservations",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    customerId: varchar("customer_id", { length: 36 }).notNull(),
+    partySize: int("party_size").notNull().default(2),
+    reservedAt: timestamp("reserved_at", { mode: "date" }).notNull(),
+    notes: text("notes"),
+    status: varchar("status", { length: 24 }).notNull().default("requested"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_restaurant_reservations_app_idx").on(table.appId),
+    customerIdx: index("app_restaurant_reservations_customer_idx").on(table.appId, table.customerId),
+    reservedAtIdx: index("app_restaurant_reservations_reserved_at_idx").on(table.appId, table.reservedAt),
+  }),
+);
+
+// --- App Runtime (fitness) tables ---
+
+export const appFitnessClasses = mysqlTable(
+  "app_fitness_classes",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    name: varchar("name", { length: 200 }).notNull(),
+    description: text("description"),
+    startsAt: timestamp("starts_at", { mode: "date" }).notNull(),
+    endsAt: timestamp("ends_at", { mode: "date" }).notNull(),
+    capacity: int("capacity").notNull().default(20),
+    active: tinyint("active").notNull().default(1),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_fitness_classes_app_idx").on(table.appId),
+    activeIdx: index("app_fitness_classes_active_idx").on(table.appId, table.active),
+    startsAtIdx: index("app_fitness_classes_starts_at_idx").on(table.appId, table.startsAt),
+  }),
+);
+
+export const appFitnessBookings = mysqlTable(
+  "app_fitness_bookings",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    customerId: varchar("customer_id", { length: 36 }).notNull(),
+    classId: varchar("class_id", { length: 36 }).notNull(),
+    status: varchar("status", { length: 24 }).notNull().default("booked"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appCustomerIdx: index("app_fitness_bookings_app_customer_idx").on(table.appId, table.customerId),
+    appClassIdx: index("app_fitness_bookings_app_class_idx").on(table.appId, table.classId),
+  }),
+);
+
+// --- App Runtime (education) tables ---
+
+export const appCourses = mysqlTable(
+  "app_courses",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    description: text("description"),
+    imageUrl: text("image_url"),
+    active: tinyint("active").notNull().default(1),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_courses_app_idx").on(table.appId),
+    activeIdx: index("app_courses_active_idx").on(table.appId, table.active),
+  }),
+);
+
+export const appCourseLessons = mysqlTable(
+  "app_course_lessons",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    courseId: varchar("course_id", { length: 36 }).notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    contentUrl: text("content_url"),
+    sortOrder: int("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    courseIdx: index("app_course_lessons_course_idx").on(table.appId, table.courseId),
+  }),
+);
+
+export const appCourseEnrollments = mysqlTable(
+  "app_course_enrollments",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    customerId: varchar("customer_id", { length: 36 }).notNull(),
+    courseId: varchar("course_id", { length: 36 }).notNull(),
+    status: varchar("status", { length: 24 }).notNull().default("enrolled"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appCustomerIdx: index("app_course_enrollments_app_customer_idx").on(table.appId, table.customerId),
+    appCourseIdx: index("app_course_enrollments_app_course_idx").on(table.appId, table.courseId),
+  }),
+);
+
+// --- App Runtime (real estate) tables ---
+
+export const appRealEstateListings = mysqlTable(
+  "app_real_estate_listings",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    description: text("description"),
+    address: text("address"),
+    currency: varchar("currency", { length: 8 }).notNull().default("INR"),
+    priceCents: int("price_cents").notNull().default(0),
+    imageUrl: text("image_url"),
+    active: tinyint("active").notNull().default(1),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_real_estate_listings_app_idx").on(table.appId),
+    activeIdx: index("app_real_estate_listings_active_idx").on(table.appId, table.active),
+  }),
+);
+
+export const appRealEstateInquiries = mysqlTable(
+  "app_real_estate_inquiries",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    listingId: varchar("listing_id", { length: 36 }).notNull(),
+    customerId: varchar("customer_id", { length: 36 }),
+    name: varchar("name", { length: 200 }),
+    email: varchar("email", { length: 320 }),
+    phone: varchar("phone", { length: 40 }),
+    message: text("message"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appListingIdx: index("app_real_estate_inquiries_app_listing_idx").on(table.appId, table.listingId),
+    appCustomerIdx: index("app_real_estate_inquiries_app_customer_idx").on(table.appId, table.customerId),
+  }),
+);
+
+export const appSavedItems = mysqlTable(
+  "app_saved_items",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    customerId: varchar("customer_id", { length: 36 }).notNull(),
+    kind: varchar("kind", { length: 24 }).notNull().default("item"),
+    itemId: varchar("item_id", { length: 36 }).notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appCustomerIdx: index("app_saved_items_app_customer_idx").on(table.appId, table.customerId),
+    appItemIdx: index("app_saved_items_app_item_idx").on(table.appId, table.kind, table.itemId),
+  }),
+);
+
+// --- App Runtime (healthcare) tables ---
+
+export const appDoctors = mysqlTable(
+  "app_doctors",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    name: varchar("name", { length: 200 }).notNull(),
+    specialty: varchar("specialty", { length: 120 }),
+    bio: text("bio"),
+    imageUrl: text("image_url"),
+    active: tinyint("active").notNull().default(1),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_doctors_app_idx").on(table.appId),
+    activeIdx: index("app_doctors_active_idx").on(table.appId, table.active),
+  }),
+);
+
+export const appDoctorAppointments = mysqlTable(
+  "app_doctor_appointments",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    customerId: varchar("customer_id", { length: 36 }).notNull(),
+    doctorId: varchar("doctor_id", { length: 36 }).notNull(),
+    status: varchar("status", { length: 24 }).notNull().default("requested"),
+    startAt: timestamp("start_at", { mode: "date" }).notNull(),
+    endAt: timestamp("end_at", { mode: "date" }).notNull(),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_doctor_appointments_app_idx").on(table.appId),
+    customerIdx: index("app_doctor_appointments_customer_idx").on(table.appId, table.customerId),
+    startAtIdx: index("app_doctor_appointments_start_at_idx").on(table.appId, table.startAt),
+  }),
+);
+
+// --- App Runtime (radio) tables ---
+
+export const appRadioStations = mysqlTable(
+  "app_radio_stations",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    name: varchar("name", { length: 200 }).notNull(),
+    streamUrl: text("stream_url").notNull(),
+    imageUrl: text("image_url"),
+    active: tinyint("active").notNull().default(1),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_radio_stations_app_idx").on(table.appId),
+    activeIdx: index("app_radio_stations_active_idx").on(table.appId, table.active),
+  }),
+);
+
+export const appPodcastEpisodes = mysqlTable(
+  "app_podcast_episodes",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    showTitle: varchar("show_title", { length: 200 }),
+    title: varchar("title", { length: 255 }).notNull(),
+    description: text("description"),
+    audioUrl: text("audio_url"),
+    publishedAt: timestamp("published_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_podcast_episodes_app_idx").on(table.appId),
+    publishedAtIdx: index("app_podcast_episodes_published_at_idx").on(table.appId, table.publishedAt),
+  }),
+);
+
+// --- App Runtime (music) tables ---
+
+export const appMusicAlbums = mysqlTable(
+  "app_music_albums",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    artist: varchar("artist", { length: 200 }),
+    imageUrl: text("image_url"),
+    releasedAt: timestamp("released_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_music_albums_app_idx").on(table.appId),
+  }),
+);
+
+export const appMusicTracks = mysqlTable(
+  "app_music_tracks",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    albumId: varchar("album_id", { length: 36 }).notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    trackNumber: int("track_number").notNull().default(1),
+    durationSeconds: int("duration_seconds").notNull().default(0),
+    audioUrl: text("audio_url"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    albumIdx: index("app_music_tracks_album_idx").on(table.appId, table.albumId),
+  }),
+);
+
+// --- App Runtime (business leads) tables ---
+
+export const appLeads = mysqlTable(
+  "app_leads",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    name: varchar("name", { length: 200 }),
+    email: varchar("email", { length: 320 }),
+    phone: varchar("phone", { length: 40 }),
+    message: text("message"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_leads_app_idx").on(table.appId),
+  }),
+);
+
 export const buildJobs = mysqlTable("build_jobs", {
   id: varchar("id", { length: 36 }).primaryKey(),
   appId: varchar("app_id", { length: 36 }).notNull(),

@@ -34,6 +34,26 @@ import {
   appOrderItems,
   appOrders,
   appProducts,
+  appServices,
+  appAppointments,
+  appPosts,
+  appPostBookmarks,
+  appRestaurantReservations,
+  appFitnessClasses,
+  appFitnessBookings,
+  appCourses,
+  appCourseLessons,
+  appCourseEnrollments,
+  appRealEstateListings,
+  appRealEstateInquiries,
+  appSavedItems,
+  appDoctors,
+  appDoctorAppointments,
+  appRadioStations,
+  appPodcastEpisodes,
+  appMusicAlbums,
+  appMusicTracks,
+  appLeads,
   appWebhooks,
 } from "@shared/db.mysql";
 import {
@@ -1372,6 +1392,1181 @@ export async function registerRoutes(
     }
   });
 
+  // --- Runtime (public) salon services ---
+  app.get("/api/runtime/:appId/services", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Services require MySQL storage" });
+      }
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select()
+        .from(appServices)
+        .where(and(eq(appServices.appId, appId), eq(appServices.active, 1)))
+        .orderBy(desc(appServices.updatedAt));
+
+      return res.json(
+        rows.map((s: any) => ({
+          id: s.id,
+          appId: s.appId,
+          name: s.name,
+          description: s.description ?? "",
+          imageUrl: s.imageUrl ?? null,
+          currency: s.currency ?? "INR",
+          priceCents: Number(s.priceCents || 0),
+          durationMinutes: Number(s.durationMinutes || 30),
+          active: s.active === 1 || s.active === true,
+        })),
+      );
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Runtime (public) posts (news/church/business/music) ---
+  app.get("/api/runtime/:appId/posts", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Posts require MySQL storage" });
+      }
+
+      const type = String(req.query.type || "").trim().toLowerCase();
+      const category = String(req.query.category || "").trim();
+
+      const db = getMysqlDb();
+      const where = [eq(appPosts.appId, appId), eq(appPosts.active, 1)] as any[];
+      if (type) where.push(eq(appPosts.type, type));
+      if (category) where.push(eq(appPosts.category, category));
+
+      const rows = await db
+        .select()
+        .from(appPosts)
+        .where(and(...where))
+        .orderBy(desc(appPosts.publishedAt), desc(appPosts.updatedAt));
+
+      return res.json(
+        rows.map((p: any) => ({
+          id: p.id,
+          type: p.type,
+          title: p.title,
+          excerpt: p.excerpt ?? "",
+          content: p.content ?? "",
+          imageUrl: p.imageUrl ?? null,
+          category: p.category ?? null,
+          publishedAt: p.publishedAt ? (p.publishedAt instanceof Date ? p.publishedAt.toISOString() : String(p.publishedAt)) : null,
+        })),
+      );
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Runtime (customer) post bookmarks (news) ---
+  app.post("/api/runtime/:appId/posts/:postId/bookmark", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const postId = String(req.params.postId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Bookmarks require MySQL storage" });
+      }
+
+      const auth = String(req.headers.authorization || "");
+      const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+      const payload = token ? verifyRuntimeToken(appId, token) : null;
+      if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
+
+      const schema = z.object({ on: z.boolean().optional().default(true) }).strict();
+      const { on } = schema.parse(req.body ?? {});
+
+      const db = getMysqlDb();
+      const existing = await db
+        .select({ id: appPostBookmarks.id })
+        .from(appPostBookmarks)
+        .where(and(eq(appPostBookmarks.appId, appId), eq(appPostBookmarks.customerId, String(payload.sub)), eq(appPostBookmarks.postId, postId)))
+        .limit(1);
+
+      if (on) {
+        if (!existing.length) {
+          await db.insert(appPostBookmarks).values({
+            id: crypto.randomUUID(),
+            appId,
+            customerId: String(payload.sub),
+            postId,
+            createdAt: new Date(),
+          } as any);
+        }
+      } else {
+        if (existing.length) {
+          await db
+            .delete(appPostBookmarks)
+            .where(and(eq(appPostBookmarks.appId, appId), eq(appPostBookmarks.customerId, String(payload.sub)), eq(appPostBookmarks.postId, postId)));
+        }
+      }
+
+      return res.json({ ok: true, bookmarked: on });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.get("/api/runtime/:appId/bookmarks", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Bookmarks require MySQL storage" });
+      }
+
+      const auth = String(req.headers.authorization || "");
+      const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+      const payload = token ? verifyRuntimeToken(appId, token) : null;
+      if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select({
+          id: appPosts.id,
+          type: appPosts.type,
+          title: appPosts.title,
+          excerpt: appPosts.excerpt,
+          imageUrl: appPosts.imageUrl,
+          category: appPosts.category,
+          publishedAt: appPosts.publishedAt,
+        })
+        .from(appPostBookmarks)
+        .leftJoin(appPosts, and(eq(appPosts.appId, appId), eq(appPosts.id, appPostBookmarks.postId)))
+        .where(and(eq(appPostBookmarks.appId, appId), eq(appPostBookmarks.customerId, String(payload.sub))))
+        .orderBy(desc(appPostBookmarks.createdAt));
+
+      return res.json(
+        rows
+          .filter((r: any) => !!r.id)
+          .map((p: any) => ({
+            id: p.id,
+            type: p.type,
+            title: p.title,
+            excerpt: p.excerpt ?? "",
+            imageUrl: p.imageUrl ?? null,
+            category: p.category ?? null,
+            publishedAt: p.publishedAt ? (p.publishedAt instanceof Date ? p.publishedAt.toISOString() : String(p.publishedAt)) : null,
+          })),
+      );
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Runtime (restaurant) reservations ---
+  app.post("/api/runtime/:appId/reservations", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Reservations require MySQL storage" });
+      }
+
+      const auth = String(req.headers.authorization || "");
+      const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+      const payload = token ? verifyRuntimeToken(appId, token) : null;
+      if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
+
+      const schema = z
+        .object({
+          reservedAt: z.string().min(1),
+          partySize: z.number().int().min(1).max(50).optional().default(2),
+          notes: z.string().max(2000).optional(),
+        })
+        .strict();
+      const { reservedAt, partySize, notes } = schema.parse(req.body);
+
+      const dt = new Date(reservedAt);
+      if (Number.isNaN(dt.getTime())) return res.status(400).json({ message: "Invalid reservedAt" });
+      if (dt.getTime() < Date.now() - 5 * 60 * 1000) return res.status(400).json({ message: "Reservation must be in the future" });
+
+      const db = getMysqlDb();
+      const id = crypto.randomUUID();
+      const now = new Date();
+      await db.insert(appRestaurantReservations).values({
+        id,
+        appId,
+        customerId: String(payload.sub),
+        partySize,
+        reservedAt: dt,
+        notes: notes ?? null,
+        status: "requested",
+        createdAt: now,
+        updatedAt: now,
+      } as any);
+
+      await emitAppEvent(appId, String(payload.sub), "reservation.created", { reservationId: id, reservedAt: dt.toISOString(), partySize });
+      return res.status(201).json({ id, status: "requested" });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.get("/api/runtime/:appId/reservations", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Reservations require MySQL storage" });
+      }
+
+      const auth = String(req.headers.authorization || "");
+      const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+      const payload = token ? verifyRuntimeToken(appId, token) : null;
+      if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select()
+        .from(appRestaurantReservations)
+        .where(and(eq(appRestaurantReservations.appId, appId), eq(appRestaurantReservations.customerId, String(payload.sub))))
+        .orderBy(desc(appRestaurantReservations.reservedAt));
+
+      return res.json(
+        rows.map((r: any) => ({
+          id: r.id,
+          status: r.status,
+          partySize: Number(r.partySize || 2),
+          reservedAt: r.reservedAt instanceof Date ? r.reservedAt.toISOString() : String(r.reservedAt),
+          notes: r.notes ?? "",
+        })),
+      );
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Runtime (fitness) classes + bookings ---
+  app.get("/api/runtime/:appId/classes", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Classes require MySQL storage" });
+      }
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select()
+        .from(appFitnessClasses)
+        .where(and(eq(appFitnessClasses.appId, appId), eq(appFitnessClasses.active, 1)))
+        .orderBy(asc(appFitnessClasses.startsAt));
+
+      return res.json(
+        rows.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          description: c.description ?? "",
+          startsAt: c.startsAt instanceof Date ? c.startsAt.toISOString() : String(c.startsAt),
+          endsAt: c.endsAt instanceof Date ? c.endsAt.toISOString() : String(c.endsAt),
+          capacity: Number(c.capacity || 0),
+        })),
+      );
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.post("/api/runtime/:appId/classes/:classId/book", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const classId = String(req.params.classId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Class booking requires MySQL storage" });
+      }
+
+      const auth = String(req.headers.authorization || "");
+      const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+      const payload = token ? verifyRuntimeToken(appId, token) : null;
+      if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
+
+      const db = getMysqlDb();
+      const existing = await db
+        .select({ id: appFitnessBookings.id })
+        .from(appFitnessBookings)
+        .where(and(eq(appFitnessBookings.appId, appId), eq(appFitnessBookings.customerId, String(payload.sub)), eq(appFitnessBookings.classId, classId)))
+        .limit(1);
+      if (existing.length) return res.status(409).json({ message: "Already booked" });
+
+      const classRows = await db
+        .select()
+        .from(appFitnessClasses)
+        .where(and(eq(appFitnessClasses.appId, appId), eq(appFitnessClasses.id, classId)))
+        .limit(1);
+      const klass: any = classRows[0];
+      if (!klass || !(klass.active === 1 || klass.active === true)) {
+        return res.status(400).json({ message: "Invalid class" });
+      }
+
+      const id = crypto.randomUUID();
+      await db.insert(appFitnessBookings).values({
+        id,
+        appId,
+        customerId: String(payload.sub),
+        classId,
+        status: "booked",
+        createdAt: new Date(),
+      } as any);
+
+      await emitAppEvent(appId, String(payload.sub), "class.booked", { bookingId: id, classId });
+      return res.status(201).json({ id, status: "booked" });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.get("/api/runtime/:appId/class-bookings", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Class booking requires MySQL storage" });
+      }
+
+      const auth = String(req.headers.authorization || "");
+      const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+      const payload = token ? verifyRuntimeToken(appId, token) : null;
+      if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select({
+          id: appFitnessBookings.id,
+          status: appFitnessBookings.status,
+          createdAt: appFitnessBookings.createdAt,
+          classId: appFitnessBookings.classId,
+          className: appFitnessClasses.name,
+          startsAt: appFitnessClasses.startsAt,
+        })
+        .from(appFitnessBookings)
+        .leftJoin(appFitnessClasses, and(eq(appFitnessClasses.appId, appId), eq(appFitnessClasses.id, appFitnessBookings.classId)))
+        .where(and(eq(appFitnessBookings.appId, appId), eq(appFitnessBookings.customerId, String(payload.sub))))
+        .orderBy(desc(appFitnessBookings.createdAt));
+
+      return res.json(
+        rows.map((b: any) => ({
+          id: b.id,
+          status: b.status,
+          classId: b.classId,
+          className: b.className ?? null,
+          startsAt: b.startsAt ? (b.startsAt instanceof Date ? b.startsAt.toISOString() : String(b.startsAt)) : null,
+        })),
+      );
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Runtime (education) courses + enrollments ---
+  app.get("/api/runtime/:appId/courses", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Courses require MySQL storage" });
+      }
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select()
+        .from(appCourses)
+        .where(and(eq(appCourses.appId, appId), eq(appCourses.active, 1)))
+        .orderBy(desc(appCourses.updatedAt));
+
+      return res.json(
+        rows.map((c: any) => ({
+          id: c.id,
+          title: c.title,
+          description: c.description ?? "",
+          imageUrl: c.imageUrl ?? null,
+        })),
+      );
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.get("/api/runtime/:appId/courses/:courseId/lessons", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const courseId = String(req.params.courseId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Lessons require MySQL storage" });
+      }
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select()
+        .from(appCourseLessons)
+        .where(and(eq(appCourseLessons.appId, appId), eq(appCourseLessons.courseId, courseId)))
+        .orderBy(asc(appCourseLessons.sortOrder), asc(appCourseLessons.createdAt));
+
+      return res.json(
+        rows.map((l: any) => ({
+          id: l.id,
+          courseId: l.courseId,
+          title: l.title,
+          contentUrl: l.contentUrl ?? null,
+          sortOrder: Number(l.sortOrder || 0),
+        })),
+      );
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.post("/api/runtime/:appId/courses/:courseId/enroll", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const courseId = String(req.params.courseId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Enrollments require MySQL storage" });
+      }
+
+      const auth = String(req.headers.authorization || "");
+      const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+      const payload = token ? verifyRuntimeToken(appId, token) : null;
+      if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
+
+      const db = getMysqlDb();
+      const existing = await db
+        .select({ id: appCourseEnrollments.id })
+        .from(appCourseEnrollments)
+        .where(and(eq(appCourseEnrollments.appId, appId), eq(appCourseEnrollments.customerId, String(payload.sub)), eq(appCourseEnrollments.courseId, courseId)))
+        .limit(1);
+      if (existing.length) return res.status(409).json({ message: "Already enrolled" });
+
+      const id = crypto.randomUUID();
+      await db.insert(appCourseEnrollments).values({
+        id,
+        appId,
+        customerId: String(payload.sub),
+        courseId,
+        status: "enrolled",
+        createdAt: new Date(),
+      } as any);
+
+      await emitAppEvent(appId, String(payload.sub), "course.enrolled", { enrollmentId: id, courseId });
+      return res.status(201).json({ id, status: "enrolled" });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.get("/api/runtime/:appId/enrollments", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Enrollments require MySQL storage" });
+      }
+
+      const auth = String(req.headers.authorization || "");
+      const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+      const payload = token ? verifyRuntimeToken(appId, token) : null;
+      if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select({
+          id: appCourseEnrollments.id,
+          status: appCourseEnrollments.status,
+          courseId: appCourseEnrollments.courseId,
+          courseTitle: appCourses.title,
+          createdAt: appCourseEnrollments.createdAt,
+        })
+        .from(appCourseEnrollments)
+        .leftJoin(appCourses, and(eq(appCourses.appId, appId), eq(appCourses.id, appCourseEnrollments.courseId)))
+        .where(and(eq(appCourseEnrollments.appId, appId), eq(appCourseEnrollments.customerId, String(payload.sub))))
+        .orderBy(desc(appCourseEnrollments.createdAt));
+
+      return res.json(
+        rows.map((e: any) => ({
+          id: e.id,
+          status: e.status,
+          courseId: e.courseId,
+          courseTitle: e.courseTitle ?? null,
+        })),
+      );
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Runtime (real estate) listings + inquiries + saved ---
+  app.get("/api/runtime/:appId/listings", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Listings require MySQL storage" });
+      }
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select()
+        .from(appRealEstateListings)
+        .where(and(eq(appRealEstateListings.appId, appId), eq(appRealEstateListings.active, 1)))
+        .orderBy(desc(appRealEstateListings.updatedAt));
+
+      return res.json(
+        rows.map((l: any) => ({
+          id: l.id,
+          title: l.title,
+          description: l.description ?? "",
+          address: l.address ?? "",
+          currency: l.currency ?? "INR",
+          priceCents: Number(l.priceCents || 0),
+          imageUrl: l.imageUrl ?? null,
+        })),
+      );
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.post("/api/runtime/:appId/listings/:listingId/inquiries", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const listingId = String(req.params.listingId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Inquiries require MySQL storage" });
+      }
+
+      const schema = z
+        .object({
+          name: z.string().max(200).optional(),
+          email: z.string().email().max(320).optional(),
+          phone: z.string().max(40).optional(),
+          message: z.string().max(5000).optional(),
+        })
+        .strict();
+      const body = schema.parse(req.body ?? {});
+
+      // customer token optional
+      const auth = String(req.headers.authorization || "");
+      const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+      const payload = token ? verifyRuntimeToken(appId, token) : null;
+
+      const db = getMysqlDb();
+      const id = crypto.randomUUID();
+      await db.insert(appRealEstateInquiries).values({
+        id,
+        appId,
+        listingId,
+        customerId: payload?.sub ? String(payload.sub) : null,
+        name: body.name ?? null,
+        email: body.email ?? null,
+        phone: body.phone ?? null,
+        message: body.message ?? null,
+        createdAt: new Date(),
+      } as any);
+
+      await emitAppEvent(appId, payload?.sub ? String(payload.sub) : null, "listing.inquiry.created", { inquiryId: id, listingId });
+      return res.status(201).json({ id });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.post("/api/runtime/:appId/saved", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Saved items require MySQL storage" });
+      }
+
+      const auth = String(req.headers.authorization || "");
+      const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+      const payload = token ? verifyRuntimeToken(appId, token) : null;
+      if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
+
+      const schema = z
+        .object({
+          kind: z.string().min(1).max(24).default("listing"),
+          itemId: z.string().min(1),
+          on: z.boolean().optional().default(true),
+        })
+        .strict();
+      const { kind, itemId, on } = schema.parse(req.body);
+
+      const db = getMysqlDb();
+      const existing = await db
+        .select({ id: appSavedItems.id })
+        .from(appSavedItems)
+        .where(and(eq(appSavedItems.appId, appId), eq(appSavedItems.customerId, String(payload.sub)), eq(appSavedItems.kind, kind), eq(appSavedItems.itemId, itemId)))
+        .limit(1);
+
+      if (on) {
+        if (!existing.length) {
+          await db.insert(appSavedItems).values({
+            id: crypto.randomUUID(),
+            appId,
+            customerId: String(payload.sub),
+            kind,
+            itemId,
+            createdAt: new Date(),
+          } as any);
+        }
+      } else {
+        if (existing.length) {
+          await db
+            .delete(appSavedItems)
+            .where(and(eq(appSavedItems.appId, appId), eq(appSavedItems.customerId, String(payload.sub)), eq(appSavedItems.kind, kind), eq(appSavedItems.itemId, itemId)));
+        }
+      }
+
+      return res.json({ ok: true, saved: on });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.get("/api/runtime/:appId/saved", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Saved items require MySQL storage" });
+      }
+
+      const auth = String(req.headers.authorization || "");
+      const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+      const payload = token ? verifyRuntimeToken(appId, token) : null;
+      if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select()
+        .from(appSavedItems)
+        .where(and(eq(appSavedItems.appId, appId), eq(appSavedItems.customerId, String(payload.sub))))
+        .orderBy(desc(appSavedItems.createdAt));
+
+      return res.json(
+        rows.map((s: any) => ({
+          id: s.id,
+          kind: s.kind,
+          itemId: s.itemId,
+          createdAt: s.createdAt,
+        })),
+      );
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Runtime (healthcare) doctors + appointments ---
+  app.get("/api/runtime/:appId/doctors", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Doctors require MySQL storage" });
+      }
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select()
+        .from(appDoctors)
+        .where(and(eq(appDoctors.appId, appId), eq(appDoctors.active, 1)))
+        .orderBy(desc(appDoctors.updatedAt));
+
+      return res.json(
+        rows.map((d: any) => ({
+          id: d.id,
+          name: d.name,
+          specialty: d.specialty ?? "",
+          bio: d.bio ?? "",
+          imageUrl: d.imageUrl ?? null,
+        })),
+      );
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.post("/api/runtime/:appId/doctor-appointments", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Doctor appointments require MySQL storage" });
+      }
+
+      const auth = String(req.headers.authorization || "");
+      const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+      const payload = token ? verifyRuntimeToken(appId, token) : null;
+      if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
+
+      const schema = z
+        .object({
+          doctorId: z.string().min(1),
+          startAt: z.string().min(1),
+          notes: z.string().max(2000).optional(),
+        })
+        .strict();
+      const { doctorId, startAt, notes } = schema.parse(req.body);
+
+      const start = new Date(startAt);
+      if (Number.isNaN(start.getTime())) return res.status(400).json({ message: "Invalid startAt" });
+      if (start.getTime() < Date.now() - 5 * 60 * 1000) return res.status(400).json({ message: "Start time must be in the future" });
+      const end = new Date(start.getTime() + 30 * 60 * 1000);
+
+      const db = getMysqlDb();
+      const docRows = await db
+        .select()
+        .from(appDoctors)
+        .where(and(eq(appDoctors.appId, appId), eq(appDoctors.id, doctorId)))
+        .limit(1);
+      const doc: any = docRows[0];
+      if (!doc || !(doc.active === 1 || doc.active === true)) return res.status(400).json({ message: "Invalid doctor" });
+
+      const id = crypto.randomUUID();
+      const now = new Date();
+      await db.insert(appDoctorAppointments).values({
+        id,
+        appId,
+        customerId: String(payload.sub),
+        doctorId,
+        status: "requested",
+        startAt: start,
+        endAt: end,
+        notes: notes ?? null,
+        createdAt: now,
+        updatedAt: now,
+      } as any);
+
+      await emitAppEvent(appId, String(payload.sub), "doctor_appointment.created", { appointmentId: id, doctorId, startAt: start.toISOString() });
+      return res.status(201).json({ id, status: "requested" });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.get("/api/runtime/:appId/doctor-appointments", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Doctor appointments require MySQL storage" });
+      }
+
+      const auth = String(req.headers.authorization || "");
+      const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+      const payload = token ? verifyRuntimeToken(appId, token) : null;
+      if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select({
+          id: appDoctorAppointments.id,
+          status: appDoctorAppointments.status,
+          startAt: appDoctorAppointments.startAt,
+          endAt: appDoctorAppointments.endAt,
+          doctorId: appDoctorAppointments.doctorId,
+          doctorName: appDoctors.name,
+          specialty: appDoctors.specialty,
+        })
+        .from(appDoctorAppointments)
+        .leftJoin(appDoctors, and(eq(appDoctors.appId, appId), eq(appDoctors.id, appDoctorAppointments.doctorId)))
+        .where(and(eq(appDoctorAppointments.appId, appId), eq(appDoctorAppointments.customerId, String(payload.sub))))
+        .orderBy(desc(appDoctorAppointments.startAt));
+
+      return res.json(
+        rows.map((a: any) => ({
+          id: a.id,
+          status: a.status,
+          doctorId: a.doctorId,
+          doctorName: a.doctorName ?? null,
+          specialty: a.specialty ?? null,
+          startAt: a.startAt instanceof Date ? a.startAt.toISOString() : String(a.startAt),
+          endAt: a.endAt instanceof Date ? a.endAt.toISOString() : String(a.endAt),
+        })),
+      );
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Runtime (radio) stations + episodes ---
+  app.get("/api/runtime/:appId/radio/stations", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Radio requires MySQL storage" });
+      }
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select()
+        .from(appRadioStations)
+        .where(and(eq(appRadioStations.appId, appId), eq(appRadioStations.active, 1)))
+        .orderBy(desc(appRadioStations.updatedAt));
+
+      return res.json(
+        rows.map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          streamUrl: s.streamUrl,
+          imageUrl: s.imageUrl ?? null,
+        })),
+      );
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.get("/api/runtime/:appId/radio/episodes", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Podcasts require MySQL storage" });
+      }
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select()
+        .from(appPodcastEpisodes)
+        .where(eq(appPodcastEpisodes.appId, appId))
+        .orderBy(desc(appPodcastEpisodes.publishedAt), desc(appPodcastEpisodes.updatedAt));
+
+      return res.json(
+        rows.map((e: any) => ({
+          id: e.id,
+          showTitle: e.showTitle ?? null,
+          title: e.title,
+          description: e.description ?? "",
+          audioUrl: e.audioUrl ?? null,
+          publishedAt: e.publishedAt ? (e.publishedAt instanceof Date ? e.publishedAt.toISOString() : String(e.publishedAt)) : null,
+        })),
+      );
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Runtime (music) albums + tracks ---
+  app.get("/api/runtime/:appId/music/albums", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Music requires MySQL storage" });
+      }
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select()
+        .from(appMusicAlbums)
+        .where(eq(appMusicAlbums.appId, appId))
+        .orderBy(desc(appMusicAlbums.releasedAt), desc(appMusicAlbums.updatedAt));
+
+      return res.json(
+        rows.map((a: any) => ({
+          id: a.id,
+          title: a.title,
+          artist: a.artist ?? "",
+          imageUrl: a.imageUrl ?? null,
+          releasedAt: a.releasedAt ? (a.releasedAt instanceof Date ? a.releasedAt.toISOString() : String(a.releasedAt)) : null,
+        })),
+      );
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.get("/api/runtime/:appId/music/albums/:albumId/tracks", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const albumId = String(req.params.albumId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Music requires MySQL storage" });
+      }
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select()
+        .from(appMusicTracks)
+        .where(and(eq(appMusicTracks.appId, appId), eq(appMusicTracks.albumId, albumId)))
+        .orderBy(asc(appMusicTracks.trackNumber), asc(appMusicTracks.createdAt));
+
+      return res.json(
+        rows.map((t: any) => ({
+          id: t.id,
+          albumId: t.albumId,
+          title: t.title,
+          trackNumber: Number(t.trackNumber || 1),
+          durationSeconds: Number(t.durationSeconds || 0),
+          audioUrl: t.audioUrl ?? null,
+        })),
+      );
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Runtime (business) lead capture ---
+  app.post("/api/runtime/:appId/leads", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Leads require MySQL storage" });
+      }
+
+      const schema = z
+        .object({
+          name: z.string().max(200).optional(),
+          email: z.string().email().max(320).optional(),
+          phone: z.string().max(40).optional(),
+          message: z.string().max(5000).optional(),
+        })
+        .strict();
+      const body = schema.parse(req.body ?? {});
+
+      const id = crypto.randomUUID();
+      const db = getMysqlDb();
+      await db.insert(appLeads).values({
+        id,
+        appId,
+        name: body.name ?? null,
+        email: body.email ?? null,
+        phone: body.phone ?? null,
+        message: body.message ?? null,
+        createdAt: new Date(),
+      } as any);
+
+      await emitAppEvent(appId, null, "lead.created", { leadId: id });
+      return res.status(201).json({ id });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Runtime (customer) salon appointments ---
+  app.post("/api/runtime/:appId/appointments", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Appointments require MySQL storage" });
+      }
+
+      const auth = String(req.headers.authorization || "");
+      const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+      const payload = token ? verifyRuntimeToken(appId, token) : null;
+      if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
+
+      const schema = z
+        .object({
+          serviceId: z.string().min(1),
+          startAt: z.string().min(1), // ISO string
+          notes: z.string().max(2000).optional(),
+          paymentProvider: z.enum(["cod", "razorpay", "stripe"]).optional().default("cod"),
+        })
+        .strict();
+      const { serviceId, startAt, notes, paymentProvider } = schema.parse(req.body);
+
+      const start = new Date(startAt);
+      if (Number.isNaN(start.getTime())) return res.status(400).json({ message: "Invalid startAt" });
+      // Guardrail: disallow bookings in the past (5 min tolerance).
+      if (start.getTime() < Date.now() - 5 * 60 * 1000) {
+        return res.status(400).json({ message: "Start time must be in the future" });
+      }
+
+      const db = getMysqlDb();
+      const serviceRows = await db
+        .select()
+        .from(appServices)
+        .where(and(eq(appServices.appId, appId), eq(appServices.id, serviceId)))
+        .limit(1);
+      const service: any = serviceRows[0];
+      if (!service || !(service.active === 1 || service.active === true)) {
+        return res.status(400).json({ message: "Invalid service" });
+      }
+
+      const durationMinutes = Number(service.durationMinutes || 30);
+      const end = new Date(start.getTime() + Math.max(5, durationMinutes) * 60 * 1000);
+
+      // Basic conflict check: same customer cannot overlap their own appointment.
+      const conflicts = await db
+        .select({ id: appAppointments.id })
+        .from(appAppointments)
+        .where(
+          and(
+            eq(appAppointments.appId, appId),
+            eq(appAppointments.customerId, String(payload.sub)),
+            sql`NOT (${appAppointments.endAt} <= ${start} OR ${appAppointments.startAt} >= ${end})`,
+          ),
+        )
+        .limit(1);
+      if (conflicts.length) {
+        return res.status(409).json({ message: "You already have a booking around that time" });
+      }
+
+      const id = crypto.randomUUID();
+      const now = new Date();
+      await db.insert(appAppointments).values({
+        id,
+        appId,
+        customerId: String(payload.sub),
+        serviceId,
+        status: "requested",
+        currency: service.currency ?? "INR",
+        priceCents: Number(service.priceCents || 0),
+        startAt: start,
+        endAt: end,
+        notes: notes ?? null,
+        paymentProvider,
+        paymentStatus: paymentProvider === "cod" ? "completed" : "pending",
+        createdAt: now,
+        updatedAt: now,
+      } as any);
+
+      await emitAppEvent(appId, String(payload.sub), "appointment.created", {
+        appointmentId: id,
+        serviceId,
+        startAt: start.toISOString(),
+      });
+
+      return res.status(201).json({
+        id,
+        status: "requested",
+        serviceId,
+        startAt: start.toISOString(),
+        endAt: end.toISOString(),
+        paymentProvider,
+        paymentStatus: paymentProvider === "cod" ? "completed" : "pending",
+      });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.get("/api/runtime/:appId/appointments", async (req, res, next) => {
+    try {
+      const appId = String(req.params.appId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Appointments require MySQL storage" });
+      }
+
+      const auth = String(req.headers.authorization || "");
+      const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+      const payload = token ? verifyRuntimeToken(appId, token) : null;
+      if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select({
+          id: appAppointments.id,
+          status: appAppointments.status,
+          currency: appAppointments.currency,
+          priceCents: appAppointments.priceCents,
+          startAt: appAppointments.startAt,
+          endAt: appAppointments.endAt,
+          serviceId: appAppointments.serviceId,
+          paymentProvider: appAppointments.paymentProvider,
+          paymentStatus: appAppointments.paymentStatus,
+          createdAt: appAppointments.createdAt,
+          serviceName: appServices.name,
+        })
+        .from(appAppointments)
+        .leftJoin(appServices, and(eq(appServices.appId, appId), eq(appServices.id, appAppointments.serviceId)))
+        .where(and(eq(appAppointments.appId, appId), eq(appAppointments.customerId, String(payload.sub))))
+        .orderBy(desc(appAppointments.startAt));
+
+      return res.json(
+        rows.map((a: any) => ({
+          id: a.id,
+          status: a.status,
+          serviceId: a.serviceId,
+          serviceName: a.serviceName ?? null,
+          currency: a.currency ?? "INR",
+          priceCents: Number(a.priceCents || 0),
+          startAt: a.startAt instanceof Date ? a.startAt.toISOString() : String(a.startAt),
+          endAt: a.endAt instanceof Date ? a.endAt.toISOString() : String(a.endAt),
+          paymentProvider: a.paymentProvider ?? null,
+          paymentStatus: a.paymentStatus,
+          createdAt: a.createdAt,
+        })),
+      );
+    } catch (err) {
+      return next(err);
+    }
+  });
+
   // --- Runtime (customer) orders ---
   app.post("/api/runtime/:appId/orders", async (req, res, next) => {
     try {
@@ -2168,6 +3363,440 @@ export async function registerRoutes(
         status: buildNow ? "processing" : "draft",
       });
 
+      // Best-effort runtime seeding for certain industries.
+      // This is what turns “pretty preview screens” into a functional runtime experience.
+      try {
+        const industry = String((created as any)?.industry || "").toLowerCase();
+        if (process.env.DATABASE_URL?.startsWith("mysql://") && industry) {
+          const db = getMysqlDb();
+          const now = new Date();
+
+          const hasAny = async (table: any) => {
+            const r = await db.select({ id: table.id }).from(table).where(eq(table.appId, created.id)).limit(1);
+            return r.length > 0;
+          };
+
+          if (industry === "salon" || industry === "photography" || industry === "business") {
+            if (!(await hasAny(appServices))) {
+              await db.insert(appServices).values([
+                {
+                  id: crypto.randomUUID(),
+                  appId: created.id,
+                  name: industry === "photography" ? "Portrait Session" : "Haircut & Styling",
+                  description: industry === "photography" ? "60-minute guided portrait session" : "Consultation, wash, cut and styling",
+                  imageUrl: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800",
+                  currency: "INR",
+                  priceCents: 79900,
+                  durationMinutes: 60,
+                  active: 1,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+                {
+                  id: crypto.randomUUID(),
+                  appId: created.id,
+                  name: industry === "business" ? "Consultation Call" : "Facial & Cleanup",
+                  description: industry === "business" ? "30-minute discovery call" : "Deep cleanse, exfoliation and glow",
+                  imageUrl: "https://images.unsplash.com/photo-1519014816548-bf5fe059798b?w=800",
+                  currency: "INR",
+                  priceCents: 129900,
+                  durationMinutes: 30,
+                  active: 1,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+                {
+                  id: crypto.randomUUID(),
+                  appId: created.id,
+                  name: industry === "photography" ? "Wedding Package" : "Manicure & Pedicure",
+                  description: industry === "photography" ? "Full-day coverage + edited gallery" : "Nail care, massage and polish",
+                  imageUrl: "https://images.unsplash.com/photo-1512207846876-bb54ef5056fe?w=800",
+                  currency: "INR",
+                  priceCents: 99900,
+                  durationMinutes: 90,
+                  active: 1,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+              ] as any);
+            }
+          }
+
+          if (industry === "ecommerce" || industry === "restaurant" || industry === "music") {
+            if (!(await hasAny(appProducts))) {
+              const items = industry === "restaurant"
+                ? [
+                    {
+                      name: "Butter Chicken",
+                      description: "Creamy tomato gravy, served with naan",
+                      imageUrl: "https://images.unsplash.com/photo-1604908176997-125f25cc500f?w=800",
+                      priceCents: 29900,
+                    },
+                    {
+                      name: "Veg Biryani",
+                      description: "Aromatic basmati rice with vegetables",
+                      imageUrl: "https://images.unsplash.com/photo-1631515243342-4c8dbb2fbc2f?w=800",
+                      priceCents: 22900,
+                    },
+                    {
+                      name: "Gulab Jamun",
+                      description: "Classic Indian dessert",
+                      imageUrl: "https://images.unsplash.com/photo-1600849995740-2d08a4b2cfb8?w=800",
+                      priceCents: 9900,
+                    },
+                  ]
+                : industry === "music"
+                  ? [
+                      {
+                        name: "Band T-Shirt",
+                        description: "Official merch — 100% cotton",
+                        imageUrl: "https://images.unsplash.com/photo-1520975916090-3105956dac38?w=800",
+                        priceCents: 69900,
+                      },
+                      {
+                        name: "Vinyl Record",
+                        description: "Limited edition vinyl pressing",
+                        imageUrl: "https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=800",
+                        priceCents: 149900,
+                      },
+                    ]
+                  : [
+                      {
+                        name: "Premium Product",
+                        description: "High quality item with fast shipping",
+                        imageUrl: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800",
+                        priceCents: 129900,
+                      },
+                      {
+                        name: "Everyday Essential",
+                        description: "Best value for daily use",
+                        imageUrl: "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=800",
+                        priceCents: 59900,
+                      },
+                      {
+                        name: "Gift Pack",
+                        description: "Perfect for special occasions",
+                        imageUrl: "https://images.unsplash.com/photo-1512909006721-3d6018887383?w=800",
+                        priceCents: 89900,
+                      },
+                    ];
+
+              await db.insert(appProducts).values(
+                items.map((i) => ({
+                  id: crypto.randomUUID(),
+                  appId: created.id,
+                  name: i.name,
+                  description: i.description,
+                  imageUrl: i.imageUrl,
+                  currency: "INR",
+                  priceCents: i.priceCents,
+                  active: 1,
+                  createdAt: now,
+                  updatedAt: now,
+                })) as any,
+              );
+            }
+          }
+
+          if (industry === "news") {
+            if (!(await hasAny(appPosts))) {
+              await db.insert(appPosts).values([
+                {
+                  id: crypto.randomUUID(),
+                  appId: created.id,
+                  type: "news",
+                  title: "Breaking: New update available",
+                  excerpt: "Your app is live with real runtime modules.",
+                  content: "This is a seeded example article. Replace it with your content using the admin panel endpoints.",
+                  imageUrl: "https://images.unsplash.com/photo-1522199755839-a2bacb67c546?w=800",
+                  category: "General",
+                  active: 1,
+                  publishedAt: now,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+                {
+                  id: crypto.randomUUID(),
+                  appId: created.id,
+                  type: "news",
+                  title: "Top 5 tips for productivity",
+                  excerpt: "Short, practical steps you can apply today.",
+                  content: "Seeded content for the news template.",
+                  imageUrl: "https://images.unsplash.com/photo-1553877522-43269d4ea984?w=800",
+                  category: "Tips",
+                  active: 1,
+                  publishedAt: now,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+              ] as any);
+            }
+          }
+
+          if (industry === "church") {
+            if (!(await hasAny(appPosts))) {
+              await db.insert(appPosts).values([
+                {
+                  id: crypto.randomUUID(),
+                  appId: created.id,
+                  type: "sermon",
+                  title: "Sunday Message: Hope & Purpose",
+                  excerpt: "A short reflection on hope.",
+                  content: "Seed sermon text. You can attach audio/video URLs via content fields later.",
+                  imageUrl: "https://images.unsplash.com/photo-1520697222869-fc1fbcf6c36e?w=800",
+                  category: "Sermons",
+                  active: 1,
+                  publishedAt: now,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+                {
+                  id: crypto.randomUUID(),
+                  appId: created.id,
+                  type: "event",
+                  title: "Community Gathering",
+                  excerpt: "Join us this week for fellowship.",
+                  content: "Seed event details. You can store structured event data later.",
+                  imageUrl: "https://images.unsplash.com/photo-1520975958225-85f94c6620f8?w=800",
+                  category: "Events",
+                  active: 1,
+                  publishedAt: now,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+              ] as any);
+            }
+          }
+
+          if (industry === "fitness") {
+            if (!(await hasAny(appFitnessClasses))) {
+              const start1 = new Date(Date.now() + 24 * 60 * 60 * 1000);
+              start1.setMinutes(0, 0, 0);
+              const end1 = new Date(start1.getTime() + 45 * 60 * 1000);
+              const start2 = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+              start2.setMinutes(0, 0, 0);
+              const end2 = new Date(start2.getTime() + 60 * 60 * 1000);
+
+              await db.insert(appFitnessClasses).values([
+                {
+                  id: crypto.randomUUID(),
+                  appId: created.id,
+                  name: "HIIT Basics",
+                  description: "Beginner-friendly high intensity interval training",
+                  startsAt: start1,
+                  endsAt: end1,
+                  capacity: 25,
+                  active: 1,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+                {
+                  id: crypto.randomUUID(),
+                  appId: created.id,
+                  name: "Yoga Flow",
+                  description: "Full body mobility and flexibility",
+                  startsAt: start2,
+                  endsAt: end2,
+                  capacity: 30,
+                  active: 1,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+              ] as any);
+            }
+          }
+
+          if (industry === "education") {
+            if (!(await hasAny(appCourses))) {
+              const course1 = crypto.randomUUID();
+              const course2 = crypto.randomUUID();
+
+              await db.insert(appCourses).values([
+                {
+                  id: course1,
+                  appId: created.id,
+                  title: "Getting Started",
+                  description: "A starter course with a few lessons",
+                  imageUrl: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800",
+                  active: 1,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+                {
+                  id: course2,
+                  appId: created.id,
+                  title: "Advanced Concepts",
+                  description: "Go deeper with structured lessons",
+                  imageUrl: "https://images.unsplash.com/photo-1513258496099-48168024aec0?w=800",
+                  active: 1,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+              ] as any);
+
+              await db.insert(appCourseLessons).values([
+                {
+                  id: crypto.randomUUID(),
+                  appId: created.id,
+                  courseId: course1,
+                  title: "Welcome",
+                  contentUrl: "https://example.com/lesson/welcome",
+                  sortOrder: 1,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+                {
+                  id: crypto.randomUUID(),
+                  appId: created.id,
+                  courseId: course1,
+                  title: "Lesson 1",
+                  contentUrl: "https://example.com/lesson/1",
+                  sortOrder: 2,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+              ] as any);
+            }
+          }
+
+          if (industry === "realestate") {
+            if (!(await hasAny(appRealEstateListings))) {
+              await db.insert(appRealEstateListings).values([
+                {
+                  id: crypto.randomUUID(),
+                  appId: created.id,
+                  title: "2BHK Apartment",
+                  description: "Bright apartment near city center",
+                  address: "City Center",
+                  currency: "INR",
+                  priceCents: 650000000,
+                  imageUrl: "https://images.unsplash.com/photo-1560185127-6a8c0b2b7f5e?w=800",
+                  active: 1,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+                {
+                  id: crypto.randomUUID(),
+                  appId: created.id,
+                  title: "Villa with Garden",
+                  description: "Spacious villa with private garden",
+                  address: "Suburbs",
+                  currency: "INR",
+                  priceCents: 1800000000,
+                  imageUrl: "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800",
+                  active: 1,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+              ] as any);
+            }
+          }
+
+          if (industry === "healthcare") {
+            if (!(await hasAny(appDoctors))) {
+              await db.insert(appDoctors).values([
+                {
+                  id: crypto.randomUUID(),
+                  appId: created.id,
+                  name: "Dr. A. Sharma",
+                  specialty: "General Physician",
+                  bio: "Consultation for common illnesses and health advice",
+                  imageUrl: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=800",
+                  active: 1,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+                {
+                  id: crypto.randomUUID(),
+                  appId: created.id,
+                  name: "Dr. R. Patel",
+                  specialty: "Dermatologist",
+                  bio: "Skin and hair specialist",
+                  imageUrl: "https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=800",
+                  active: 1,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+              ] as any);
+            }
+          }
+
+          if (industry === "radio") {
+            if (!(await hasAny(appRadioStations))) {
+              await db.insert(appRadioStations).values([
+                {
+                  id: crypto.randomUUID(),
+                  appId: created.id,
+                  name: "Live Station",
+                  streamUrl: "https://example.com/stream/live",
+                  imageUrl: "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=800",
+                  active: 1,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+              ] as any);
+            }
+            if (!(await hasAny(appPodcastEpisodes))) {
+              await db.insert(appPodcastEpisodes).values([
+                {
+                  id: crypto.randomUUID(),
+                  appId: created.id,
+                  showTitle: "Weekly Show",
+                  title: "Episode 1: Welcome",
+                  description: "Seeded podcast episode",
+                  audioUrl: "https://example.com/podcast/episode1.mp3",
+                  publishedAt: now,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+              ] as any);
+            }
+          }
+
+          if (industry === "music") {
+            if (!(await hasAny(appMusicAlbums))) {
+              const albumId = crypto.randomUUID();
+              await db.insert(appMusicAlbums).values([
+                {
+                  id: albumId,
+                  appId: created.id,
+                  title: "Debut Album",
+                  artist: created.name,
+                  imageUrl: "https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=800",
+                  releasedAt: now,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+              ] as any);
+              await db.insert(appMusicTracks).values([
+                {
+                  id: crypto.randomUUID(),
+                  appId: created.id,
+                  albumId,
+                  title: "Track One",
+                  trackNumber: 1,
+                  durationSeconds: 210,
+                  audioUrl: "https://example.com/audio/track1.mp3",
+                  createdAt: now,
+                },
+                {
+                  id: crypto.randomUUID(),
+                  appId: created.id,
+                  albumId,
+                  title: "Track Two",
+                  trackNumber: 2,
+                  durationSeconds: 195,
+                  audioUrl: "https://example.com/audio/track2.mp3",
+                  createdAt: now,
+                },
+              ] as any);
+            }
+          }
+        }
+      } catch {
+        // Ignore seeding failures; app creation must succeed even if runtime data is not seeded.
+      }
+
       // If the app is meant to be built immediately, enqueue a build job.
       // This avoids apps being stuck in "processing" with no job.
       if ((created.status as any) === "processing") {
@@ -2175,6 +3804,124 @@ export async function registerRoutes(
       }
 
       return res.status(201).json(created);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Owner Admin (CRUD) for salon services ---
+  app.get("/api/apps/:id/admin/services", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Admin services require MySQL storage" });
+      }
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select()
+        .from(appServices)
+        .where(eq(appServices.appId, appId))
+        .orderBy(desc(appServices.updatedAt));
+      return res.json(rows);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.post("/api/apps/:id/admin/services", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Admin services require MySQL storage" });
+      }
+
+      const schema = z
+        .object({
+          name: z.string().min(1).max(200),
+          description: z.string().max(5000).optional(),
+          imageUrl: z.string().max(2000).optional(),
+          durationMinutes: z.number().int().min(5).max(12 * 60).optional().default(30),
+          priceCents: z.number().int().min(0).max(50_000_00).optional().default(0),
+          currency: z.string().max(8).optional().default("INR"),
+          active: z.boolean().optional().default(true),
+        })
+        .strict();
+
+      const payload = schema.parse(req.body);
+      const db = getMysqlDb();
+      const id = crypto.randomUUID();
+      const now = new Date();
+
+      await db.insert(appServices).values({
+        id,
+        appId,
+        name: payload.name,
+        description: payload.description ?? null,
+        imageUrl: payload.imageUrl ?? null,
+        currency: payload.currency,
+        priceCents: payload.priceCents,
+        durationMinutes: payload.durationMinutes,
+        active: payload.active ? 1 : 0,
+        createdAt: now,
+        updatedAt: now,
+      } as any);
+
+      return res.status(201).json({ id });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.patch("/api/apps/:id/admin/services/:serviceId", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const serviceId = String(req.params.serviceId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Admin services require MySQL storage" });
+      }
+
+      const schema = z
+        .object({
+          name: z.string().min(1).max(200).optional(),
+          description: z.string().max(5000).optional().nullable(),
+          imageUrl: z.string().max(2000).optional().nullable(),
+          durationMinutes: z.number().int().min(5).max(12 * 60).optional(),
+          priceCents: z.number().int().min(0).max(50_000_00).optional(),
+          currency: z.string().max(8).optional(),
+          active: z.boolean().optional(),
+        })
+        .strict();
+      const patch = schema.parse(req.body);
+
+      const db = getMysqlDb();
+      const update: any = { ...patch, updatedAt: new Date() };
+      if (typeof patch.active === "boolean") update.active = patch.active ? 1 : 0;
+
+      await db
+        .update(appServices)
+        .set(update)
+        .where(and(eq(appServices.appId, appId), eq(appServices.id, serviceId)));
+
+      return res.json({ ok: true });
     } catch (err) {
       return next(err);
     }
