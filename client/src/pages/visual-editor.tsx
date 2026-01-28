@@ -2068,8 +2068,24 @@ export default function VisualEditor() {
         }
 
         if (kind === "deleteSelected") {
-          if (!selectedComponent) continue;
-          deleteComponent();
+          if (!selectedComponent || !activeScreen) continue;
+
+          const removeFromTree = (components: EditorComponent[]): EditorComponent[] => {
+            return components
+              .filter((comp) => comp.id !== selectedComponent.id)
+              .map((comp) => ({
+                ...comp,
+                children: comp.children ? removeFromTree(comp.children) : undefined,
+              }));
+          };
+
+          setScreens((prev) =>
+            prev.map((screen) =>
+              screen.id === activeScreenId ? { ...screen, components: removeFromTree(screen.components) } : screen,
+            ),
+          );
+          setSelectedComponentId(null);
+          setHasChanges(true);
           applied++;
           continue;
         }
@@ -2077,7 +2093,7 @@ export default function VisualEditor() {
 
       return applied;
     },
-    [addComponent, deleteComponent, selectedComponent, updateComponentById],
+    [activeScreen, activeScreenId, addComponent, selectedComponent, updateComponentById],
   );
 
   const handleAgentSend = useCallback(async () => {
