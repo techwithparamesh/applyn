@@ -81,7 +81,6 @@ import {
   ListTree,
   Link2,
   Send,
-  MessageSquare,
 } from "lucide-react";
 
 import { QRCodeSVG } from "qrcode.react";
@@ -1288,6 +1287,15 @@ export default function VisualEditor() {
   const [followActiveScreen, setFollowActiveScreen] = useState(true);
   const [liveScreenIndex, setLiveScreenIndex] = useState(0);
   const [rightSidebarTab, setRightSidebarTab] = useState<"agent" | "properties" | "code" | "qr">("properties");
+  const [agentInput, setAgentInput] = useState<string>("");
+  const [agentSending, setAgentSending] = useState(false);
+  const [agentMessages, setAgentMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([
+    {
+      role: "assistant",
+      content:
+        "Hi! I can help you edit this screen. Try: Add a hero section • Add a button • Change the button color to blue • Set the title to \"Welcome\"",
+    },
+  ]);
   const [paletteSearch, setPaletteSearch] = useState<string>("");
   const [websitePreviewUrl, setWebsitePreviewUrl] = useState<string>("");
   const [hasChanges, setHasChanges] = useState(false);
@@ -1822,7 +1830,173 @@ export default function VisualEditor() {
     ));
     setSelectedComponentId(newComponent.id);
     setHasChanges(true);
+    return newComponent.id;
   }, [activeScreen, activeScreenId]);
+
+  const updateComponentById = useCallback((componentId: string, props: Record<string, any>) => {
+    if (!componentId || !activeScreen) return;
+
+    const updateInTree = (components: EditorComponent[]): EditorComponent[] => {
+      return components.map((comp) => {
+        if (comp.id === componentId) return { ...comp, props };
+        if (comp.children) return { ...comp, children: updateInTree(comp.children) };
+        return comp;
+      });
+    };
+
+    setScreens((prev) =>
+      prev.map((screen) =>
+        screen.id === activeScreenId ? { ...screen, components: updateInTree(screen.components) } : screen,
+      ),
+    );
+    setHasChanges(true);
+  }, [activeScreen, activeScreenId]);
+
+  const runLocalAgentCommand = useCallback((rawPrompt: string) => {
+    const prompt = (rawPrompt || "").trim();
+    const lower = prompt.toLowerCase();
+
+    const colorMap: Record<string, string> = {
+      blue: "#3b82f6",
+      red: "#ef4444",
+      green: "#22c55e",
+      purple: "#a855f7",
+      pink: "#ec4899",
+      orange: "#f97316",
+      yellow: "#eab308",
+      black: "#111827",
+      white: "#ffffff",
+      gray: "#64748b",
+      slate: "#334155",
+      cyan: "#06b6d4",
+      teal: "#14b8a6",
+    };
+
+    const extractQuoted = () => {
+      const m = prompt.match(/\"([^\"]+)\"/);
+      return m?.[1]?.trim();
+    };
+
+    const extractColor = () => {
+      const hex = prompt.match(/#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b/);
+      if (hex) return `#${hex[1]}`;
+      for (const k of Object.keys(colorMap)) {
+        if (lower.includes(k)) return colorMap[k];
+      }
+      return null;
+    };
+
+    const replyHelp = () =>
+      "I can currently: add hero/text/button/divider/spacer, and change text/title/subtitle/button label/color/background. Select a component first for change commands.";
+
+    // ADD commands
+    if (/\b(add|insert|create|put)\b/.test(lower)) {
+      const wantsHero = /\bhero\b/.test(lower);
+      const wantsButton = /\bbutton\b/.test(lower);
+      const wantsText = /\btext\b/.test(lower);
+      const wantsHeading = /\bheading\b|\btitle\b/.test(lower);
+      const wantsDivider = /\bdivider\b|\bseparator\b/.test(lower);
+      const wantsSpacer = /\bspacer\b|\bspace\b/.test(lower);
+
+      let createdId: string | undefined;
+      if (wantsHero) createdId = addComponent("hero") as any;
+      else if (wantsButton) createdId = addComponent("button") as any;
+      else if (wantsHeading) createdId = addComponent("heading") as any;
+      else if (wantsText) createdId = addComponent("text") as any;
+      else if (wantsDivider) createdId = addComponent("divider") as any;
+      else if (wantsSpacer) createdId = addComponent("spacer") as any;
+
+      if (!createdId) {
+        return { applied: false, message: replyHelp() };
+      }
+
+      const quoted = extractQuoted();
+      if (quoted) {
+        // Apply initial text where it makes sense.
+        if (wantsHeading) updateComponentById(createdId, { ...getDefaultProps("heading"), text: quoted });
+        if (wantsText) updateComponentById(createdId, { ...getDefaultProps("text"), text: quoted });
+        if (wantsButton) updateComponentById(createdId, { ...getDefaultProps("button"), text: quoted });
+        if (wantsHero) updateComponentById(createdId, { ...getDefaultProps("hero"), title: quoted });
+      }
+
+      return { applied: true, message: "Done. Added it to the current screen." };
+    }
+
+    // CHANGE commands (need selection)
+    if (/\b(change|set|update|make)\b/.test(lower)) {
+      if (!selectedComponent) {
+        return { applied: false, message: "Select a component in the preview first, then tell me what to change." };
+      }
+
+      const quoted = extractQuoted();
+      const color = extractColor();
+      const base = selectedComponent.props || {};
+
+      // Button label/text
+      if (selectedComponent.type === "button" && (/(label|text|title)\b/.test(lower) || /\bbutton\b/.test(lower))) {
+        if (!quoted) return { applied: false, message: "Tell me the new label in quotes, e.g. Set button text to \"Join now\"" };
+        updateComponentById(selectedComponent.id, { ...base, text: quoted });
+        return { applied: true, message: "Updated the button text." };
+      }
+
+      // Text / heading
+      if ((selectedComponent.type === "text" || selectedComponent.type === "heading") && /(text|title|copy)\b/.test(lower)) {
+        if (!quoted) return { applied: false, message: "Tell me the new text in quotes, e.g. Set text to \"Hello\"" };
+        updateComponentById(selectedComponent.id, { ...base, text: quoted });
+        return { applied: true, message: "Updated the text." };
+      }
+
+      // Hero title/subtitle
+      if (selectedComponent.type === "hero" && /(title|headline)\b/.test(lower)) {
+        if (!quoted) return { applied: false, message: "Tell me the new hero title in quotes." };
+        updateComponentById(selectedComponent.id, { ...base, title: quoted });
+        return { applied: true, message: "Updated the hero title." };
+      }
+      if (selectedComponent.type === "hero" && /(subtitle|tagline)\b/.test(lower)) {
+        if (!quoted) return { applied: false, message: "Tell me the new hero subtitle in quotes." };
+        updateComponentById(selectedComponent.id, { ...base, subtitle: quoted });
+        return { applied: true, message: "Updated the hero subtitle." };
+      }
+
+      // Colors
+      if (/(color|colour|background)\b/.test(lower)) {
+        if (!color) return { applied: false, message: "Tell me a color name (blue/red/green...) or a hex code like #3b82f6." };
+
+        // Prefer button background when it looks like a button request
+        if (selectedComponent.type === "button") {
+          updateComponentById(selectedComponent.id, { ...base, backgroundColor: color });
+          return { applied: true, message: "Updated the button color." };
+        }
+
+        // Generic background
+        updateComponentById(selectedComponent.id, { ...base, backgroundColor: color });
+        return { applied: true, message: "Updated the background color." };
+      }
+
+      // Fallback
+      return { applied: false, message: replyHelp() };
+    }
+
+    return { applied: false, message: replyHelp() };
+  }, [addComponent, selectedComponent, updateComponentById]);
+
+  const handleAgentSend = useCallback(async () => {
+    const prompt = agentInput.trim();
+    if (!prompt) return;
+    setAgentInput("");
+    setAgentSending(true);
+    setAgentMessages((prev) => [...prev, { role: "user", content: prompt }]);
+
+    try {
+      const result = runLocalAgentCommand(prompt);
+      setAgentMessages((prev) => [...prev, { role: "assistant", content: result.message }]);
+      if (result.applied) {
+        toast({ title: "Applied" });
+      }
+    } finally {
+      setAgentSending(false);
+    }
+  }, [agentInput, runLocalAgentCommand, toast]);
 
   const copyToClipboard = useCallback(async (text: string, successLabel: string) => {
     try {
@@ -2867,15 +3041,24 @@ export default function VisualEditor() {
                   <div className="p-4 space-y-3">
                     {/* Agent Chat Messages Area */}
                     <div className="space-y-3 min-h-[200px]">
-                      <div className="flex gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center shrink-0">
-                          <Bot className="h-4 w-4 text-white" />
+                      {agentMessages.map((m, idx) => (
+                        <div key={idx} className={`flex gap-3 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                          {m.role === "assistant" && (
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center shrink-0">
+                              <Bot className="h-4 w-4 text-white" />
+                            </div>
+                          )}
+                          <div
+                            className={
+                              m.role === "user"
+                                ? "max-w-[85%] bg-slate-700/60 rounded-xl p-3 border border-slate-600/50"
+                                : "max-w-[85%] bg-slate-800/50 rounded-xl p-3 border border-slate-700/50"
+                            }
+                          >
+                            <p className="text-sm text-white whitespace-pre-wrap">{m.content}</p>
+                          </div>
                         </div>
-                        <div className="flex-1 bg-slate-800/50 rounded-xl p-3 border border-slate-700/50">
-                          <p className="text-sm text-white">Hi! I'm your AI assistant. Tell me what you want to add or change, and I'll help you build it.</p>
-                          <p className="text-xs text-slate-400 mt-2">Try: "Add a hero section" or "Change the button color to blue"</p>
-                        </div>
-                      </div>
+                      ))}
                     </div>
                   </div>
                 </ScrollArea>
@@ -2884,31 +3067,27 @@ export default function VisualEditor() {
                   <div className="flex gap-2">
                     <Input
                       placeholder="Describe what you want..."
+                      value={agentInput}
+                      onChange={(e) => setAgentInput(e.target.value)}
                       className="flex-1 bg-slate-800/50 border-slate-700/50 text-white placeholder:text-slate-500 text-sm"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
-                          toast({
-                            title: "AI Agent",
-                            description: "AI-assisted editing is coming soon! For now, use the Props tab to edit components.",
-                          });
+                          void handleAgentSend();
                         }
                       }}
+                      disabled={agentSending}
                     />
                     <Button 
                       size="sm" 
                       className="bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400"
-                      onClick={() => {
-                        toast({
-                          title: "AI Agent",
-                          description: "AI-assisted editing is coming soon! For now, use the Props tab to edit components.",
-                        });
-                      }}
+                      onClick={() => void handleAgentSend()}
+                      disabled={agentSending}
                     >
                       <Send className="h-4 w-4" />
                     </Button>
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-2 text-center">Press Enter to send  AI editing coming soon</p>
+                  <p className="text-[10px] text-slate-500 mt-2 text-center">Press Enter to send</p>
                 </div>
               </div>
             </TabsContent>
