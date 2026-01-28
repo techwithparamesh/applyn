@@ -11,6 +11,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { getAppUrlDisplay, isHttpUrl } from "@/lib/utils";
 
 type AppItem = {
@@ -126,8 +127,8 @@ export default function PreviewApp() {
       await navigator.clipboard.writeText(getPreviewUrl());
       setCopied(true);
       toast({
-        title: "Link copied! 📋",
-        description: "Share this link to preview the app on any device.",
+        title: "Link copied",
+        description: "Anyone with this link can preview the app.",
       });
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -137,6 +138,22 @@ export default function PreviewApp() {
         variant: "destructive",
       });
     }
+  };
+
+  const shareOrCopyPreviewUrl = async () => {
+    const url = getPreviewUrl();
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: app.name,
+          url,
+        });
+        return;
+      }
+    } catch {
+      // fall back to copy
+    }
+    await copyPreviewUrl();
   };
 
   // Status badge helper
@@ -209,34 +226,31 @@ export default function PreviewApp() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* QR Code Button - Always visible */}
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void shareOrCopyPreviewUrl()}
+              className="border-white/10 bg-white/5 hover:bg-white/10 rounded-xl"
+            >
+              <Share2 className="mr-2 h-4 w-4" /> Share Preview
+            </Button>
+
+            <Button
+              variant="outline"
               size="sm"
               onClick={() => setShowQRModal(true)}
               className="border-cyan-500/20 bg-cyan-500/5 hover:bg-cyan-500/10 text-cyan-400 rounded-xl"
             >
-              <QrCode className="mr-2 h-4 w-4" /> QR Preview
+              <QrCode className="mr-2 h-4 w-4" /> QR Code
             </Button>
-            
-            {/* Visual Editor Button */}
-            <Button 
-              variant="outline" 
+
+            <Button
+              variant="outline"
               size="sm"
               onClick={() => setLocation(`/apps/${app.id}/visual-editor`)}
               className="border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10 text-purple-400 rounded-xl"
             >
-              <Wand2 className="mr-2 h-4 w-4" /> Visual Editor
-            </Button>
-            
-            {/* Settings/Edit Button */}
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setLocation(`/apps/${app.id}/edit`)}
-              className="border-white/10 bg-white/5 hover:bg-white/10 rounded-xl"
-            >
-              <Edit className="mr-2 h-4 w-4" /> Settings
+              <Wand2 className="mr-2 h-4 w-4" /> Open Editor
             </Button>
             
             {/* Download buttons - Only for paid plans with live status */}
@@ -270,7 +284,7 @@ export default function PreviewApp() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="flex flex-col lg:flex-row gap-8 items-start"
+          className="flex flex-col lg:flex-row gap-6 items-start"
         >
           {/* Device Preview */}
           <div className="flex-1 flex justify-center">
@@ -290,81 +304,60 @@ export default function PreviewApp() {
           </div>
 
           {/* App Details Sidebar */}
-          <div className="w-full lg:w-80 space-y-4">
-            {/* App Details Card - Clean Design */}
+          <div className="w-full lg:w-80 space-y-3">
+            {/* Preview Center */}
             <div className="rounded-2xl border border-white/[0.06] bg-[#0d1117] overflow-hidden">
               <div className="px-5 py-3 border-b border-white/[0.06]">
-                <h3 className="text-sm font-semibold text-white">App Details</h3>
-              </div>
-              <div className="p-5 space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Platform</span>
-                  <span className="text-sm text-white capitalize px-2.5 py-1 rounded-full bg-white/5 border border-white/10">{app.platform}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Status</span>
-                  <span className="text-sm text-white capitalize">{app.status}</span>
-                </div>
-                {app.packageName && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Package</span>
-                    <span className="text-white text-xs truncate max-w-[150px] font-mono bg-white/5 px-2 py-0.5 rounded">{app.packageName}</span>
-                  </div>
-                )}
-                {app.versionCode && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Version</span>
-                    <span className="text-sm text-white">{app.versionCode}</span>
-                  </div>
-                )}
-                {app.artifactSize && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Size</span>
-                    <span className="text-sm text-white">{(app.artifactSize / 1024 / 1024).toFixed(1)} MB</span>
-                  </div>
-                )}
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Created</span>
-                  <span className="text-sm text-white">{new Date(app.createdAt).toLocaleDateString()}</span>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Preview</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Share, scan, or open on any device.</p>
                 </div>
               </div>
-            </div>
-
-            {/* Color Info - Clean Design */}
-            <div className="rounded-2xl border border-white/[0.06] bg-[#0d1117] overflow-hidden">
-              <div className="px-5 py-3 border-b border-white/[0.06]">
-                <h3 className="text-sm font-semibold text-white">Theme Colors</h3>
-              </div>
-              <div className="p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Primary</span>
+              <div className="p-4 space-y-3">
+                <div>
+                  <label className="text-xs text-muted-foreground mb-2 block font-medium">Shareable link</label>
                   <div className="flex items-center gap-2">
-                    <div 
-                      className="h-7 w-7 rounded-full border-2 border-white/20 shadow-lg"
-                      style={{ backgroundColor: app.primaryColor }}
-                    />
-                    <span className="text-xs text-white font-mono bg-white/5 px-2 py-0.5 rounded">{app.primaryColor}</span>
-                  </div>
-                </div>
-                {app.splashColor && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Splash</span>
-                    <div className="flex items-center gap-2">
-                      <div 
-                        className="h-7 w-7 rounded-lg border-2 border-white/20 shadow-lg"
-                        style={{ backgroundColor: app.splashColor }}
-                      />
-                      <span className="text-xs text-white font-mono bg-white/5 px-2 py-0.5 rounded">{app.splashColor}</span>
+                    <div className="flex-1 px-3 py-2.5 rounded-xl bg-white/5 border border-white/[0.06] text-sm text-muted-foreground truncate font-mono">
+                      {getPreviewUrl()}
                     </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void copyPreviewUrl()}
+                      className="border-white/10 bg-white/5 hover:bg-white/10 rounded-xl h-10 w-10 p-0"
+                      aria-label="Copy preview link"
+                    >
+                      {copied ? <CheckCircle2 className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
+                    </Button>
                   </div>
-                )}
+                  <p className="mt-2 text-xs text-muted-foreground">Anyone with this link can preview your app.</p>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1 border-white/10 bg-white/5 hover:bg-white/10 rounded-xl h-11"
+                    onClick={() => setShowQRModal(true)}
+                  >
+                    <QrCode className="mr-2 h-4 w-4" /> QR Code
+                  </Button>
+                  <Button
+                    className="flex-1 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-xl h-11"
+                    onClick={() => window.open(getPreviewUrl(), "_blank", "noopener,noreferrer")}
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" /> Open Preview
+                  </Button>
+                </div>
               </div>
             </div>
 
-            {/* Quick Actions - Clean Design */}
+            {/* Manage */}
             <div className="rounded-2xl border border-white/[0.06] bg-[#0d1117] overflow-hidden">
               <div className="px-5 py-3 border-b border-white/[0.06]">
-                <h3 className="text-sm font-semibold text-white">Quick Actions</h3>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Manage</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Editor, settings, and delivery.</p>
+                </div>
               </div>
               <div className="p-3 space-y-1">
                 <Button 
@@ -379,7 +372,7 @@ export default function PreviewApp() {
                   className="w-full justify-start text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl"
                   onClick={() => setLocation(`/apps/${app.id}/edit`)}
                 >
-                  <Edit className="mr-3 h-4 w-4" /> Edit App Settings
+                  <Edit className="mr-3 h-4 w-4" /> App Settings
                 </Button>
                 <Button 
                   variant="ghost" 
@@ -397,7 +390,105 @@ export default function PreviewApp() {
                     <ExternalLink className="mr-3 h-4 w-4" /> Visit Website
                   </Button>
                 )}
+
+                {!isPreviewOnly && app.status === "live" && (
+                  <div className="pt-2 mt-2 border-t border-white/[0.06] space-y-2">
+                    {(app.platform === "android" || app.platform === "both") && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleDownload("android")}
+                        className="w-full bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 rounded-xl"
+                      >
+                        <Download className="mr-2 h-4 w-4" /> Download APK
+                      </Button>
+                    )}
+                    {(app.platform === "ios" || app.platform === "both") && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleDownload("ios")}
+                        className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 rounded-xl"
+                      >
+                        <Download className="mr-2 h-4 w-4" /> Download iOS
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
+            </div>
+
+            {/* Details (collapsed by default) */}
+            <div className="rounded-2xl border border-white/[0.06] bg-[#0d1117] overflow-hidden">
+              <Accordion type="single" collapsible>
+                <AccordionItem value="details" className="border-none">
+                  <AccordionTrigger className="px-5 py-3 text-sm font-semibold text-white hover:no-underline hover:bg-white/[0.03] transition-colors data-[state=open]:bg-white/[0.02]">
+                    <div className="text-left">
+                      <div>Details</div>
+                      <div className="text-xs font-normal text-muted-foreground mt-0.5">Platform, status, and theme.</div>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-5 pb-5 pt-1">
+                    <div className="space-y-4">
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-muted-foreground">Platform</span>
+                          <span className="text-sm text-white capitalize px-2.5 py-1 rounded-full bg-white/5 border border-white/10">{app.platform}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-muted-foreground">Status</span>
+                          <span className="text-sm text-white capitalize">{app.status}</span>
+                        </div>
+                        {app.packageName && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-muted-foreground">Package</span>
+                            <span className="text-white text-xs truncate max-w-[150px] font-mono bg-white/5 px-2 py-0.5 rounded">{app.packageName}</span>
+                          </div>
+                        )}
+                        {app.versionCode && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-muted-foreground">Version</span>
+                            <span className="text-sm text-white">{app.versionCode}</span>
+                          </div>
+                        )}
+                        {app.artifactSize && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-muted-foreground">Size</span>
+                            <span className="text-sm text-white">{(app.artifactSize / 1024 / 1024).toFixed(1)} MB</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-muted-foreground">Created</span>
+                          <span className="text-sm text-white">{new Date(app.createdAt).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+
+                      <div className="pt-4 border-t border-white/[0.06] space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Primary</span>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="h-7 w-7 rounded-full border-2 border-white/20 shadow-lg"
+                              style={{ backgroundColor: app.primaryColor }}
+                            />
+                            <span className="text-xs text-white font-mono bg-white/5 px-2 py-0.5 rounded">{app.primaryColor}</span>
+                          </div>
+                        </div>
+                        {app.splashColor && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Splash</span>
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="h-7 w-7 rounded-lg border-2 border-white/20 shadow-lg"
+                                style={{ backgroundColor: app.splashColor }}
+                              />
+                              <span className="text-xs text-white font-mono bg-white/5 px-2 py-0.5 rounded">{app.splashColor}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </div>
             
             {/* Upgrade Prompt for Preview Tier */}
@@ -500,15 +591,15 @@ export default function PreviewApp() {
               <Button 
                 variant="outline" 
                 className="flex-1 border-white/10 bg-white/5 hover:bg-white/10 rounded-xl h-11"
-                onClick={copyPreviewUrl}
+                onClick={() => void shareOrCopyPreviewUrl()}
               >
-                <Share2 className="mr-2 h-4 w-4" /> Share Link
+                <Share2 className="mr-2 h-4 w-4" /> Share
               </Button>
               <Button 
                 className="flex-1 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-xl h-11"
                 onClick={() => {
                   setShowQRModal(false);
-                  window.open(getPreviewUrl(), "_blank");
+                  window.open(getPreviewUrl(), "_blank", "noopener,noreferrer");
                 }}
               >
                 <ExternalLink className="mr-2 h-4 w-4" /> Open Preview

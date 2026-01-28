@@ -11,7 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, Home, Share2, Download, ArrowUp, Smartphone, Sparkles } from "lucide-react";
+import { ExternalLink, Share2, Copy, CheckCircle2, ArrowUp, Smartphone, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { DevicePreview } from "@/components/device-preview";
@@ -35,15 +35,21 @@ export default function LivePreview() {
   const [showAddToHome, setShowAddToHome] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [isAndroid, setIsAndroid] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   
   // Detect platform
   useEffect(() => {
     const ua = navigator.userAgent;
     setIsIOS(/iPad|iPhone|iPod/.test(ua));
     setIsAndroid(/Android/.test(ua));
+    setIsMobile(window.matchMedia?.("(max-width: 768px)")?.matches ?? window.innerWidth <= 768);
     
-    // Show add to home screen prompt after 3 seconds
-    const timer = setTimeout(() => setShowAddToHome(true), 3000);
+    // Show add-to-home prompt a bit later, and avoid nagging repeatedly.
+    const dismissed = window.localStorage.getItem("livePreviewA2hsDismissed") === "1";
+    const timer = setTimeout(() => {
+      if (!dismissed) setShowAddToHome(true);
+    }, 6000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -87,6 +93,33 @@ export default function LivePreview() {
   }
 
   const isWebsite = isHttpUrl(app.url);
+  const canSuggestA2hs = isWebsite && (isIOS || isAndroid) && isMobile;
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // no-op
+    }
+  };
+
+  const shareLink = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: app.name,
+          url: window.location.href,
+        });
+        return;
+      }
+    } catch {
+      // fall back to copy
+    }
+    await copyLink();
+  };
+
   const openApp = () => {
     if (isWebsite) {
       window.open(app.url, "_blank", "noopener,noreferrer");
@@ -134,15 +167,19 @@ export default function LivePreview() {
             variant="ghost"
             className="text-white/70 hover:text-white"
             onClick={() => {
-              if (navigator.share) {
-                navigator.share({
-                  title: app.name,
-                  url: window.location.href
-                });
-              }
+              void shareLink();
             }}
           >
-            <Share2 className="h-4 w-4" />
+            {copied ? <CheckCircle2 className="h-4 w-4 text-green-400" /> : <Share2 className="h-4 w-4" />}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-white/70 hover:text-white"
+            onClick={() => void copyLink()}
+            aria-label="Copy preview link"
+          >
+            {copied ? <CheckCircle2 className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
           </Button>
         </div>
       </header>
@@ -167,7 +204,7 @@ export default function LivePreview() {
       </div>
 
       {/* Add to Home Screen Prompt */}
-      {showAddToHome && (
+      {showAddToHome && canSuggestA2hs && (
         <motion.div 
           initial={{ y: 100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -208,7 +245,10 @@ export default function LivePreview() {
                     size="sm"
                     variant="outline"
                     className="border-white/20 text-xs"
-                    onClick={() => setShowAddToHome(false)}
+                    onClick={() => {
+                      setShowAddToHome(false);
+                      window.localStorage.setItem("livePreviewA2hsDismissed", "1");
+                    }}
                   >
                     Later
                   </Button>

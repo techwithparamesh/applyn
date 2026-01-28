@@ -5,7 +5,7 @@
  * with components like Text, Image, Button, Gallery, Forms, etc.
  */
 
-import { useMemo, useState, useCallback, useEffect } from "react";
+import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -81,6 +81,7 @@ import {
   ListTree,
   Link2,
   Send,
+  RotateCcw,
 } from "lucide-react";
 
 import { QRCodeSVG } from "qrcode.react";
@@ -1290,6 +1291,7 @@ export default function VisualEditor() {
   const [agentInput, setAgentInput] = useState<string>("");
   const [agentSending, setAgentSending] = useState(false);
   const [aiStatus, setAiStatus] = useState<{ available: boolean; provider?: string } | null>(null);
+  const [agentAutoScroll, setAgentAutoScroll] = useState(true);
   const [agentMessages, setAgentMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([
     {
       role: "assistant",
@@ -1297,6 +1299,65 @@ export default function VisualEditor() {
         "Hi! I can help you edit this screen. Try: Add a hero section • Add a button • Change the button color to blue • Set the title to \"Welcome\"",
     },
   ]);
+
+  const agentEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    // Keep the latest message visible when chatting.
+    if (!agentAutoScroll) return;
+    agentEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [agentMessages.length]);
+
+  const clearAgentChat = useCallback(() => {
+    setAgentMessages([
+      {
+        role: "assistant",
+        content:
+          "What would you like to change? Tip: select a component first to edit it precisely.",
+      },
+    ]);
+  }, []);
+
+  const agentQuickPrompts = useMemo(() => {
+    const findTypeById = (components: EditorComponent[], targetId: string): ComponentType | null => {
+      for (const comp of components) {
+        if (comp.id === targetId) return comp.type;
+        if (comp.children?.length) {
+          const found = findTypeById(comp.children, targetId);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const screen = screens.find((s) => s.id === activeScreenId) || screens[0];
+    const selectedType = selectedComponentId && screen ? findTypeById(screen.components, selectedComponentId) : null;
+
+    // Keep these short; they act like “chips” the user can tap.
+    if (selectedType === "button") {
+      return [
+        "Change this button text to \"Book now\"",
+        "Make this button orange",
+        "Make this button full width",
+      ];
+    }
+    if (selectedType === "text" || selectedType === "heading") {
+      return [
+        "Rewrite this text to be shorter",
+        "Change this text to \"Veggies\"",
+        "Make this text centered",
+      ];
+    }
+    if (selectedType === "hero") {
+      return [
+        "Set hero title to \"Welcome\"",
+        "Set hero subtitle to \"Train smarter today\"",
+        "Make the hero button say \"Get started\"",
+      ];
+    }
+
+    return ["Add a hero section", "Add a button \"Join now\"", "Add a pricing section"];
+  }, [activeScreenId, screens, selectedComponentId]);
   const [paletteSearch, setPaletteSearch] = useState<string>("");
   const [websitePreviewUrl, setWebsitePreviewUrl] = useState<string>("");
   const [hasChanges, setHasChanges] = useState(false);
@@ -3192,8 +3253,74 @@ export default function VisualEditor() {
               <div className="flex flex-col h-full">
                 <ScrollArea className="flex-1 bg-slate-800/30">
                   <div className="p-4 space-y-3">
+                    <div className="rounded-xl border border-slate-700/50 bg-slate-900/40 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-xs text-slate-300 font-medium truncate">
+                            {selectedComponent ? `Selected: ${selectedComponent.type}` : `Screen: ${activeScreen?.name || "Home"}`}
+                          </p>
+                          <p className="text-[11px] text-slate-500 truncate">
+                            {aiStatus?.available
+                              ? `AI enabled (${aiStatus?.provider || "configured"})`
+                              : "AI disabled (set OPENAI_API_KEY or ANTHROPIC_API_KEY)"}
+                          </p>
+                        </div>
+                        <div className="shrink-0">
+                          <Badge
+                            className={
+                              aiStatus?.available
+                                ? "bg-emerald-500/15 text-emerald-200 border border-emerald-500/20"
+                                : "bg-slate-700/40 text-slate-300 border border-slate-600/40"
+                            }
+                          >
+                            {aiStatus?.available ? "Live" : "Offline"}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className={
+                              agentAutoScroll
+                                ? "h-7 px-2 text-[11px] border-slate-700/60 bg-slate-900/30 text-slate-200 hover:bg-slate-800/40"
+                                : "h-7 px-2 text-[11px] border-slate-700/60 bg-slate-900/10 text-slate-400 hover:bg-slate-800/30"
+                            }
+                            onClick={() => setAgentAutoScroll((v) => !v)}
+                          >
+                            {agentAutoScroll ? "Auto-scroll: On" : "Auto-scroll: Off"}
+                          </Button>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-[11px] text-slate-300 hover:bg-slate-800/40"
+                          onClick={clearAgentChat}
+                        >
+                          <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Clear
+                        </Button>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {agentQuickPrompts.map((p) => (
+                          <button
+                            key={p}
+                            type="button"
+                            className="text-[11px] px-2 py-1 rounded-full border border-slate-700/60 bg-slate-900/30 text-slate-200 hover:bg-slate-800/40 transition-colors"
+                            onClick={() => setAgentInput((cur) => (cur ? `${cur.trim()} ${p}` : p))}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* Agent Chat Messages Area */}
-                    <div className="space-y-3 min-h-[200px]">
+                    <div className="space-y-3 min-h-[200px] pb-6">
                       {agentMessages.map((m, idx) => (
                         <div key={idx} className={`flex gap-3 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                           {m.role === "assistant" && (
@@ -3204,43 +3331,63 @@ export default function VisualEditor() {
                           <div
                             className={
                               m.role === "user"
-                                ? "max-w-[85%] bg-slate-700/60 rounded-xl p-3 border border-slate-600/50"
-                                : "max-w-[85%] bg-slate-800/50 rounded-xl p-3 border border-slate-700/50"
+                                ? "max-w-[90%] bg-slate-700/50 rounded-2xl px-3.5 py-3 border border-slate-600/50"
+                                : "max-w-[90%] bg-slate-900/55 rounded-2xl px-3.5 py-3 border border-slate-700/60"
                             }
                           >
-                            <p className="text-sm text-white whitespace-pre-wrap">{m.content}</p>
+                            <p className="text-sm text-slate-100 whitespace-pre-wrap leading-relaxed">{m.content}</p>
                           </div>
                         </div>
                       ))}
+
+                      {agentSending && (
+                        <div className="flex gap-3 justify-start">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center shrink-0">
+                            <Bot className="h-4 w-4 text-white" />
+                          </div>
+                          <div className="max-w-[90%] bg-slate-900/55 rounded-2xl px-3.5 py-3 border border-slate-700/60">
+                            <div className="flex items-center gap-2 text-sm text-slate-300">
+                              <Loader2 className="h-4 w-4 animate-spin" /> Thinking...
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div ref={agentEndRef} />
                     </div>
                   </div>
                 </ScrollArea>
                 {/* Chat Input */}
                 <div className="p-3 border-t border-slate-700/50 bg-slate-900/80">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Describe what you want..."
+                  <div className="flex gap-2 items-end">
+                    <Textarea
+                      placeholder={
+                        selectedComponent
+                          ? "Ask me to change this selected component…"
+                          : "Ask me to add something… (Tip: click a component to edit it)"
+                      }
                       value={agentInput}
                       onChange={(e) => setAgentInput(e.target.value)}
-                      className="flex-1 bg-slate-800/50 border-slate-700/50 text-white placeholder:text-slate-500 text-sm"
+                      className="flex-1 bg-slate-800/50 border-slate-700/50 text-slate-100 placeholder:text-slate-500 text-sm resize-none min-h-[42px] max-h-[120px]"
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
+                        if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
                           void handleAgentSend();
                         }
                       }}
                       disabled={agentSending}
+                      rows={2}
                     />
-                    <Button 
-                      size="sm" 
-                      className="bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400"
+                    <Button
+                      size="sm"
+                      className="h-[42px] bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400"
                       onClick={() => void handleAgentSend()}
-                      disabled={agentSending}
+                      disabled={agentSending || !agentInput.trim()}
                     >
-                      <Send className="h-4 w-4" />
+                      {agentSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                     </Button>
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-2 text-center">Press Enter to send</p>
+                  <p className="text-[10px] text-slate-500 mt-2 text-center">Enter to send • Shift+Enter for new line</p>
                 </div>
               </div>
             </TabsContent>
