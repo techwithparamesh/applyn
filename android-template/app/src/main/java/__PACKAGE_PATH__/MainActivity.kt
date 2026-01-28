@@ -226,32 +226,24 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Handle http/https links
+        // IMPORTANT: keep navigation inside the WebView by default.
+        // Many real websites rely on redirects across domains (www/non-www), CDNs, auth providers,
+        // and payment gateways. Forcing "same domain only" breaks real apps.
         if (scheme == "http" || scheme == "https") {
-            val appHost = startUrl.replace(Regex("^https?://"), "").split("/")[0]
             val linkHost = uri.host ?: ""
 
-            // External domains to open in native apps
+            // A few destinations should open externally to feel native.
             val externalDomains = listOf(
-                "wa.me", "api.whatsapp.com", "whatsapp.com",
-                "t.me", "telegram.me", "telegram.org",
-                "facebook.com", "fb.com", "m.facebook.com",
-                "instagram.com", "twitter.com", "x.com",
-                "linkedin.com", "youtube.com", "youtu.be",
                 "play.google.com", "apps.apple.com",
+                "wa.me", "api.whatsapp.com",
                 "maps.google.com", "maps.app.goo.gl"
             )
-
             if (externalDomains.any { linkHost.contains(it) }) {
                 return openExternalIntent(uri)
             }
 
-            // Keep same-domain navigation within the app
-            if (linkHost.contains(appHost) || appHost.contains(linkHost)) {
-                return false
-            }
-
-            // Open other external links in browser
-            return openExternalIntent(uri)
+            // Default: allow in-WebView navigation (including redirects)
+            return false
         }
 
         return false

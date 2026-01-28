@@ -3331,6 +3331,15 @@ export async function registerRoutes(
       const user = getAuthedUser(req);
       if (!user) return res.status(401).json({ message: "Unauthorized" });
 
+      const publicBaseUrlFromReq = (req: any) => {
+        const xfProto = String(req.headers?.["x-forwarded-proto"] || "").split(",")[0]?.trim();
+        const xfHost = String(req.headers?.["x-forwarded-host"] || "").split(",")[0]?.trim();
+        const host = xfHost || String(req.headers?.host || "");
+        const proto = xfProto || (req.secure ? "https" : String(req.protocol || "http"));
+        if (!host) return "";
+        return `${proto}://${host}`.replace(/\/$/, "");
+      };
+
       // --- Enforce app limit based on plan (staff bypass) ---
       if (!isStaff(user)) {
         const { checkUserAppLimit } = await import("./subscription-middleware");
@@ -3362,6 +3371,27 @@ export async function registerRoutes(
         ...payload,
         status: buildNow ? "processing" : "draft",
       });
+
+      // If the client created a "native-only" app (typically from prompt/scratch mode),
+      // we still want a REAL app experience. We do that by pointing the wrapper WebView
+      // at our hosted runtime URL instead of leaving a placeholder like native://app.
+      try {
+        const rawUrl = String((created as any)?.url || "");
+        const isNativePlaceholder = rawUrl.toLowerCase().startsWith("native://") || rawUrl.toLowerCase().startsWith("runtime://");
+        const isNativeOnly = Boolean((created as any)?.isNativeOnly);
+        if (isNativeOnly || isNativePlaceholder) {
+          const base = publicBaseUrlFromReq(req);
+          if (base) {
+            const runtimeUrl = `${base}/runtime/${created.id}`;
+            const updated = await storage.updateApp(created.id, { url: runtimeUrl } as any);
+            if (updated) {
+              (created as any).url = runtimeUrl;
+            }
+          }
+        }
+      } catch {
+        // Best-effort only; do not block app creation.
+      }
 
       // Best-effort runtime seeding for certain industries.
       // This is what turns “pretty preview screens” into a functional runtime experience.

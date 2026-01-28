@@ -109,8 +109,13 @@ export function DevicePreview({
   const [retryCount, setRetryCount] = useState(0);
   const [activeScreenIndex, setActiveScreenIndex] = useState(0);
 
-  // Determine if this is a native-only app (no website)
-  const isNativeApp = isNativeOnly || url?.startsWith("native://") || !url || url === "https://example.com";
+  // Determine if this should be treated as a "native preview" (screens renderer)
+  // vs a webview app (iframe/screenshot). A native-only app can still be a real
+  // webview app if it points to our hosted runtime (http/https).
+  const rawUrl = String(url || "");
+  const isHttp = rawUrl.startsWith("http://") || rawUrl.startsWith("https://");
+  const isNativeScheme = rawUrl.startsWith("native://") || rawUrl.startsWith("runtime://");
+  const isNativeApp = (!isHttp && (isNativeOnly || isNativeScheme || !rawUrl || rawUrl === "https://example.com"));
 
   // Check if a platform is available based on user's plan
   const isPlatformAvailable = (platform: DevicePlatform) => {
