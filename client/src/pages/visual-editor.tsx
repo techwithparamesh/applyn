@@ -299,6 +299,20 @@ function ComponentPreview({
   
   const renderComponent = () => {
     switch (component.type) {
+      case "spacer": {
+        const height = Number(component.props?.height ?? 12);
+        return <div style={{ height: Number.isFinite(height) ? height : 12 }} />;
+      }
+      case "divider": {
+        const thickness = Number(component.props?.thickness ?? 1);
+        const color = component.props?.color || "#e5e7eb";
+        return (
+          <div
+            className="w-full"
+            style={{ height: Number.isFinite(thickness) ? thickness : 1, backgroundColor: color }}
+          />
+        );
+      }
       case "text":
         return (
           <p style={{ fontSize: component.props.fontSize, color: component.props.color }} className="py-2">
@@ -433,14 +447,59 @@ function ComponentPreview({
             )}
           </div>
         );
-      case "card":
+      case "card": {
+        const title = component.props?.title;
+        const subtitle = component.props?.subtitle;
+        const description = component.props?.description;
+        const icon = component.props?.icon;
+        const image = component.props?.image;
+        const compact = !!component.props?.compact;
+        const horizontal = !!component.props?.horizontal;
+        const backgroundColor = component.props?.backgroundColor;
+
+        if (horizontal) {
+          return (
+            <div
+              className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-white"
+              style={backgroundColor ? { backgroundColor } : undefined}
+            >
+              {image ? (
+                <img src={image} alt={title || "Card"} className="w-14 h-14 rounded-lg object-cover" />
+              ) : (
+                <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center text-xl">
+                  {icon || "📦"}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                {title && <div className="text-sm font-semibold text-gray-900 truncate">{title}</div>}
+                {subtitle && <div className="text-[11px] text-gray-500 truncate">{subtitle}</div>}
+              </div>
+              <div className="text-gray-400">›</div>
+            </div>
+          );
+        }
+
         return (
-          <div className="bg-white rounded-xl shadow-sm border p-4">
-            <div className="text-2xl mb-2">{component.props.icon}</div>
-            <h3 className="font-semibold text-slate-900">{component.props.title}</h3>
-            <p className="text-sm text-slate-500">{component.props.description}</p>
+          <div
+            className={
+              "rounded-xl border border-gray-200 bg-white " +
+              (compact ? "p-3" : "p-4")
+            }
+            style={backgroundColor ? { backgroundColor } : undefined}
+          >
+            <div className="flex items-start gap-3">
+              {icon && <div className="text-2xl leading-none">{icon}</div>}
+              <div className="flex-1 min-w-0">
+                {title && <div className="text-sm font-semibold text-gray-900 truncate">{title}</div>}
+                {subtitle && <div className="text-[11px] text-gray-500 truncate">{subtitle}</div>}
+                {description && !compact && (
+                  <div className="text-[11px] text-gray-600 mt-1 line-clamp-2">{description}</div>
+                )}
+              </div>
+            </div>
           </div>
         );
+      }
       case "section":
         return (
           <div style={{ padding: component.props.padding }} className="bg-slate-50 rounded-lg">
@@ -615,184 +674,192 @@ function ComponentPreview({
         
       // ---- Extended Template Components ----
       case "hero":
-        {
-          const title = typeof component.props.title === "string" && component.props.title.trim()
-            ? component.props.title
-            : "Your App";
-          const subtitle = typeof component.props.subtitle === "string" && component.props.subtitle.trim()
-            ? component.props.subtitle
-            : "";
-
-          const backgroundImage = typeof component.props.backgroundImage === "string" && component.props.backgroundImage.trim()
-            ? component.props.backgroundImage
-            : "";
-
-          const buttonText = typeof component.props.buttonText === "string" && component.props.buttonText.trim()
-            ? component.props.buttonText
-            : "";
-
         return (
-          <div 
-            className="relative rounded-lg overflow-hidden"
-            style={{ 
-              backgroundImage: backgroundImage ? `url(${backgroundImage})` : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              height: component.props.height || 200
+          <div
+            className="relative rounded-xl overflow-hidden"
+            style={{
+              backgroundImage: component.props?.backgroundImage ? `url(${component.props.backgroundImage})` : undefined,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              height: component.props?.height || 180,
+              backgroundColor: component.props?.backgroundImage ? undefined : "#2563EB",
             }}
           >
-            <div className="absolute inset-0" style={{ backgroundColor: component.props.overlayColor || 'rgba(0,0,0,0.4)' }} />
-            <div className="relative z-10 flex flex-col justify-center items-center h-full text-center p-4">
-              <h2 className="text-xl font-bold text-white mb-2">{title}</h2>
-              {subtitle && <p className="text-sm text-white/80 mb-4">{subtitle}</p>}
-              {buttonText && (
-                <button className="px-6 py-2 bg-white text-gray-900 rounded-full font-medium text-sm">
-                  {buttonText}
-                </button>
+            <div className="absolute inset-0" style={{ backgroundColor: component.props?.overlayColor || "rgba(0,0,0,0.35)" }} />
+            <div className="relative z-10 h-full p-4 flex flex-col justify-end text-white">
+              <div className="text-xl font-bold break-words">{component.props?.title || "Welcome"}</div>
+              {component.props?.subtitle && <div className="text-xs text-white/80 mt-1 break-words">{component.props.subtitle}</div>}
+              {component.props?.buttonText && (
+                <div className="mt-3">
+                  <button className="px-4 py-2 bg-white text-gray-900 rounded-full text-xs font-semibold">{component.props.buttonText}</button>
+                </div>
               )}
             </div>
           </div>
         );
-        }
         
-      case "productGrid":
-        {
-          const products: any[] = Array.isArray(component.props.products) ? component.props.products : [];
-          const categoryLower = String(activeCategory || "All").toLowerCase();
-          const filtered = categoryLower === "all"
-            ? products
-            : products.filter((p) => String(p?.category || "").toLowerCase() === categoryLower);
-          const visible = filtered.length > 0 ? filtered : products;
+      case "productGrid": {
+        const products: any[] = Array.isArray(component.props?.products) ? component.props.products : [];
+        const columns = component.props?.columns || 2;
+        const categoryLower = String(activeCategory || "All").toLowerCase();
+        const filtered = categoryLower === "all"
+          ? products
+          : products.filter((p) => String(p?.category || "").toLowerCase() === categoryLower);
+        const visible = filtered.length > 0 ? filtered : products;
 
-          return (
-            <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${component.props.columns || 2}, 1fr)` }}>
-              {visible.slice(0, 6).map((product: any, i: number) => (
-                <div key={i} className="bg-white rounded-lg border overflow-hidden">
-                  {product.image ? (
-                    <img src={product.image} alt={product.name || "Product"} className="w-full h-24 object-cover" />
-                  ) : (
-                    <div className="w-full h-24 bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-400 text-xs">
-                      No image
-                    </div>
-                  )}
-                  <div className="p-2">
-                    <p className="font-medium text-xs truncate">{product.name || "Unnamed"}</p>
-                    <div className="flex items-center justify-between mt-1">
-                      <p className="text-sm font-bold text-green-600">{product.price}</p>
-                      {product.rating && <span className="text-xs text-amber-500">★ {product.rating}</span>}
-                    </div>
-                    {product.category && (
-                      <p className="text-[10px] text-slate-500 mt-1">{product.category}</p>
-                    )}
+        return (
+          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
+            {visible.slice(0, 6).map((product, idx) => (
+              <div key={idx} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                {product.image && <img src={product.image} alt={product.name} className="w-full h-24 object-cover" />}
+                <div className="p-2">
+                  <div className="text-xs font-medium truncate">{product.name}</div>
+                  <div className="flex items-center justify-between mt-1">
+                    <div className="text-sm font-bold text-cyan-600">{product.price}</div>
+                    {product.rating && <div className="text-[10px] text-amber-600">★ {product.rating}</div>}
                   </div>
                 </div>
-              ))}
-            </div>
-          );
-        }
+              </div>
+            ))}
+          </div>
+        );
+      }
         
-      case "carousel":
-        {
-          const items: any[] = Array.isArray(component.props.items) ? component.props.items : [];
-          return (
+      case "carousel": {
+        const items: any[] = Array.isArray(component.props?.items) ? component.props.items : [];
+        return (
+          <div className="-mx-4 px-4">
             <div className="flex gap-3 overflow-x-auto pb-2">
-              {items.map((item: any, i: number) => (
-                <div key={i} className="flex-shrink-0 w-48 rounded-lg overflow-hidden bg-white border">
-                  {item.image ? (
-                    <img src={item.image} alt={item.title || "Item"} className="w-full h-24 object-cover" />
-                  ) : (
-                    <div className="w-full h-24 bg-gradient-to-br from-slate-100 to-slate-200" />
-                  )}
-                  <div className="p-2">
-                    <p className="font-medium text-sm">{item.title || "Untitled"}</p>
-                    <p className="text-xs text-gray-500">{item.subtitle || ""}</p>
+              {items.slice(0, 10).map((item, idx) => (
+                <div
+                  key={idx}
+                  className="flex-shrink-0 w-44 bg-white rounded-xl border border-gray-200 overflow-hidden"
+                >
+                  {item?.image && <img src={item.image} alt={item?.title || ""} className="w-full h-24 object-cover" />}
+                  <div className="p-3">
+                    <div className="text-xs font-semibold text-gray-900 truncate">{item?.title || item?.name || "Item"}</div>
+                    {item?.subtitle && <div className="text-[11px] text-gray-500 mt-0.5 line-clamp-2">{item.subtitle}</div>}
                   </div>
                 </div>
               ))}
               {items.length === 0 && (
-                <div className="text-xs text-slate-400 p-4">Add carousel items in Properties</div>
+                <div className="text-xs text-gray-500">No items</div>
               )}
             </div>
-          );
-        }
+          </div>
+        );
+      }
         
-      case "testimonial":
+      case "testimonial": {
+        const items: any[] = Array.isArray(component.props?.items) ? component.props.items : [];
         return (
           <div className="space-y-3">
-            {component.props.reviews?.map((review: any, i: number) => (
-              <div key={i} className="bg-white rounded-lg p-3 border">
-                <div className="flex items-center gap-2 mb-2">
-                  {review.avatar && <img src={review.avatar} alt="" className="w-8 h-8 rounded-full" />}
-                  <div>
-                    <p className="font-medium text-sm">{review.name}</p>
-                    <div className="flex text-amber-500 text-xs">{'★'.repeat(review.rating || 5)}</div>
-                  </div>
+            {items.slice(0, 4).map((t, idx) => (
+              <div key={idx} className="bg-white rounded-xl border border-gray-200 p-3">
+                <div className="text-[11px] text-gray-700 leading-relaxed">"{t?.quote || t?.text || "Great experience!"}"</div>
+                <div className="mt-2 flex items-center justify-between">
+                  <div className="text-[11px] font-semibold text-gray-900 truncate">{t?.name || "Customer"}</div>
+                  {t?.rating && <div className="text-[10px] text-amber-600">★ {t.rating}</div>}
                 </div>
-                <p className="text-xs text-gray-600">"{review.text}"</p>
               </div>
             ))}
           </div>
         );
+      }
         
-      case "stats":
+      case "stats": {
+        const items: any[] = Array.isArray(component.props?.items) ? component.props.items : [];
+        const columns = component.props?.columns || 2;
         return (
-          <div className="grid grid-cols-3 gap-3 p-3 bg-white rounded-lg">
-            {component.props.items?.map((stat: any, i: number) => (
-              <div key={i} className="text-center">
-                <span className="text-lg">{stat.icon}</span>
-                <p className="text-lg font-bold">{stat.value}</p>
-                <p className="text-xs text-gray-500">{stat.label}</p>
+          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
+            {items.slice(0, 6).map((s, idx) => (
+              <div key={idx} className="bg-white rounded-xl border border-gray-200 p-3">
+                <div className="text-lg font-bold text-cyan-600">{s?.value ?? s?.number ?? "0"}</div>
+                <div className="text-[11px] text-gray-500 mt-0.5">{s?.label || s?.title || "Stat"}</div>
               </div>
             ))}
           </div>
         );
+      }
         
-      case "team":
+      case "team": {
+        const members: any[] = Array.isArray(component.props?.members) ? component.props.members : [];
         return (
-          <div className="flex gap-3 overflow-x-auto pb-2">
-            {component.props.members?.map((member: any, i: number) => (
-              <div key={i} className="flex-shrink-0 text-center w-24">
-                <img src={member.image} alt={member.name} className="w-16 h-16 rounded-full mx-auto object-cover" />
-                <p className="font-medium text-xs mt-2 truncate">{member.name}</p>
-                <p className="text-[10px] text-gray-500 truncate">{member.role}</p>
+          <div className="grid grid-cols-2 gap-3">
+            {members.slice(0, 6).map((m, idx) => (
+              <div key={idx} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                {m?.image ? (
+                  <img src={m.image} alt={m?.name || "Member"} className="w-full h-20 object-cover" />
+                ) : (
+                  <div className="w-full h-20 bg-gray-100" />
+                )}
+                <div className="p-2">
+                  <div className="text-xs font-semibold text-gray-900 truncate">{m?.name || "Team"}</div>
+                  {m?.role && <div className="text-[10px] text-gray-500 truncate">{m.role}</div>}
+                </div>
               </div>
             ))}
           </div>
         );
+      }
         
-      case "contactForm":
+      case "contactForm": {
+        const fields: any[] = Array.isArray(component.props?.fields) ? component.props.fields : [];
+        const buttonText = component.props?.buttonText || "Send";
         return (
-          <div className="space-y-3 p-3 bg-white rounded-lg border">
-            {component.props.fields?.map((field: string, i: number) => (
-              <input 
-                key={i}
-                type={field === 'email' ? 'email' : 'text'}
-                placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
+          <div className="bg-white rounded-xl border border-gray-200 p-3 space-y-2">
+            {fields.slice(0, 6).map((f, idx) => (
+              <input
+                key={idx}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                placeholder={f?.placeholder || f?.label || "Field"}
+                type={f?.type || "text"}
               />
             ))}
-            <button className="w-full py-2 bg-cyan-500 text-white rounded-lg font-medium text-sm">
-              {component.props.submitText || 'Submit'}
+            <button className="w-full px-3 py-2 rounded-lg text-white text-sm font-semibold bg-cyan-600">
+              {buttonText}
             </button>
           </div>
         );
+      }
         
-      case "socialLinks":
+      case "map": {
+        const height = Number(component.props?.height ?? 150);
+        const latitude = component.props?.latitude;
+        const longitude = component.props?.longitude;
         return (
-          <div className="flex justify-center gap-4 p-3">
-            {component.props.links?.map((link: any, i: number) => (
-              <div key={i} className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl">
-                {link.platform === 'instagram' ? '📷' : 
-                 link.platform === 'twitter' ? '🐦' :
-                 link.platform === 'facebook' ? '📘' :
-                 link.platform === 'youtube' ? '📺' : '🔗'}
-              </div>
+          <div
+            className="w-full rounded-xl border border-gray-200 bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-xs text-gray-500"
+            style={{ height: Number.isFinite(height) ? height : 150 }}
+          >
+            Map preview {latitude != null && longitude != null ? `(${latitude}, ${longitude})` : ""}
+          </div>
+        );
+      }
+      case "socialLinks": {
+        const links: any[] = Array.isArray(component.props?.links) ? component.props.links : [];
+        return (
+          <div className="flex flex-wrap gap-2">
+            {links.slice(0, 8).map((l, idx) => (
+              <button
+                key={idx}
+                className="px-3 py-2 rounded-xl border border-gray-200 bg-white text-xs font-medium text-gray-800"
+                style={l?.color ? { borderColor: `${l.color}40` } : undefined}
+              >
+                <span className="mr-1">{l?.icon || "🔗"}</span>
+                {l?.label || l?.name || "Link"}
+              </button>
             ))}
           </div>
         );
+      }
 
       default:
-        return <div className="p-4 bg-slate-100 rounded text-sm text-slate-500">{component.type}</div>;
+        return (
+          <div className="p-3 rounded-xl border border-dashed border-gray-300 bg-white text-[11px] text-gray-500">
+            Unsupported component: <span className="font-semibold">{String(component.type || "unknown")}</span>
+          </div>
+        );
     }
   };
 

@@ -15,7 +15,7 @@
  */
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { 
   Globe, 
   Home, 
@@ -37,6 +37,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { getTemplateById } from "@/lib/app-templates";
 
 // Types for the component
 type DevicePlatform = "android" | "ios";
@@ -114,6 +115,51 @@ export function DevicePreview({
   const [imageError, setImageError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [activeScreenIndex, setActiveScreenIndex] = useState<number>(typeof screenIndex === "number" ? screenIndex : 0);
+
+  // Load industry template if screens not provided but industry is
+  const resolvedScreens = useMemo(() => {
+    if (screens && screens.length > 0) {
+      return screens;
+    }
+    if (!industry) {
+      return undefined;
+    }
+    // Normalize industry ID
+    const normalizeIndustry = (raw: string) => {
+      const v = raw.trim().toLowerCase();
+      const normalized = v
+        .replace(/&/g, "and")
+        .replace(/\s+/g, " ")
+        .replace(/[^a-z0-9 ]/g, "")
+        .trim();
+      if (getTemplateById(normalized)) return normalized;
+      if (normalized.includes("salon") || normalized.includes("spa") || normalized.includes("beauty")) return "salon";
+      if (normalized.includes("restaurant") || normalized.includes("food") || normalized.includes("cafe")) return "restaurant";
+      if (normalized.includes("ecommerce") || normalized.includes("e commerce") || normalized.includes("store") || normalized.includes("shop")) return "ecommerce";
+      if (normalized.includes("church") || normalized.includes("ministry")) return "church";
+      if (normalized.includes("fitness") || normalized.includes("gym")) return "fitness";
+      if (normalized.includes("education") || normalized.includes("school")) return "education";
+      if (normalized.includes("radio") || normalized.includes("station")) return "radio";
+      if (normalized.includes("health") || normalized.includes("clinic") || normalized.includes("medical")) return "healthcare";
+      if (normalized.includes("real estate") || normalized.includes("realestate") || normalized.includes("property")) return "realestate";
+      if (normalized.includes("photo") || normalized.includes("photography")) return "photography";
+      if (normalized.includes("music") || normalized.includes("band")) return "music";
+      if (normalized.includes("news") || normalized.includes("magazine") || normalized.includes("blog")) return "news";
+      if (normalized.includes("business") || normalized.includes("company")) return "business";
+      return null;
+    };
+    const normalizedIndustry = normalizeIndustry(industry);
+    if (!normalizedIndustry) return undefined;
+    const template = getTemplateById(normalizedIndustry);
+    if (!template) return undefined;
+    return template.screens.map((ts) => ({
+      id: ts.id,
+      name: ts.name,
+      icon: ts.icon,
+      isHome: ts.isHome,
+      components: ts.components as NativeComponent[],
+    }));
+  }, [screens, industry]);
 
   useEffect(() => {
     if (typeof screenIndex === "number" && screenIndex !== activeScreenIndex) {
@@ -263,7 +309,7 @@ export function DevicePreview({
               onRetry={handleRetry}
               isNativeApp={isNativeApp}
               preferLivePreview={preferLivePreview}
-              screens={screens}
+              screens={resolvedScreens}
               industry={industry}
               activeScreenIndex={activeScreenIndex}
               onScreenChange={handleScreenChange}
@@ -283,7 +329,7 @@ export function DevicePreview({
               onRetry={handleRetry}
               isNativeApp={isNativeApp}
               preferLivePreview={preferLivePreview}
-              screens={screens}
+              screens={resolvedScreens}
               industry={industry}
               activeScreenIndex={activeScreenIndex}
               onScreenChange={handleScreenChange}
