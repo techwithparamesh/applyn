@@ -168,12 +168,16 @@ export function DevicePreview({
   }, [screenIndex, activeScreenIndex]);
 
   // Determine if this should be treated as a "native preview" (screens renderer)
-  // vs a webview app (iframe/screenshot). A native-only app can still be a real
-  // webview app if it points to our hosted runtime (http/https).
+  // vs a webview app (iframe/screenshot). 
+  // PRIORITY: If we have screens data (provided or from template), always use native renderer.
   const rawUrl = String(url || "");
   const isHttp = rawUrl.startsWith("http://") || rawUrl.startsWith("https://");
   const isNativeScheme = rawUrl.startsWith("native://") || rawUrl.startsWith("runtime://");
-  const isNativeApp = (!isHttp && (isNativeOnly || isNativeScheme || !rawUrl || rawUrl === "https://example.com"));
+  const hasScreensData = resolvedScreens && resolvedScreens.length > 0;
+  const isRuntimeUrl = rawUrl.includes("/runtime/") || rawUrl.includes("/live-preview/");
+  
+  // Show native renderer if: we have screens data, OR it's a native-only app, OR it's a runtime URL
+  const isNativeApp = hasScreensData || isNativeOnly || isNativeScheme || isRuntimeUrl || (!isHttp && (!rawUrl || rawUrl === "https://example.com"));
 
   // Check if a platform is available based on user's plan
   const isPlatformAvailable = (platform: DevicePlatform) => {

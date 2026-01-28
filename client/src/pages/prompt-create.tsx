@@ -215,23 +215,153 @@ function defaultCapabilitiesForIndustry(industryId: string | undefined | null): 
     publishingChecklist: true,
   };
 
-  if (id.includes("ecommerce") || id.includes("store") || id.includes("shop")) {
+  // E-commerce, Store, Shop - full commerce stack
+  if (id.includes("ecommerce") || id.includes("store") || id.includes("shop") || id.includes("grocery") || id.includes("retail")) {
     return { ...base, payments: true, notifications: true };
   }
-  if (id.includes("restaurant")) {
+  // Restaurant, Food, Cafe - orders + notifications
+  if (id.includes("restaurant") || id.includes("food") || id.includes("cafe") || id.includes("delivery")) {
     return { ...base, payments: true, notifications: true };
   }
-  if (id.includes("salon") || id.includes("spa") || id.includes("booking")) {
+  // Salon, Spa, Beauty, Booking - appointments + payments
+  if (id.includes("salon") || id.includes("spa") || id.includes("beauty") || id.includes("booking")) {
     return { ...base, payments: true, notifications: true };
   }
-  if (id.includes("education")) {
-    return { ...base, payments: false, notifications: true };
+  // Fitness, Gym - memberships + class notifications
+  if (id.includes("fitness") || id.includes("gym") || id.includes("workout") || id.includes("health")) {
+    return { ...base, payments: true, notifications: true };
   }
-  if (id.includes("news") || id.includes("blog") || id.includes("radio") || id.includes("music")) {
+  // Healthcare, Clinic, Medical - appointments + patient portal
+  if (id.includes("healthcare") || id.includes("clinic") || id.includes("medical") || id.includes("doctor")) {
+    return { ...base, payments: true, notifications: true };
+  }
+  // Education, School, Course - course payments + notifications
+  if (id.includes("education") || id.includes("school") || id.includes("course") || id.includes("learning")) {
+    return { ...base, payments: true, notifications: true };
+  }
+  // Church, Ministry, Nonprofit - donations
+  if (id.includes("church") || id.includes("ministry") || id.includes("nonprofit") || id.includes("charity")) {
+    return { ...base, payments: true, notifications: true, admin: true };
+  }
+  // Real Estate, Property - listings + inquiries
+  if (id.includes("realestate") || id.includes("real estate") || id.includes("property")) {
     return { ...base, payments: false, notifications: true, admin: true };
+  }
+  // News, Blog, Magazine, Radio, Music - content + notifications
+  if (id.includes("news") || id.includes("blog") || id.includes("radio") || id.includes("music") || id.includes("podcast")) {
+    return { ...base, payments: false, notifications: true, admin: true };
+  }
+  // Photography, Portfolio - bookings
+  if (id.includes("photo") || id.includes("portfolio") || id.includes("studio")) {
+    return { ...base, payments: true, notifications: true };
+  }
+  // Business, Corporate - basic
+  if (id.includes("business") || id.includes("corporate") || id.includes("company")) {
+    return { ...base, payments: false, notifications: true };
   }
 
   return base;
+}
+
+// Get industry-specific capability descriptions
+function getCapabilityDescriptions(industryId: string | undefined | null): Record<string, { title: string; description: string }> {
+  const id = String(industryId || "").toLowerCase();
+  
+  const defaults = {
+    auth: { title: "Authentication & Profiles", description: "Login, roles, member-only screens" },
+    payments: { title: "Payments", description: "Checkout, subscriptions, order payments" },
+    admin: { title: "Admin Panel", description: "Manage catalog, orders, users" },
+    analytics: { title: "Analytics", description: "Track activation, retention, conversions" },
+    notifications: { title: "Push Notifications", description: "Announcements, order updates, reminders" },
+    publishingChecklist: { title: "Publish Checklist", description: "Store assets, privacy policy, screenshots" },
+  };
+
+  // E-commerce
+  if (id.includes("ecommerce") || id.includes("store") || id.includes("shop") || id.includes("grocery")) {
+    return {
+      ...defaults,
+      payments: { title: "Checkout & Payments", description: "Shopping cart, Razorpay/Stripe, order tracking" },
+      admin: { title: "Product Management", description: "Inventory, orders, customer management" },
+      notifications: { title: "Order Notifications", description: "Order confirmations, shipping updates, promotions" },
+    };
+  }
+  // Fitness / Gym
+  if (id.includes("fitness") || id.includes("gym") || id.includes("workout")) {
+    return {
+      ...defaults,
+      auth: { title: "Member Profiles", description: "Membership tiers, workout history, goals" },
+      payments: { title: "Membership Payments", description: "Subscriptions, class bookings, trainer fees" },
+      admin: { title: "Gym Management", description: "Classes, trainers, member schedules" },
+      notifications: { title: "Workout Reminders", description: "Class reminders, achievement alerts, tips" },
+    };
+  }
+  // Restaurant / Food
+  if (id.includes("restaurant") || id.includes("food") || id.includes("cafe")) {
+    return {
+      ...defaults,
+      payments: { title: "Order Payments", description: "Table orders, delivery checkout, tips" },
+      admin: { title: "Menu Management", description: "Menu items, orders, table reservations" },
+      notifications: { title: "Order Updates", description: "Order ready, delivery tracking, specials" },
+    };
+  }
+  // Salon / Spa
+  if (id.includes("salon") || id.includes("spa") || id.includes("beauty")) {
+    return {
+      ...defaults,
+      payments: { title: "Booking Payments", description: "Service deposits, full payments, packages" },
+      admin: { title: "Appointment Management", description: "Staff schedules, services, clients" },
+      notifications: { title: "Appointment Reminders", description: "Booking confirmations, reminders, offers" },
+    };
+  }
+  // Education
+  if (id.includes("education") || id.includes("school") || id.includes("course")) {
+    return {
+      ...defaults,
+      auth: { title: "Student Profiles", description: "Enrollment, progress tracking, certificates" },
+      payments: { title: "Course Payments", description: "Enrollment fees, subscriptions, materials" },
+      admin: { title: "Course Management", description: "Lessons, students, assignments" },
+      notifications: { title: "Learning Notifications", description: "New lessons, deadlines, achievements" },
+    };
+  }
+  // Church / Nonprofit
+  if (id.includes("church") || id.includes("ministry") || id.includes("nonprofit")) {
+    return {
+      ...defaults,
+      payments: { title: "Donations & Tithes", description: "One-time & recurring giving, campaigns" },
+      admin: { title: "Ministry Management", description: "Events, members, groups, volunteers" },
+      notifications: { title: "Community Updates", description: "Events, sermons, prayer requests" },
+    };
+  }
+  // Healthcare
+  if (id.includes("healthcare") || id.includes("clinic") || id.includes("medical")) {
+    return {
+      ...defaults,
+      auth: { title: "Patient Profiles", description: "Health records, appointment history" },
+      payments: { title: "Billing & Payments", description: "Consultation fees, lab payments" },
+      admin: { title: "Clinic Management", description: "Doctors, appointments, prescriptions" },
+      notifications: { title: "Health Reminders", description: "Appointments, medication, checkups" },
+    };
+  }
+  // Real Estate
+  if (id.includes("realestate") || id.includes("property")) {
+    return {
+      ...defaults,
+      auth: { title: "Buyer/Seller Profiles", description: "Saved properties, inquiries, alerts" },
+      admin: { title: "Property Management", description: "Listings, leads, agents" },
+      notifications: { title: "Property Alerts", description: "New listings, price changes, inquiries" },
+    };
+  }
+  // News / Blog / Radio
+  if (id.includes("news") || id.includes("blog") || id.includes("radio") || id.includes("podcast")) {
+    return {
+      ...defaults,
+      auth: { title: "Subscriber Profiles", description: "Saved articles, preferences, history" },
+      admin: { title: "Content Management", description: "Articles, categories, authors" },
+      notifications: { title: "Breaking News", description: "New articles, live streams, updates" },
+    };
+  }
+
+  return defaults;
 }
 
 function buildBusinessModules(args: {
@@ -1263,90 +1393,60 @@ export default function PromptCreate() {
                     <div className="pt-2">
                       <h4 className="text-sm font-medium text-white mb-2">Business-Ready Capabilities</h4>
                       <p className="text-xs text-muted-foreground mb-3">
-                        These make the generated app closer to AppyPie-style “prompt → publish”.
+                        Tailored for your {generatedConfig.industry} business needs.
                       </p>
 
-                      <div className="grid gap-2">
-                        <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
-                          <div>
-                            <div className="text-sm text-white">Authentication & Profiles</div>
-                            <div className="text-xs text-muted-foreground">Login, roles, member-only screens</div>
+                      {(() => {
+                        const capDescs = getCapabilityDescriptions(generatedConfig.industry);
+                        return (
+                          <div className="grid gap-2">
+                            <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
+                              <div>
+                                <div className="text-sm text-white">{capDescs.auth.title}</div>
+                                <div className="text-xs text-muted-foreground">{capDescs.auth.description}</div>
+                              </div>
+                              <input type="checkbox" className="h-4 w-4" checked={businessCaps.auth} onChange={(e) => setBusinessCaps((p) => ({ ...p, auth: e.target.checked }))} />
+                            </label>
+                            <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
+                              <div>
+                                <div className="text-sm text-white">{capDescs.payments.title}</div>
+                                <div className="text-xs text-muted-foreground">{capDescs.payments.description}</div>
+                              </div>
+                              <input type="checkbox" className="h-4 w-4" checked={businessCaps.payments} onChange={(e) => setBusinessCaps((p) => ({ ...p, payments: e.target.checked }))} />
+                            </label>
+                            <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
+                              <div>
+                                <div className="text-sm text-white">{capDescs.admin.title}</div>
+                                <div className="text-xs text-muted-foreground">{capDescs.admin.description}</div>
+                              </div>
+                              <input type="checkbox" className="h-4 w-4" checked={businessCaps.admin} onChange={(e) => setBusinessCaps((p) => ({ ...p, admin: e.target.checked }))} />
+                            </label>
+                            <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
+                              <div>
+                                <div className="text-sm text-white">{capDescs.analytics.title}</div>
+                                <div className="text-xs text-muted-foreground">{capDescs.analytics.description}</div>
+                              </div>
+                              <input type="checkbox" className="h-4 w-4" checked={businessCaps.analytics} onChange={(e) => setBusinessCaps((p) => ({ ...p, analytics: e.target.checked }))} />
+                            </label>
+                            <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
+                              <div>
+                                <div className="text-sm text-white">{capDescs.notifications.title}</div>
+                                <div className="text-xs text-muted-foreground">{capDescs.notifications.description}</div>
+                              </div>
+                              <input type="checkbox" className="h-4 w-4" checked={businessCaps.notifications} onChange={(e) => setBusinessCaps((p) => ({ ...p, notifications: e.target.checked }))} />
+                            </label>
+                            <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
+                              <div>
+                                <div className="text-sm text-white">{capDescs.publishingChecklist.title}</div>
+                                <div className="text-xs text-muted-foreground">{capDescs.publishingChecklist.description}</div>
+                              </div>
+                              <input type="checkbox" className="h-4 w-4" checked={businessCaps.publishingChecklist} onChange={(e) => setBusinessCaps((p) => ({ ...p, publishingChecklist: e.target.checked }))} />
+                            </label>
                           </div>
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4"
-                            checked={businessCaps.auth}
-                            onChange={(e) => setBusinessCaps((p) => ({ ...p, auth: e.target.checked }))}
-                          />
-                        </label>
-
-                        <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
-                          <div>
-                            <div className="text-sm text-white">Payments</div>
-                            <div className="text-xs text-muted-foreground">Checkout, subscriptions, order payments</div>
-                          </div>
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4"
-                            checked={businessCaps.payments}
-                            onChange={(e) => setBusinessCaps((p) => ({ ...p, payments: e.target.checked }))}
-                          />
-                        </label>
-
-                        <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
-                          <div>
-                            <div className="text-sm text-white">Admin Panel</div>
-                            <div className="text-xs text-muted-foreground">Manage catalog, orders, users</div>
-                          </div>
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4"
-                            checked={businessCaps.admin}
-                            onChange={(e) => setBusinessCaps((p) => ({ ...p, admin: e.target.checked }))}
-                          />
-                        </label>
-
-                        <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
-                          <div>
-                            <div className="text-sm text-white">Analytics</div>
-                            <div className="text-xs text-muted-foreground">Track activation, retention, conversions</div>
-                          </div>
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4"
-                            checked={businessCaps.analytics}
-                            onChange={(e) => setBusinessCaps((p) => ({ ...p, analytics: e.target.checked }))}
-                          />
-                        </label>
-
-                        <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
-                          <div>
-                            <div className="text-sm text-white">Push Notifications</div>
-                            <div className="text-xs text-muted-foreground">Announcements, order updates, reminders</div>
-                          </div>
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4"
-                            checked={businessCaps.notifications}
-                            onChange={(e) => setBusinessCaps((p) => ({ ...p, notifications: e.target.checked }))}
-                          />
-                        </label>
-
-                        <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
-                          <div>
-                            <div className="text-sm text-white">Publish Checklist</div>
-                            <div className="text-xs text-muted-foreground">Store assets, privacy policy, screenshots</div>
-                          </div>
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4"
-                            checked={businessCaps.publishingChecklist}
-                            onChange={(e) => setBusinessCaps((p) => ({ ...p, publishingChecklist: e.target.checked }))}
-                          />
-                        </label>
-                      </div>
+                        );
+                      })()}
                     </div>
-                  </CardContent>
+                  </CardContent>t>
                 </Card>
               </div>
 
