@@ -11,11 +11,13 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { getTemplateById, cloneTemplate, type IndustryTemplate, type TemplateScreen } from "@/lib/app-templates";
+import { DevicePreview } from "@/components/device-preview";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -1217,6 +1219,9 @@ export default function VisualEditor() {
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [deviceView, setDeviceView] = useState<"mobile" | "desktop">("mobile");
   const [editorMode, setEditorMode] = useState<"components" | "website">("components"); // Default to components for native apps
+  const [canvasPreviewMode, setCanvasPreviewMode] = useState<"edit" | "live">("edit");
+  const [followActiveScreen, setFollowActiveScreen] = useState(true);
+  const [liveScreenIndex, setLiveScreenIndex] = useState(0);
   const [rightSidebarTab, setRightSidebarTab] = useState<"agent" | "properties" | "code" | "qr">("properties");
   const [paletteSearch, setPaletteSearch] = useState<string>("");
   const [websitePreviewUrl, setWebsitePreviewUrl] = useState<string>("");
@@ -1240,6 +1245,25 @@ export default function VisualEditor() {
       setEditorMode(isNative ? "components" : "website");
     }
   }, [app]);
+
+  // Keep preview mode sensible: live preview is only meaningful in mobile + components mode.
+  useEffect(() => {
+    if (editorMode !== "components") {
+      setCanvasPreviewMode("edit");
+    }
+  }, [editorMode]);
+
+  const activeScreenIndex = useMemo(() => {
+    const idx = screens.findIndex((s) => s.id === activeScreenId);
+    return idx >= 0 ? idx : 0;
+  }, [screens, activeScreenId]);
+
+  // When following, keep the live preview index aligned.
+  useEffect(() => {
+    if (followActiveScreen) {
+      setLiveScreenIndex(activeScreenIndex);
+    }
+  }, [followActiveScreen, activeScreenIndex]);
 
   const webviewPages = useMemo(() => {
     const modules = (app as any)?.modules;
@@ -1955,6 +1979,32 @@ export default function VisualEditor() {
             </Button>
           </div>
 
+          {/* In-canvas preview mode (Edit vs Live) */}
+          {editorMode === "components" && (
+            <div className="flex items-center gap-1 p-1 bg-slate-800/80 rounded-lg border border-slate-700/50">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setCanvasPreviewMode("edit")}
+                className={`h-8 px-3 ${canvasPreviewMode === "edit"
+                  ? "text-cyan-300 bg-cyan-500/10"
+                  : "text-slate-400 hover:text-white"}`}
+              >
+                <MousePointer className="h-4 w-4 mr-2" /> Edit
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setSelectedComponentId(null); setCanvasPreviewMode("live"); }}
+                className={`h-8 px-3 ${canvasPreviewMode === "live"
+                  ? "text-purple-300 bg-purple-500/10"
+                  : "text-slate-400 hover:text-white"}`}
+              >
+                <Eye className="h-4 w-4 mr-2" /> Live
+              </Button>
+            </div>
+          )}
+
           <div className="h-6 w-px bg-slate-700" />
 
           <Button variant="ghost" size="icon" title="Undo" className="text-slate-400 hover:text-white">
@@ -2330,6 +2380,152 @@ export default function VisualEditor() {
               <div className="relative">
                 {/* Phone glow */}
                 <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-cyan-500/20 blur-3xl rounded-full scale-125 opacity-40" />
+
+                {/* Desktop split view: edit + live side-by-side */}
+                {deviceView === "desktop" && canvasPreviewMode === "live" ? (
+                  <div className="relative flex items-start gap-8">
+                    <div className="shrink-0 sticky top-24">
+                      <div className="mb-3 flex items-center justify-between gap-3 px-2">
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            className={
+                              followActiveScreen
+                                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                                : "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                            }
+                          >
+                            {followActiveScreen ? "Synced" : "Detached"}
+                          </Badge>
+                          <span className="text-xs text-slate-300">Live preview</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-400">Follow active screen</span>
+                          <Switch
+                            checked={followActiveScreen}
+                            onCheckedChange={(v) => {
+                              setFollowActiveScreen(!!v);
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <DevicePreview
+                        url={"native://app"}
+                        appName={app?.name || "My App"}
+                        primaryColor={app?.primaryColor || ""}
+                        icon={String((app as any)?.iconUrl || app?.icon || "📱")}
+                        preferLivePreview={true}
+                        screens={screens as any}
+                        industry={app?.industry || undefined}
+                        isNativeOnly={true}
+                        screenIndex={followActiveScreen ? activeScreenIndex : liveScreenIndex}
+                        onScreenIndexChange={(idx) => {
+                          setLiveScreenIndex(idx);
+                          if (followActiveScreen) {
+                            const next = screens[idx];
+                            if (next?.id) {
+                              setActiveScreenId(next.id);
+                              setSelectedComponentId(null);
+                            }
+                          }
+                        }}
+                        showToggle={true}
+                        availablePlatforms={["android", "ios"]}
+                        defaultPlatform="ios"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div 
+                        className="relative bg-white w-full rounded-2xl shadow-2xl shadow-black/50 overflow-hidden transition-all border-[10px] border-slate-900"
+                        style={{ minHeight: "600px" }}
+                      >
+                        {/* Content Area with Reorder */}
+                        <ScrollArea className="flex-1" style={{ height: "540px" }}>
+                          <div className="min-h-full bg-[#F6F7FB]">
+                            <div className="px-4 pt-4 pb-3">
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="text-[17px] font-semibold text-gray-900 truncate">{activeScreen?.name || "Home"}</div>
+                                  <div className="text-[11px] text-gray-500 mt-0.5">
+                                    Click components to edit • Drag to reorder
+                                  </div>
+                                </div>
+                                <div
+                                  className="h-2 w-2 rounded-full shrink-0"
+                                  style={{
+                                    backgroundColor: app?.primaryColor || "#2563EB",
+                                    boxShadow: `0 0 0 4px ${(app?.primaryColor || "#2563EB")}22`,
+                                  }}
+                                  aria-hidden
+                                />
+                              </div>
+                            </div>
+
+                            <div className="px-4 pb-6">
+                              {activeScreen && activeScreen.components.length > 0 ? (
+                                <Reorder.Group 
+                                  axis="y" 
+                                  values={activeScreen.components} 
+                                  onReorder={handleReorder}
+                                  className="space-y-5"
+                                >
+                                  {activeScreen.components.map((component) => (
+                                    <Reorder.Item 
+                                      key={component.id} 
+                                      value={component}
+                                      className="cursor-grab active:cursor-grabbing"
+                                    >
+                                      <ComponentPreview
+                                        component={component}
+                                        selectedComponentId={selectedComponentId}
+                                        onSelect={setSelectedComponentId}
+                                        interaction={{
+                                          activeCategory,
+                                          setActiveCategory,
+                                          setEditorMode,
+                                        }}
+                                      />
+                                    </Reorder.Item>
+                                  ))}
+                                </Reorder.Group>
+                              ) : (
+                                <div className="py-16 text-center">
+                                  <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-purple-100 to-cyan-100 flex items-center justify-center">
+                                    <Sparkles className="h-10 w-10 text-purple-500" />
+                                  </div>
+                                  <p className="text-slate-600 font-medium">Ready to build!</p>
+                                  <p className="text-sm text-slate-400 mt-2">Click components on the left to add them here</p>
+                                  <p className="text-xs text-slate-400 mt-1">Drag to reorder • Click to edit</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </ScrollArea>
+                      </div>
+                    </div>
+                  </div>
+                ) : canvasPreviewMode === "live" ? (
+                  <DevicePreview
+                    url={"native://app"}
+                    appName={app?.name || "My App"}
+                    primaryColor={app?.primaryColor || ""}
+                    icon={String((app as any)?.iconUrl || app?.icon || "📱")}
+                    preferLivePreview={true}
+                    screens={screens as any}
+                    industry={app?.industry || undefined}
+                    isNativeOnly={true}
+                    screenIndex={activeScreenIndex}
+                    onScreenIndexChange={(idx) => {
+                      const next = screens[idx];
+                      if (next?.id) {
+                        setActiveScreenId(next.id);
+                        setSelectedComponentId(null);
+                      }
+                    }}
+                    showToggle={deviceView === "desktop"}
+                    availablePlatforms={deviceView === "desktop" ? ["android", "ios"] : ["android"]}
+                    defaultPlatform={deviceView === "desktop" ? "ios" : "android"}
+                  />
+                ) : (
                 
                 <div 
                   className={`relative bg-white rounded-[2.5rem] shadow-2xl shadow-black/50 overflow-hidden transition-all border-[10px] border-slate-900 ${
@@ -2366,13 +2562,36 @@ export default function VisualEditor() {
 
                   {/* Content Area with Reorder */}
                   <ScrollArea className="flex-1" style={{ height: deviceView === "mobile" ? "calc(700px - 140px)" : "540px" }}>
-                    <div className="p-4 min-h-full bg-gradient-to-b from-slate-50 to-white">
+                    <div className="min-h-full bg-[#F6F7FB]">
+                      {/* Screen header (mobile-only) */}
+                      {deviceView === "mobile" && (
+                        <div className="px-4 pt-4 pb-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-[17px] font-semibold text-gray-900 truncate">{activeScreen?.name || "Home"}</div>
+                              <div className="text-[11px] text-gray-500 mt-0.5">
+                                Click components to edit • Drag to reorder
+                              </div>
+                            </div>
+                            <div
+                              className="h-2 w-2 rounded-full shrink-0"
+                              style={{
+                                backgroundColor: app?.primaryColor || "#2563EB",
+                                boxShadow: `0 0 0 4px ${(app?.primaryColor || "#2563EB")}22`,
+                              }}
+                              aria-hidden
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="px-4 pb-6">
                       {activeScreen && activeScreen.components.length > 0 ? (
                         <Reorder.Group 
                           axis="y" 
                           values={activeScreen.components} 
                           onReorder={handleReorder}
-                          className="space-y-4"
+                          className="space-y-5"
                         >
                           {activeScreen.components.map((component) => (
                             <Reorder.Item 
@@ -2403,30 +2622,44 @@ export default function VisualEditor() {
                           <p className="text-xs text-slate-400 mt-1">Drag to reorder • Click to edit</p>
                         </div>
                       )}
+                      </div>
                     </div>
                   </ScrollArea>
 
                   {/* Bottom Navigation - Mobile Only */}
                   {deviceView === "mobile" && (
-                    <div className="h-16 bg-white border-t border-gray-100 flex items-center justify-around px-6 shrink-0">
-                      {screens.slice(0, 4).map((screen, i) => (
-                        <button 
-                          key={screen.id}
-                          onClick={() => { setActiveScreenId(screen.id); setSelectedComponentId(null); }}
-                          className="flex flex-col items-center gap-1"
-                        >
-                          <span className="text-lg">{screen.icon}</span>
-                          <span 
-                            className={`text-[10px] font-medium ${screen.id === activeScreenId ? "" : "text-gray-400"}`}
-                            style={{ color: screen.id === activeScreenId ? app?.primaryColor || "#2563EB" : undefined }}
+                    <div className="h-16 bg-white/90 backdrop-blur border-t border-gray-200 flex items-center justify-around px-1 shrink-0">
+                      {screens.slice(0, 4).map((screen) => {
+                        const isActive = screen.id === activeScreenId;
+                        return (
+                          <button
+                            key={screen.id}
+                            onClick={() => { setActiveScreenId(screen.id); setSelectedComponentId(null); }}
+                            className={
+                              "relative flex flex-col items-center justify-center gap-1 min-w-0 w-full h-full px-2 transition-colors " +
+                              (isActive ? "text-gray-900" : "text-gray-500")
+                            }
                           >
-                            {screen.name.length > 8 ? screen.name.substring(0, 8) + "..." : screen.name}
-                          </span>
-                        </button>
-                      ))}
+                            {isActive && (
+                              <span
+                                className="absolute top-0 left-1/2 -translate-x-1/2 h-[3px] w-10 rounded-full"
+                                style={{ backgroundColor: app?.primaryColor || "#2563EB" }}
+                              />
+                            )}
+                            <span className={"text-[20px] leading-none " + (isActive ? "" : "opacity-90")}>{screen.icon}</span>
+                            <span
+                              className="text-[10px] font-medium truncate max-w-[74px]"
+                              style={{ color: isActive ? app?.primaryColor || "#2563EB" : undefined }}
+                            >
+                              {screen.name}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
+                )}
               </div>
               
               {/* Screen info */}

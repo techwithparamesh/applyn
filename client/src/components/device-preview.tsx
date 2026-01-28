@@ -70,6 +70,10 @@ interface DevicePreviewProps {
   industry?: string;
   /** Whether app is native only (no website) */
   isNativeOnly?: boolean;
+  /** Optional controlled active screen index for native previews */
+  screenIndex?: number;
+  /** Callback when native preview screen changes */
+  onScreenIndexChange?: (index: number) => void;
   /** Platforms available based on user's plan */
   availablePlatforms?: DevicePlatform[];
   /** Initial selected platform */
@@ -98,6 +102,8 @@ export function DevicePreview({
   screens,
   industry,
   isNativeOnly = false,
+  screenIndex,
+  onScreenIndexChange,
   availablePlatforms = ["android", "ios"],
   defaultPlatform = "ios",
   onPlatformChange,
@@ -107,7 +113,13 @@ export function DevicePreview({
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const [activeScreenIndex, setActiveScreenIndex] = useState(0);
+  const [activeScreenIndex, setActiveScreenIndex] = useState<number>(typeof screenIndex === "number" ? screenIndex : 0);
+
+  useEffect(() => {
+    if (typeof screenIndex === "number" && screenIndex !== activeScreenIndex) {
+      setActiveScreenIndex(screenIndex);
+    }
+  }, [screenIndex, activeScreenIndex]);
 
   // Determine if this should be treated as a "native preview" (screens renderer)
   // vs a webview app (iframe/screenshot). A native-only app can still be a real
@@ -146,6 +158,13 @@ export function DevicePreview({
     setImageError(false);
     setImageLoaded(false);
     setRetryCount(prev => prev + 1);
+  };
+
+  const handleScreenChange = (nextIndex: number) => {
+    if (typeof screenIndex !== "number") {
+      setActiveScreenIndex(nextIndex);
+    }
+    onScreenIndexChange?.(nextIndex);
   };
 
   return (
@@ -247,7 +266,7 @@ export function DevicePreview({
               screens={screens}
               industry={industry}
               activeScreenIndex={activeScreenIndex}
-              onScreenChange={setActiveScreenIndex}
+              onScreenChange={handleScreenChange}
             />
           ) : (
             <AndroidDeviceFrame
@@ -267,7 +286,7 @@ export function DevicePreview({
               screens={screens}
               industry={industry}
               activeScreenIndex={activeScreenIndex}
-              onScreenChange={setActiveScreenIndex}
+              onScreenChange={handleScreenChange}
             />
           )}
         </motion.div>
@@ -620,6 +639,20 @@ function NativeComponentPreview({
 }) {
   const render = () => {
     switch (component.type) {
+      case "spacer": {
+        const height = Number(component.props?.height ?? 12);
+        return <div style={{ height: Number.isFinite(height) ? height : 12 }} />;
+      }
+      case "divider": {
+        const thickness = Number(component.props?.thickness ?? 1);
+        const color = component.props?.color || "#e5e7eb";
+        return (
+          <div
+            className="w-full"
+            style={{ height: Number.isFinite(thickness) ? thickness : 1, backgroundColor: color }}
+          />
+        );
+      }
       case "text":
         return <p className="text-sm text-gray-700" style={{ color: component.props?.color }}>{component.props?.text}</p>;
       case "heading": {
@@ -653,6 +686,59 @@ function NativeComponentPreview({
           >
             {text}
           </button>
+        );
+      }
+      case "card": {
+        const title = component.props?.title;
+        const subtitle = component.props?.subtitle;
+        const description = component.props?.description;
+        const icon = component.props?.icon;
+        const image = component.props?.image;
+        const compact = !!component.props?.compact;
+        const horizontal = !!component.props?.horizontal;
+        const backgroundColor = component.props?.backgroundColor;
+
+        if (horizontal) {
+          return (
+            <div
+              className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-white"
+              style={backgroundColor ? { backgroundColor } : undefined}
+            >
+              {image ? (
+                <img src={image} alt={title || "Card"} className="w-14 h-14 rounded-lg object-cover" />
+              ) : (
+                <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center text-xl">
+                  {icon || "📦"}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                {title && <div className="text-sm font-semibold text-gray-900 truncate">{title}</div>}
+                {subtitle && <div className="text-[11px] text-gray-500 truncate">{subtitle}</div>}
+              </div>
+              <div className="text-gray-400">›</div>
+            </div>
+          );
+        }
+
+        return (
+          <div
+            className={
+              "rounded-xl border border-gray-200 bg-white " +
+              (compact ? "p-3" : "p-4")
+            }
+            style={backgroundColor ? { backgroundColor } : undefined}
+          >
+            <div className="flex items-start gap-3">
+              {icon && <div className="text-2xl leading-none">{icon}</div>}
+              <div className="flex-1 min-w-0">
+                {title && <div className="text-sm font-semibold text-gray-900 truncate">{title}</div>}
+                {subtitle && <div className="text-[11px] text-gray-500 truncate">{subtitle}</div>}
+                {description && !compact && (
+                  <div className="text-[11px] text-gray-600 mt-1 line-clamp-2">{description}</div>
+                )}
+              </div>
+            </div>
+          </div>
         );
       }
       case "container":
@@ -804,6 +890,129 @@ function NativeComponentPreview({
             type={component.props?.type || "text"}
           />
         );
+      case "carousel": {
+        const items: any[] = Array.isArray(component.props?.items) ? component.props.items : [];
+        return (
+          <div className="-mx-4 px-4">
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {items.slice(0, 10).map((item, idx) => (
+                <div
+                  key={idx}
+                  className="flex-shrink-0 w-44 bg-white rounded-xl border border-gray-200 overflow-hidden"
+                >
+                  {item?.image && <img src={item.image} alt={item?.title || ""} className="w-full h-24 object-cover" />}
+                  <div className="p-3">
+                    <div className="text-xs font-semibold text-gray-900 truncate">{item?.title || item?.name || "Item"}</div>
+                    {item?.subtitle && <div className="text-[11px] text-gray-500 mt-0.5 line-clamp-2">{item.subtitle}</div>}
+                  </div>
+                </div>
+              ))}
+              {items.length === 0 && (
+                <div className="text-xs text-gray-500">No items</div>
+              )}
+            </div>
+          </div>
+        );
+      }
+      case "testimonial": {
+        const items: any[] = Array.isArray(component.props?.items) ? component.props.items : [];
+        return (
+          <div className="space-y-3">
+            {items.slice(0, 4).map((t, idx) => (
+              <div key={idx} className="bg-white rounded-xl border border-gray-200 p-3">
+                <div className="text-[11px] text-gray-700 leading-relaxed">“{t?.quote || t?.text || "Great experience!"}”</div>
+                <div className="mt-2 flex items-center justify-between">
+                  <div className="text-[11px] font-semibold text-gray-900 truncate">{t?.name || "Customer"}</div>
+                  {t?.rating && <div className="text-[10px] text-amber-600">★ {t.rating}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      }
+      case "stats": {
+        const items: any[] = Array.isArray(component.props?.items) ? component.props.items : [];
+        const columns = component.props?.columns || 2;
+        return (
+          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
+            {items.slice(0, 6).map((s, idx) => (
+              <div key={idx} className="bg-white rounded-xl border border-gray-200 p-3">
+                <div className="text-lg font-bold" style={{ color: themeColor }}>{s?.value ?? s?.number ?? "0"}</div>
+                <div className="text-[11px] text-gray-500 mt-0.5">{s?.label || s?.title || "Stat"}</div>
+              </div>
+            ))}
+          </div>
+        );
+      }
+      case "team": {
+        const members: any[] = Array.isArray(component.props?.members) ? component.props.members : [];
+        return (
+          <div className="grid grid-cols-2 gap-3">
+            {members.slice(0, 6).map((m, idx) => (
+              <div key={idx} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                {m?.image ? (
+                  <img src={m.image} alt={m?.name || "Member"} className="w-full h-20 object-cover" />
+                ) : (
+                  <div className="w-full h-20 bg-gray-100" />
+                )}
+                <div className="p-2">
+                  <div className="text-xs font-semibold text-gray-900 truncate">{m?.name || "Team"}</div>
+                  {m?.role && <div className="text-[10px] text-gray-500 truncate">{m.role}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      }
+      case "socialLinks": {
+        const links: any[] = Array.isArray(component.props?.links) ? component.props.links : [];
+        return (
+          <div className="flex flex-wrap gap-2">
+            {links.slice(0, 8).map((l, idx) => (
+              <button
+                key={idx}
+                className="px-3 py-2 rounded-xl border border-gray-200 bg-white text-xs font-medium text-gray-800"
+                style={l?.color ? { borderColor: `${l.color}40` } : undefined}
+              >
+                <span className="mr-1">{l?.icon || "🔗"}</span>
+                {l?.label || l?.name || "Link"}
+              </button>
+            ))}
+          </div>
+        );
+      }
+      case "contactForm": {
+        const fields: any[] = Array.isArray(component.props?.fields) ? component.props.fields : [];
+        const buttonText = component.props?.buttonText || "Send";
+        return (
+          <div className="bg-white rounded-xl border border-gray-200 p-3 space-y-2">
+            {fields.slice(0, 6).map((f, idx) => (
+              <input
+                key={idx}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                placeholder={f?.placeholder || f?.label || "Field"}
+                type={f?.type || "text"}
+              />
+            ))}
+            <button className="w-full px-3 py-2 rounded-lg text-white text-sm font-semibold" style={{ backgroundColor: themeColor }}>
+              {buttonText}
+            </button>
+          </div>
+        );
+      }
+      case "map": {
+        const height = Number(component.props?.height ?? 150);
+        const latitude = component.props?.latitude;
+        const longitude = component.props?.longitude;
+        return (
+          <div
+            className="w-full rounded-xl border border-gray-200 bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-xs text-gray-500"
+            style={{ height: Number.isFinite(height) ? height : 150 }}
+          >
+            Map preview {latitude != null && longitude != null ? `(${latitude}, ${longitude})` : ""}
+          </div>
+        );
+      }
       case "hero":
         return (
           <div
@@ -855,7 +1064,11 @@ function NativeComponentPreview({
         );
       }
       default:
-        return null;
+        return (
+          <div className="p-3 rounded-xl border border-dashed border-gray-300 bg-white text-[11px] text-gray-500">
+            Unsupported component: <span className="font-semibold">{String(component.type || "unknown")}</span>
+          </div>
+        );
     }
   };
 
@@ -879,10 +1092,31 @@ function NativeScreensPreview({
   const [activeCategory, setActiveCategory] = useState("All");
   const activeScreen = screens[activeScreenIndex] || screens[0];
 
+  const screenTitle = activeScreen?.name || "Home";
+  const screenSubtitle = activeScreen?.isHome ? "Welcome back" : "";
+
   return (
     <div className="h-full flex flex-col bg-white overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-gray-50 to-white">
-        <div className="space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto bg-[#F6F7FB]">
+        <div className="px-4 pt-4 pb-6">
+          {/* Screen header */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[17px] font-semibold text-gray-900 truncate">{screenTitle}</div>
+                {screenSubtitle && <div className="text-[11px] text-gray-500 mt-0.5">{screenSubtitle}</div>}
+              </div>
+              <div className="shrink-0 flex items-center gap-2">
+                <div
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: themeColor, boxShadow: `0 0 0 4px ${themeColor}22` }}
+                  aria-hidden
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-5">
           {activeScreen?.components?.map((component) => (
             <NativeComponentPreview
               key={component.id}
@@ -892,26 +1126,40 @@ function NativeScreensPreview({
               setActiveCategory={setActiveCategory}
             />
           ))}
+          </div>
         </div>
       </div>
 
       {/* Native-style bottom navigation */}
-      <div className="h-14 bg-white border-t border-gray-200 flex items-center justify-around px-2 shrink-0">
-        {screens.slice(0, 4).map((screen, i) => (
-          <button
-            key={screen.id}
-            onClick={() => onScreenChange(i)}
-            className="flex flex-col items-center gap-0.5 min-w-0"
-          >
-            <span className="text-lg">{screen.icon || "📄"}</span>
-            <span
-              className={"text-[10px] font-medium truncate max-w-[64px] " + (i === activeScreenIndex ? "" : "text-gray-400")}
-              style={i === activeScreenIndex ? { color: themeColor } : undefined}
+      <div className="h-16 bg-white/90 backdrop-blur border-t border-gray-200 flex items-center justify-around px-1 shrink-0">
+        {screens.slice(0, 4).map((screen, i) => {
+          const isActive = i === activeScreenIndex;
+          return (
+            <button
+              key={screen.id}
+              onClick={() => onScreenChange(i)}
+              className={
+                "relative flex flex-col items-center justify-center gap-1 min-w-0 w-full h-full px-2 transition-colors " +
+                (isActive ? "text-gray-900" : "text-gray-500")
+              }
             >
-              {screen.name}
-            </span>
-          </button>
-        ))}
+              {/* Active indicator */}
+              {isActive && (
+                <span
+                  className="absolute top-0 left-1/2 -translate-x-1/2 h-[3px] w-10 rounded-full"
+                  style={{ backgroundColor: themeColor }}
+                />
+              )}
+              <span className={"text-[20px] leading-none " + (isActive ? "" : "opacity-90")}>{screen.icon || "📄"}</span>
+              <span
+                className={"text-[10px] font-medium truncate max-w-[74px] " + (isActive ? "" : "")}
+                style={isActive ? { color: themeColor } : undefined}
+              >
+                {screen.name}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -1027,11 +1275,11 @@ function NativeAppContent({
   const content = getDemoContent();
   
   return (
-    <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
+    <div className="h-full flex flex-col bg-[#F6F7FB] overflow-hidden">
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto">
         {/* Hero Section */}
-        <div className="relative h-48 overflow-hidden">
+        <div className="relative h-52 overflow-hidden">
           <img 
             src={content.hero.image} 
             alt={content.hero.title}
@@ -1052,10 +1300,10 @@ function NativeAppContent({
         
         {/* Products/Services Section */}
         <div className="p-4">
-          <h2 className="text-sm font-semibold text-gray-800 mb-3">Featured</h2>
+          <h2 className="text-sm font-semibold text-gray-900 mb-3">Featured</h2>
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4">
             {content.products.map((product, i) => (
-              <div key={i} className="flex-shrink-0 w-32 bg-white rounded-xl shadow-sm overflow-hidden">
+              <div key={i} className="flex-shrink-0 w-32 bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                 <img 
                   src={product.image} 
                   alt={product.name}
@@ -1075,7 +1323,7 @@ function NativeAppContent({
         <div className="px-4 pb-4">
           <div className="grid grid-cols-4 gap-2">
             {["🏠 Home", "🔍 Search", "❤️ Saved", "👤 Profile"].map((item, i) => (
-              <div key={i} className="flex flex-col items-center p-2 bg-white rounded-lg">
+              <div key={i} className="flex flex-col items-center p-2 bg-white rounded-xl border border-gray-200 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                 <span className="text-lg">{item.split(" ")[0]}</span>
                 <span className="text-[9px] text-gray-500 mt-1">{item.split(" ")[1]}</span>
               </div>
@@ -1085,10 +1333,10 @@ function NativeAppContent({
         
         {/* More Content Placeholder */}
         <div className="px-4 pb-6">
-          <h2 className="text-sm font-semibold text-gray-800 mb-3">Popular Now</h2>
+          <h2 className="text-sm font-semibold text-gray-900 mb-3">Popular Now</h2>
           <div className="space-y-2">
             {content.products.slice(0, 2).map((product, i) => (
-              <div key={i} className="flex items-center gap-3 p-2 bg-white rounded-lg shadow-sm">
+              <div key={i} className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-gray-200 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                 <img 
                   src={product.image} 
                   alt={product.name}
