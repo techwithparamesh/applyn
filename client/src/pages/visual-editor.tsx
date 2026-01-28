@@ -515,10 +515,6 @@ function ComponentPreview({
             ))}
           </div>
         );
-      case "divider":
-        return <hr style={{ borderColor: component.props.color, borderWidth: component.props.thickness }} className="my-4" />;
-      case "spacer":
-        return <div style={{ height: component.props.height }} />;
       case "gallery":
         return (
           <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${component.props.columns}, 1fr)` }}>
