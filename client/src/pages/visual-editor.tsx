@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Visual App Editor - Appy Pie Style Component Editor
  * 
  * A drag-and-drop visual editor for building native app screens
@@ -80,6 +80,8 @@ import {
   Bot,
   ListTree,
   Link2,
+  Send,
+  MessageSquare,
 } from "lucide-react";
 
 import { QRCodeSVG } from "qrcode.react";
@@ -171,7 +173,7 @@ const SECTION_TEMPLATES = [
   {
     id: "hero-1",
     name: "Hero Banner",
-    preview: "🖼️",
+    preview: "ðŸ–¼ï¸",
     components: [
       {
         id: "hero-container",
@@ -188,7 +190,7 @@ const SECTION_TEMPLATES = [
   {
     id: "features-grid",
     name: "Features Grid",
-    preview: "⬛⬛⬛",
+    preview: "â¬›â¬›â¬›",
     components: [
       {
         id: "features-section",
@@ -200,9 +202,9 @@ const SECTION_TEMPLATES = [
             type: "grid" as ComponentType,
             props: { columns: 3, gap: 16 },
             children: [
-              { id: "f1", type: "card" as ComponentType, props: { title: "Feature 1", description: "Description here", icon: "⚡" } },
-              { id: "f2", type: "card" as ComponentType, props: { title: "Feature 2", description: "Description here", icon: "🚀" } },
-              { id: "f3", type: "card" as ComponentType, props: { title: "Feature 3", description: "Description here", icon: "💡" } },
+              { id: "f1", type: "card" as ComponentType, props: { title: "Feature 1", description: "Description here", icon: "âš¡" } },
+              { id: "f2", type: "card" as ComponentType, props: { title: "Feature 2", description: "Description here", icon: "ðŸš€" } },
+              { id: "f3", type: "card" as ComponentType, props: { title: "Feature 3", description: "Description here", icon: "ðŸ’¡" } },
             ]
           }
         ]
@@ -212,7 +214,7 @@ const SECTION_TEMPLATES = [
   {
     id: "contact-form",
     name: "Contact Form",
-    preview: "📝",
+    preview: "ðŸ“",
     components: [
       {
         id: "contact-section",
@@ -250,10 +252,10 @@ const getDefaultProps = (type: ComponentType): Record<string, any> => {
     case "grid": return { columns: 2, gap: 16 };
     case "gallery": return { columns: 2, images: [] };
     case "section": return { title: "Section Title", padding: 20 };
-    case "card": return { title: "Card Title", description: "Card description", icon: "📦" };
+    case "card": return { title: "Card Title", description: "Card description", icon: "ðŸ“¦" };
     case "divider": return { color: "#e5e7eb", thickness: 1 };
     case "spacer": return { height: 20 };
-    case "icon": return { icon: "⭐", size: 24 };
+    case "icon": return { icon: "â­", size: 24 };
     case "list": return { items: ["Item 1", "Item 2", "Item 3"], ordered: false };
     case "form": return { submitText: "Submit" };
     case "input": return { label: "Label", placeholder: "Enter value", type: "text", required: false };
@@ -467,14 +469,14 @@ function ComponentPreview({
                 <img src={image} alt={title || "Card"} className="w-14 h-14 rounded-lg object-cover" />
               ) : (
                 <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center text-xl">
-                  {icon || "📦"}
+                  {icon || "ðŸ“¦"}
                 </div>
               )}
               <div className="flex-1 min-w-0">
                 {title && <div className="text-sm font-semibold text-gray-900 truncate">{title}</div>}
                 {subtitle && <div className="text-[11px] text-gray-500 truncate">{subtitle}</div>}
               </div>
-              <div className="text-gray-400">›</div>
+              <div className="text-gray-400">â€º</div>
             </div>
           );
         }
@@ -712,7 +714,7 @@ function ComponentPreview({
                   <div className="text-xs font-medium truncate">{product.name}</div>
                   <div className="flex items-center justify-between mt-1">
                     <div className="text-sm font-bold text-cyan-600">{product.price}</div>
-                    {product.rating && <div className="text-[10px] text-amber-600">★ {product.rating}</div>}
+                    {product.rating && <div className="text-[10px] text-amber-600">â˜… {product.rating}</div>}
                   </div>
                 </div>
               </div>
@@ -755,7 +757,7 @@ function ComponentPreview({
                 <div className="text-[11px] text-gray-700 leading-relaxed">"{t?.quote || t?.text || "Great experience!"}"</div>
                 <div className="mt-2 flex items-center justify-between">
                   <div className="text-[11px] font-semibold text-gray-900 truncate">{t?.name || "Customer"}</div>
-                  {t?.rating && <div className="text-[10px] text-amber-600">★ {t.rating}</div>}
+                  {t?.rating && <div className="text-[10px] text-amber-600">â˜… {t.rating}</div>}
                 </div>
               </div>
             ))}
@@ -842,7 +844,7 @@ function ComponentPreview({
                 className="px-3 py-2 rounded-xl border border-gray-200 bg-white text-xs font-medium text-gray-800"
                 style={l?.color ? { borderColor: `${l.color}40` } : undefined}
               >
-                <span className="mr-1">{l?.icon || "🔗"}</span>
+                <span className="mr-1">{l?.icon || "ðŸ”—"}</span>
                 {l?.label || l?.name || "Link"}
               </button>
             ))}
@@ -1250,7 +1252,7 @@ function PropertiesPanel({
       <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center border border-cyan-500/30">
-            <span className="text-sm">✨</span>
+            <span className="text-sm">âœ¨</span>
           </div>
           <span className="text-sm font-medium text-white capitalize">{component.type}</span>
         </div>
@@ -1276,7 +1278,7 @@ export default function VisualEditor() {
   
   // Editor state
   const [screens, setScreens] = useState<EditorScreen[]>([
-    { id: "home", name: "Home", icon: "🏠", components: [], isHome: true }
+    { id: "home", name: "Home", icon: "ðŸ ", components: [], isHome: true }
   ]);
   const [activeScreenId, setActiveScreenId] = useState("home");
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
@@ -1340,7 +1342,7 @@ export default function VisualEditor() {
         id: String(p.id || p.url),
         label: String(p.label || p.url),
         url: String(p.url),
-        icon: typeof p.icon === "string" ? p.icon : "🌐",
+        icon: typeof p.icon === "string" ? p.icon : "ðŸŒ",
       }));
   }, [app]);
 
@@ -1522,7 +1524,7 @@ export default function VisualEditor() {
         setTemplatesLoaded(true);
         
         toast({
-          title: "✨ Template loaded!",
+          title: "âœ¨ Template loaded!",
           description: `${template.name} template personalized for ${app.name}. ${templateScreens.length} screens ready to customize.`,
         });
         return;
@@ -1542,7 +1544,7 @@ export default function VisualEditor() {
         {
           id: homeId,
           name: "Home",
-          icon: "🏠",
+          icon: "ðŸ ",
           isHome: true,
           components: [
             {
@@ -1561,7 +1563,7 @@ export default function VisualEditor() {
               id: generateId(),
               type: "text",
               props: {
-                text: "💡 These are optional native screens for your website app. Your main content comes from your website. Use these screens for features like push notifications landing, offline content, or special promotions.",
+                text: "ðŸ’¡ These are optional native screens for your website app. Your main content comes from your website. Use these screens for features like push notifications landing, offline content, or special promotions.",
                 fontSize: 13,
                 color: "#6B7280"
               }
@@ -1570,7 +1572,7 @@ export default function VisualEditor() {
               id: generateId(),
               type: "button",
               props: {
-                text: "🌐 View Website Mode",
+                text: "ðŸŒ View Website Mode",
                 variant: "outline",
                 action: "switch-to-website"
               }
@@ -1580,7 +1582,7 @@ export default function VisualEditor() {
         {
           id: generateId(),
           name: "Notifications",
-          icon: "🔔",
+          icon: "ðŸ””",
           isHome: false,
           components: [
             {
@@ -1606,7 +1608,7 @@ export default function VisualEditor() {
         {
           id: generateId(),
           name: "Offline",
-          icon: "📴",
+          icon: "ðŸ“´",
           isHome: false,
           components: [
             {
@@ -1653,7 +1655,7 @@ export default function VisualEditor() {
         {
           id: homeId,
           name: "Home",
-          icon: "🏠",
+          icon: "ðŸ ",
           isHome: true,
           components: [
             {
@@ -1682,7 +1684,7 @@ export default function VisualEditor() {
         {
           id: generateId(),
           name: "About",
-          icon: "ℹ️",
+          icon: "â„¹ï¸",
           isHome: false,
           components: [
             {
@@ -1716,7 +1718,7 @@ export default function VisualEditor() {
         {
           id: generateId(),
           name: "Contact",
-          icon: "📞",
+          icon: "ðŸ“ž",
           isHome: false,
           components: [
             {
@@ -1741,7 +1743,7 @@ export default function VisualEditor() {
               id: generateId(),
               type: "button",
               props: {
-                text: "📧 Email Us",
+                text: "ðŸ“§ Email Us",
                 url: "mailto:contact@example.com",
                 backgroundColor: "#2563EB",
                 textColor: "#FFFFFF"
@@ -1751,7 +1753,7 @@ export default function VisualEditor() {
               id: generateId(),
               type: "button",
               props: {
-                text: "📞 Call Us",
+                text: "ðŸ“ž Call Us",
                 url: "tel:+1234567890",
                 backgroundColor: "#059669",
                 textColor: "#FFFFFF"
@@ -1909,7 +1911,7 @@ export default function VisualEditor() {
     const newScreen: EditorScreen = {
       id: generateId(),
       name: `Screen ${screens.length + 1}`,
-      icon: "📄",
+      icon: "ðŸ“„",
       components: [],
     };
     setScreens(prev => [...prev, newScreen]);
@@ -1962,12 +1964,12 @@ export default function VisualEditor() {
           {/* App Name & Info */}
           <div className="flex items-center gap-3 border-l border-slate-700/50 pl-4">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-purple-500 flex items-center justify-center text-lg shadow-lg">
-              {app?.icon || "📱"}
+              {app?.icon || "ðŸ“±"}
             </div>
             <div>
               <h1 className="text-white font-semibold text-sm">{app?.name || "My App"}</h1>
               <p className="text-slate-400 text-xs">
-                {isNativeApp ? "Native App" : "Web App"} • {activeScreen?.name || "Home"}
+                {isNativeApp ? "Native App" : "Web App"} â€¢ {activeScreen?.name || "Home"}
               </p>
             </div>
           </div>
@@ -2153,7 +2155,7 @@ export default function VisualEditor() {
                                 className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all text-slate-400 hover:bg-slate-800/50 hover:text-white border border-transparent"
                                 title={p.url}
                               >
-                                <span className="text-base">{p.icon || "🌐"}</span>
+                                <span className="text-base">{p.icon || "ðŸŒ"}</span>
                                 <span className="flex-1 text-left truncate">{p.label}</span>
                                 <ChevronRight className="h-4 w-4 text-slate-600" />
                               </button>
@@ -2364,7 +2366,7 @@ export default function VisualEditor() {
                       style={{ backgroundColor: app?.primaryColor || "#2563EB" }}
                     >
                       <div className="text-white font-bold flex items-center gap-2 text-sm">
-                        <span className="text-lg">{app?.icon || "📱"}</span>
+                        <span className="text-lg">{app?.icon || "ðŸ“±"}</span>
                         <span className="truncate max-w-[180px]">{app?.name || "My App"}</span>
                       </div>
                       <Menu className="w-5 h-5 text-white/80" />
@@ -2475,7 +2477,7 @@ export default function VisualEditor() {
                         url={"native://app"}
                         appName={app?.name || "My App"}
                         primaryColor={app?.primaryColor || ""}
-                        icon={String((app as any)?.iconUrl || app?.icon || "📱")}
+                        icon={String((app as any)?.iconUrl || app?.icon || "ðŸ“±")}
                         preferLivePreview={true}
                         screens={screens as any}
                         industry={app?.industry || undefined}
@@ -2509,7 +2511,7 @@ export default function VisualEditor() {
                                 <div className="min-w-0">
                                   <div className="text-[17px] font-semibold text-gray-900 truncate">{activeScreen?.name || "Home"}</div>
                                   <div className="text-[11px] text-gray-500 mt-0.5">
-                                    Click components to edit • Drag to reorder
+                                    Click components to edit â€¢ Drag to reorder
                                   </div>
                                 </div>
                                 <div
@@ -2557,7 +2559,7 @@ export default function VisualEditor() {
                                   </div>
                                   <p className="text-slate-600 font-medium">Ready to build!</p>
                                   <p className="text-sm text-slate-400 mt-2">Click components on the left to add them here</p>
-                                  <p className="text-xs text-slate-400 mt-1">Drag to reorder • Click to edit</p>
+                                  <p className="text-xs text-slate-400 mt-1">Drag to reorder â€¢ Click to edit</p>
                                 </div>
                               )}
                             </div>
@@ -2571,7 +2573,7 @@ export default function VisualEditor() {
                     url={"native://app"}
                     appName={app?.name || "My App"}
                     primaryColor={app?.primaryColor || ""}
-                    icon={String((app as any)?.iconUrl || app?.icon || "📱")}
+                    icon={String((app as any)?.iconUrl || app?.icon || "ðŸ“±")}
                     preferLivePreview={true}
                     screens={screens as any}
                     industry={app?.industry || undefined}
@@ -2633,7 +2635,7 @@ export default function VisualEditor() {
                             <div className="min-w-0">
                               <div className="text-[17px] font-semibold text-gray-900 truncate">{activeScreen?.name || "Home"}</div>
                               <div className="text-[11px] text-gray-500 mt-0.5">
-                                Click components to edit • Drag to reorder
+                                Click components to edit â€¢ Drag to reorder
                               </div>
                             </div>
                             <div
@@ -2682,7 +2684,7 @@ export default function VisualEditor() {
                           </div>
                           <p className="text-slate-600 font-medium">Ready to build!</p>
                           <p className="text-sm text-slate-400 mt-2">Click components on the left to add them here</p>
-                          <p className="text-xs text-slate-400 mt-1">Drag to reorder • Click to edit</p>
+                          <p className="text-xs text-slate-400 mt-1">Drag to reorder â€¢ Click to edit</p>
                         </div>
                       )}
                       </div>
@@ -2728,7 +2730,7 @@ export default function VisualEditor() {
               {/* Screen info */}
               <div className="text-center">
                 <p className="text-sm text-slate-400 font-medium">
-                  {activeScreen?.name} • {activeScreen?.components.length || 0} components
+                  {activeScreen?.name} â€¢ {activeScreen?.components.length || 0} components
                 </p>
               </div>
             </div>
@@ -2858,17 +2860,57 @@ export default function VisualEditor() {
               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="agent" className="flex-1 m-0">
-              <ScrollArea className="h-full bg-slate-800/30">
-                <div className="p-4">
-                  <div className="rounded-xl border border-slate-700/50 bg-slate-900/40 p-4">
-                    <p className="text-sm text-white font-medium">AI Agent</p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Coming next: “Describe what you want” → auto-add components and style.
-                    </p>
+
+            <TabsContent value="agent" className="flex-1 m-0 flex flex-col overflow-hidden">
+              <div className="flex flex-col h-full">
+                <ScrollArea className="flex-1 bg-slate-800/30">
+                  <div className="p-4 space-y-3">
+                    {/* Agent Chat Messages Area */}
+                    <div className="space-y-3 min-h-[200px]">
+                      <div className="flex gap-3">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center shrink-0">
+                          <Bot className="h-4 w-4 text-white" />
+                        </div>
+                        <div className="flex-1 bg-slate-800/50 rounded-xl p-3 border border-slate-700/50">
+                          <p className="text-sm text-white">Hi! I'm your AI assistant. Tell me what you want to add or change, and I'll help you build it.</p>
+                          <p className="text-xs text-slate-400 mt-2">Try: "Add a hero section" or "Change the button color to blue"</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
+                </ScrollArea>
+                {/* Chat Input */}
+                <div className="p-3 border-t border-slate-700/50 bg-slate-900/80">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Describe what you want..."
+                      className="flex-1 bg-slate-800/50 border-slate-700/50 text-white placeholder:text-slate-500 text-sm"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          toast({
+                            title: "AI Agent",
+                            description: "AI-assisted editing is coming soon! For now, use the Props tab to edit components.",
+                          });
+                        }
+                      }}
+                    />
+                    <Button 
+                      size="sm" 
+                      className="bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400"
+                      onClick={() => {
+                        toast({
+                          title: "AI Agent",
+                          description: "AI-assisted editing is coming soon! For now, use the Props tab to edit components.",
+                        });
+                      }}
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-2 text-center">Press Enter to send  AI editing coming soon</p>
                 </div>
-              </ScrollArea>
+              </div>
             </TabsContent>
           </Tabs>
         </aside>
