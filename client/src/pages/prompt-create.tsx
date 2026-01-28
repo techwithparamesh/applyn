@@ -1446,7 +1446,7 @@ export default function PromptCreate() {
                         );
                       })()}
                     </div>
-                  </CardContent>t>
+                  </CardContent>
                 </Card>
               </div>
 
