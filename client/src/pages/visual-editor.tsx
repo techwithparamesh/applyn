@@ -350,15 +350,31 @@ function ComponentPreview({
             ? (component.props.text === activeCategory ? "primary" : "outline")
             : component.props.variant;
 
-          const className = `${paddingClass} rounded-lg font-medium transition-colors ${
-            variant === 'primary' 
-              ? 'bg-cyan-500 text-white' 
-              : 'bg-slate-200 text-slate-800'
+          const customColor: string | undefined =
+            typeof component.props.backgroundColor === "string" && component.props.backgroundColor.trim()
+              ? component.props.backgroundColor.trim()
+              : undefined;
+
+          const className = `${paddingClass} rounded-lg font-medium transition-colors border ${
+            variant === "primary"
+              ? "text-white border-transparent"
+              : variant === "secondary" || variant === "outline"
+                ? "bg-transparent text-slate-900 border-slate-300"
+                : "bg-transparent text-slate-900 border-transparent"
           }`;
+
+          const style: React.CSSProperties | undefined = customColor
+            ? variant === "primary"
+              ? { backgroundColor: customColor }
+              : variant === "secondary" || variant === "outline"
+                ? { borderColor: customColor, color: customColor }
+                : { color: customColor }
+            : undefined;
 
           return (
             <button
               className={className}
+              style={style}
               onClick={(e) => {
                 handleSelect(e);
 
@@ -1084,6 +1100,24 @@ function PropertiesPanel({
                   <SelectItem value="ghost">Ghost (Text)</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <Label className="text-xs text-slate-500">Button Color (Optional)</Label>
+              <div className="flex gap-2 mt-1.5">
+                <input
+                  type="color"
+                  value={component.props.backgroundColor || "#06b6d4"}
+                  onChange={(e) => onUpdate({ ...component.props, backgroundColor: e.target.value })}
+                  className="h-9 w-12 rounded-lg cursor-pointer bg-slate-800 border border-slate-700"
+                />
+                <Input
+                  value={component.props.backgroundColor || ""}
+                  onChange={(e) => onUpdate({ ...component.props, backgroundColor: e.target.value })}
+                  placeholder="#06b6d4"
+                  className="mt-0 font-mono text-sm"
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">Works best with Primary (filled) style.</p>
             </div>
             <div>
               <Label className="text-xs text-slate-500">Action</Label>
@@ -1917,7 +1951,7 @@ export default function VisualEditor() {
 
     const updateInTree = (components: EditorComponent[]): EditorComponent[] => {
       return components.map((comp) => {
-        if (comp.id === componentId) return { ...comp, props };
+        if (comp.id === componentId) return { ...comp, props: { ...(comp.props || {}), ...(props || {}) } };
         if (comp.children) return { ...comp, children: updateInTree(comp.children) };
         return comp;
       });

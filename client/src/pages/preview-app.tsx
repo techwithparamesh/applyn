@@ -524,78 +524,87 @@ export default function PreviewApp() {
       
       {/* QR Code Modal - Clean Design */}
       <Dialog open={showQRModal} onOpenChange={setShowQRModal}>
-        <DialogContent className="sm:max-w-md bg-[#0d1117] border-white/[0.06] rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-white flex items-center gap-3">
-              <div className="h-9 w-9 rounded-xl bg-cyan-500/10 flex items-center justify-center">
-                <QrCode className="h-5 w-5 text-cyan-400" />
-              </div>
-              Preview on Your Phone
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Scan this QR code with your phone to preview the app experience
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="flex flex-col items-center space-y-5 py-4">
-            {/* QR Code */}
-            <div className="p-5 bg-white rounded-2xl shadow-xl">
-              <QRCodeSVG 
-                value={getPreviewUrl()} 
-                size={180}
-                level="H"
-                includeMargin={false}
-                bgColor="#FFFFFF"
-                fgColor="#0a0a0a"
-              />
-            </div>
-            
-            {/* Preview URL */}
-            <div className="w-full">
-              <label className="text-xs text-muted-foreground mb-2 block font-medium">Preview Link</label>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 px-3 py-2.5 rounded-xl bg-white/5 border border-white/[0.06] text-sm text-muted-foreground truncate font-mono">
-                  {getPreviewUrl()}
+        <DialogContent className="sm:max-w-2xl w-[min(92vw,720px)] bg-[#0d1117] border-white/[0.06] rounded-2xl p-0 overflow-hidden max-h-[85vh]">
+          <div className="px-6 pt-6 pb-4 border-b border-white/[0.06]">
+            <DialogHeader>
+              <DialogTitle className="text-white flex items-center gap-3">
+                <div className="h-9 w-9 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+                  <QrCode className="h-5 w-5 text-cyan-400" />
                 </div>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={copyPreviewUrl}
-                  className="border-white/10 bg-white/5 hover:bg-white/10 rounded-xl h-10 w-10 p-0"
-                >
-                  {copied ? <CheckCircle2 className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
-                </Button>
+                Preview on your phone
+              </DialogTitle>
+              <DialogDescription className="text-muted-foreground">
+                Scan the code or share the link to open the live preview.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="px-6 py-5 overflow-auto">
+            <div className="grid gap-6 md:grid-cols-[220px_1fr] items-start">
+              {/* QR */}
+              <div className="flex flex-col items-center gap-3">
+                <div className="p-4 bg-white rounded-2xl shadow-xl">
+                  <QRCodeSVG
+                    value={getPreviewUrl()}
+                    size={168}
+                    level="H"
+                    includeMargin={false}
+                    bgColor="#FFFFFF"
+                    fgColor="#0a0a0a"
+                  />
+                </div>
+                <div className="text-xs text-muted-foreground text-center">Open your camera and scan.</div>
+              </div>
+
+              {/* Link + Instructions */}
+              <div className="space-y-5">
+                <div>
+                  <label className="text-xs text-muted-foreground mb-2 block font-medium">Preview link</label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 px-3 py-2.5 rounded-xl bg-white/5 border border-white/[0.06] text-sm text-muted-foreground truncate font-mono">
+                      {getPreviewUrl()}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void copyPreviewUrl()}
+                      className="border-white/10 bg-white/5 hover:bg-white/10 rounded-xl h-10 w-10 p-0"
+                      aria-label="Copy preview link"
+                    >
+                      {copied ? <CheckCircle2 className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-cyan-500/5 border border-cyan-500/10 p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-cyan-500/10 flex items-center justify-center shrink-0">
+                      <Smartphone className="h-4 w-4 text-cyan-400" />
+                    </div>
+                    <div className="text-sm">
+                      <p className="font-medium text-cyan-400 mb-2">Best experience</p>
+                      <ul className="space-y-1.5 text-muted-foreground text-sm">
+                        <li>Scan the QR code or open the link</li>
+                        <li>On iOS/Android, add to Home Screen (optional)</li>
+                        <li>Share the link with teammates to review</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-            
-            {/* Instructions */}
-            <div className="w-full p-4 rounded-xl bg-cyan-500/5 border border-cyan-500/10">
-              <div className="flex items-start gap-3">
-                <div className="h-8 w-8 rounded-lg bg-cyan-500/10 flex items-center justify-center shrink-0">
-                  <Smartphone className="h-4 w-4 text-cyan-400" />
-                </div>
-                <div className="text-sm">
-                  <p className="font-medium text-cyan-400 mb-2">How to preview:</p>
-                  <ol className="list-decimal list-inside space-y-1.5 text-muted-foreground">
-                    <li>Open camera app on your phone</li>
-                    <li>Point at the QR code</li>
-                    <li>Tap the notification to open</li>
-                    <li>Add to Home Screen for full experience</li>
-                  </ol>
-                </div>
-              </div>
-            </div>
-            
-            {/* Share buttons */}
+          </div>
+
+          <div className="px-6 py-4 border-t border-white/[0.06] bg-[#0d1117]/95">
             <div className="flex gap-3 w-full">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="flex-1 border-white/10 bg-white/5 hover:bg-white/10 rounded-xl h-11"
                 onClick={() => void shareOrCopyPreviewUrl()}
               >
                 <Share2 className="mr-2 h-4 w-4" /> Share
               </Button>
-              <Button 
+              <Button
                 className="flex-1 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-xl h-11"
                 onClick={() => {
                   setShowQRModal(false);
