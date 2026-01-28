@@ -106,6 +106,91 @@ async function complete(options: CompletionOptions): Promise<string> {
 }
 
 // =====================
+// 10. Visual Editor Command Generator
+// =====================
+export type VisualEditorOp =
+  | { op: "add"; componentType: string; props?: Record<string, any>; select?: boolean }
+  | { op: "updateSelected"; props: Record<string, any> }
+  | { op: "updateById"; id: string; props: Record<string, any> }
+  | { op: "deleteSelected" };
+
+export interface VisualEditorCommand {
+  message: string;
+  operations: VisualEditorOp[];
+}
+
+export async function generateVisualEditorCommand(input: {
+  prompt: string;
+  context: {
+    appName?: string;
+    industry?: string;
+    screen?: {
+      id?: string;
+      name?: string;
+      components?: Array<{ id: string; type: string; props?: Record<string, any> }>;
+    };
+    selected?: { id: string; type: string; props?: Record<string, any> } | null;
+  };
+}): Promise<VisualEditorCommand> {
+  const { prompt, context } = input;
+
+  const system = `You are an AI assistant that edits a visual app screen builder.
+
+You MUST respond with valid JSON only.
+
+Goal: Turn the user's instruction into a small set of safe edit operations.
+
+Allowed operations (array "operations"):
+- {"op":"add","componentType":string,"props"?:object,"select"?:boolean}
+- {"op":"updateSelected","props":object}
+- {"op":"updateById","id":string,"props":object}
+- {"op":"deleteSelected"}
+
+Rules:
+- Prefer updateSelected when a component is selected.
+- Only use updateById if you are confident the id exists in context.
+- Keep operations minimal (usually 1-2).
+- Do NOT invent component ids.
+- If the request is ambiguous, ask a short clarifying question in "message" and return an empty operations array.
+
+Component types you may use in add.componentType:
+text, heading, button, container, fixedContainer, grid, gallery, section, divider, spacer, icon, card, list, form, input, table, video, map,
+hero, productGrid, productCard, carousel, testimonial, pricingCard, contactForm, socialLinks, featureList, stats, team, faq.
+
+Common props by type (examples; not exhaustive):
+- text/heading: {"text": string, "align"?: "left"|"center"|"right", "color"?: string}
+- button: {"text": string, "backgroundColor"?: string, "textColor"?: string}
+- hero: {"title": string, "subtitle"?: string, "buttonText"?: string}
+- container: {"padding"?: number, "gap"?: number, "direction"?: "row"|"column", "backgroundColor"?: string}
+
+Return JSON: {"message": string, "operations": VisualEditorOp[]}`;
+
+  const content = await complete({
+    messages: [
+      { role: "system", content: system },
+      {
+        role: "user",
+        content: JSON.stringify({ prompt, context }),
+      },
+    ],
+    maxTokens: 900,
+    jsonMode: true,
+  });
+
+  try {
+    const parsed = JSON.parse(content);
+    const message = typeof parsed?.message === "string" ? parsed.message : "";
+    const operations = Array.isArray(parsed?.operations) ? parsed.operations : [];
+    return { message: message || "OK", operations } as VisualEditorCommand;
+  } catch {
+    return {
+      message: "I couldn't parse the AI response. Please try rephrasing your request.",
+      operations: [],
+    };
+  }
+}
+
+// =====================
 // 1. Website Analyzer
 // =====================
 export interface WebsiteAnalysis {

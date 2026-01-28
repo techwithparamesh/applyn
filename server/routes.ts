@@ -6815,6 +6815,34 @@ export async function registerRoutes(
     }
   });
 
+  // 6b. Visual Editor Agent (structured edit operations)
+  app.post("/api/ai/visual-editor/command", requireAuth, aiRateLimit, async (req, res, next) => {
+    try {
+      if (!isLLMConfigured()) {
+        return res.status(503).json({ message: "AI features not available" });
+      }
+
+      const schema = z.object({
+        prompt: z.string().min(1).max(1200),
+        context: z.any().optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid input" });
+      }
+
+      const { generateVisualEditorCommand } = await import("./llm");
+      const result = await generateVisualEditorCommand({
+        prompt: parsed.data.prompt,
+        context: (parsed.data.context ?? {}) as any,
+      });
+
+      return res.json(result);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
   // 7. Ticket Categorization (for staff when viewing tickets)
   app.post("/api/ai/categorize-ticket", requireRole(["admin", "support"]), async (req, res, next) => {
     try {

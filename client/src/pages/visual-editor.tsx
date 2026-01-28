@@ -1289,6 +1289,7 @@ export default function VisualEditor() {
   const [rightSidebarTab, setRightSidebarTab] = useState<"agent" | "properties" | "code" | "qr">("properties");
   const [agentInput, setAgentInput] = useState<string>("");
   const [agentSending, setAgentSending] = useState(false);
+  const [aiStatus, setAiStatus] = useState<{ available: boolean; provider?: string } | null>(null);
   const [agentMessages, setAgentMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([
     {
       role: "assistant",
@@ -1318,6 +1319,23 @@ export default function VisualEditor() {
       setEditorMode(isNative ? "components" : "website");
     }
   }, [app]);
+
+  // Preload AI availability for the Agent tab
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiRequest("GET", "/api/ai/status");
+        const json = await res.json();
+        if (!cancelled) setAiStatus({ available: !!json?.available, provider: json?.provider });
+      } catch {
+        if (!cancelled) setAiStatus({ available: false });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Keep preview mode sensible: live preview is only meaningful in mobile + components mode.
   useEffect(() => {
@@ -1980,6 +1998,88 @@ export default function VisualEditor() {
     return { applied: false, message: replyHelp() };
   }, [addComponent, selectedComponent, updateComponentById]);
 
+  const buildAiEditorContext = useCallback(() => {
+    const screen = activeScreen
+      ? {
+          id: activeScreen.id,
+          name: activeScreen.name,
+          components: (activeScreen.components || []).slice(0, 50).map((c) => ({
+            id: c.id,
+            type: c.type,
+            props: c.props,
+          })),
+        }
+      : undefined;
+
+    const selected = selectedComponent
+      ? {
+          id: selectedComponent.id,
+          type: selectedComponent.type,
+          props: selectedComponent.props,
+        }
+      : null;
+
+    return {
+      appName: typeof (app as any)?.name === "string" ? (app as any).name : undefined,
+      industry: typeof (app as any)?.industry === "string" ? (app as any).industry : undefined,
+      screen,
+      selected,
+    };
+  }, [activeScreen, selectedComponent, app]);
+
+  const applyAiOperations = useCallback(
+    (ops: any[]) => {
+      if (!Array.isArray(ops) || ops.length === 0) return 0;
+      let applied = 0;
+
+      for (const op of ops) {
+        const kind = op?.op;
+        if (kind === "add") {
+          const t = String(op?.componentType || "").trim() as any;
+          if (!t) continue;
+          const newId = addComponent(t);
+          if (typeof newId === "string") {
+            const nextProps = op?.props && typeof op.props === "object" ? { ...getDefaultProps(t), ...op.props } : undefined;
+            if (nextProps) updateComponentById(newId, nextProps);
+            if (op?.select === false) {
+              // leave selection as-is
+            }
+            applied++;
+          }
+          continue;
+        }
+
+        if (kind === "updateSelected") {
+          if (!selectedComponent) continue;
+          const props = op?.props;
+          if (!props || typeof props !== "object") continue;
+          updateComponentById(selectedComponent.id, { ...selectedComponent.props, ...props });
+          applied++;
+          continue;
+        }
+
+        if (kind === "updateById") {
+          const targetId = typeof op?.id === "string" ? op.id : "";
+          const props = op?.props;
+          if (!targetId || !props || typeof props !== "object") continue;
+          updateComponentById(targetId, props);
+          applied++;
+          continue;
+        }
+
+        if (kind === "deleteSelected") {
+          if (!selectedComponent) continue;
+          deleteComponent();
+          applied++;
+          continue;
+        }
+      }
+
+      return applied;
+    },
+    [addComponent, deleteComponent, selectedComponent, updateComponentById],
+  );
+
   const handleAgentSend = useCallback(async () => {
     const prompt = agentInput.trim();
     if (!prompt) return;
@@ -1988,15 +2088,52 @@ export default function VisualEditor() {
     setAgentMessages((prev) => [...prev, { role: "user", content: prompt }]);
 
     try {
+      // Prefer true AI edits when available
+      const available = aiStatus?.available ?? false;
+      if (available) {
+        try {
+          const res = await apiRequest("POST", "/api/ai/visual-editor/command", {
+            prompt,
+            context: buildAiEditorContext(),
+          });
+          const json = await res.json();
+          const ops = Array.isArray(json?.operations) ? json.operations : [];
+          const appliedCount = applyAiOperations(ops);
+          const msg = typeof json?.message === "string" ? json.message : "OK";
+
+          setAgentMessages((prev) => [...prev, { role: "assistant", content: msg }]);
+          if (appliedCount > 0) toast({ title: `Applied ${appliedCount} change${appliedCount === 1 ? "" : "s"}` });
+          if (appliedCount === 0) {
+            // Fall back to local rules if AI didn't output ops
+            const fallback = runLocalAgentCommand(prompt);
+            setAgentMessages((prev) => [...prev, { role: "assistant", content: fallback.message }]);
+            if (fallback.applied) toast({ title: "Applied" });
+          }
+          return;
+        } catch (err: any) {
+          const message = err?.message ? String(err.message) : "AI request failed";
+          setAgentMessages((prev) => [...prev, { role: "assistant", content: `AI error: ${message}` }]);
+          // continue to local fallback
+        }
+      }
+
+      if (!available) {
+        setAgentMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: "AI is not configured on the server (missing OPENAI_API_KEY or ANTHROPIC_API_KEY). Falling back to basic commands.",
+          },
+        ]);
+      }
+
       const result = runLocalAgentCommand(prompt);
       setAgentMessages((prev) => [...prev, { role: "assistant", content: result.message }]);
-      if (result.applied) {
-        toast({ title: "Applied" });
-      }
+      if (result.applied) toast({ title: "Applied" });
     } finally {
       setAgentSending(false);
     }
-  }, [agentInput, runLocalAgentCommand, toast]);
+  }, [agentInput, aiStatus, applyAiOperations, buildAiEditorContext, runLocalAgentCommand, toast]);
 
   const copyToClipboard = useCallback(async (text: string, successLabel: string) => {
     try {
