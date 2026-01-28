@@ -627,7 +627,7 @@ export default function AppStructure() {
                 <div className="space-y-2">
                   <Label>Jump to editor</Label>
                   <Button asChild variant="outline" className="w-full">
-                    <a href={`/apps/${id}/visual-editor`}>Open visual editor</a>
+                    <a href={`/apps/${id}/visual-editor`}>Open builder</a>
                   </Button>
                 </div>
                 <div className="space-y-2">

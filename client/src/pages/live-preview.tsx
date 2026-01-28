@@ -136,7 +136,7 @@ export default function LivePreview() {
         className="shrink-0 px-4 py-3 border-b border-white/10 backdrop-blur-xl z-50"
         style={{ backgroundColor: `${app.primaryColor}15` }}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div 
               className="h-10 w-10 rounded-xl flex items-center justify-center text-xl"
@@ -162,25 +162,29 @@ export default function LivePreview() {
               </Badge>
             </div>
           </div>
-          <Button 
-            size="sm" 
-            variant="ghost"
-            className="text-white/70 hover:text-white"
-            onClick={() => {
-              void shareLink();
-            }}
-          >
-            {copied ? <CheckCircle2 className="h-4 w-4 text-green-400" /> : <Share2 className="h-4 w-4" />}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-white/70 hover:text-white"
-            onClick={() => void copyLink()}
-            aria-label="Copy preview link"
-          >
-            {copied ? <CheckCircle2 className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
-          </Button>
+
+          <div className="flex items-center gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-white/70 hover:text-white"
+              onClick={() => {
+                void shareLink();
+              }}
+              aria-label="Share preview"
+            >
+              {copied ? <CheckCircle2 className="h-4 w-4 text-green-400" /> : <Share2 className="h-4 w-4" />}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-white/70 hover:text-white"
+              onClick={() => void copyLink()}
+              aria-label="Copy preview link"
+            >
+              {copied ? <CheckCircle2 className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
       </header>
 

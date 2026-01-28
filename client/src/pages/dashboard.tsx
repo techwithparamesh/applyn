@@ -1073,7 +1073,10 @@ export default function Dashboard() {
                           <Eye className="mr-2 h-4 w-4" /> Preview App
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/visual-editor`)}>
-                          <Settings className="mr-2 h-4 w-4" /> Edit App
+                          <Wand2 className="mr-2 h-4 w-4" /> Open Builder
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/edit`)}>
+                          <Settings className="mr-2 h-4 w-4" /> App Settings
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/publish`)}>
                           <Package className="mr-2 h-4 w-4" /> Publish Checklist

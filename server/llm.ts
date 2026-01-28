@@ -163,6 +163,17 @@ Common props by type (examples; not exhaustive):
 - hero: {"title": string, "subtitle"?: string, "buttonText"?: string}
 - container: {"padding"?: number, "gap"?: number, "direction"?: "row"|"column", "backgroundColor"?: string}
 
+Important:
+- For buttons: use "backgroundColor" (fill/accent) and "textColor" (label). Do NOT use "color" for buttons.
+- For text/heading: use "color" for text color.
+- Use hex colors when possible (e.g. "#f97316").
+
+Examples:
+- Change selected button fill to orange:
+  {"op":"updateSelected","props":{"backgroundColor":"#f97316"}}
+- Change selected button text color to orange:
+  {"op":"updateSelected","props":{"textColor":"#f97316"}}
+
 Return JSON: {"message": string, "operations": VisualEditorOp[]}`;
 
   const content = await complete({

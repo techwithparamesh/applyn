@@ -523,9 +523,9 @@ export default function AppEditor() {
                 variant="outline" 
                 size="sm"
                 onClick={() => setLocation(`/apps/${params.id}/visual-editor`)}
-                className="border-purple-500/30 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20"
+                className="border-white/[0.10] bg-white/[0.03] text-slate-100 hover:bg-white/[0.06]"
               >
-                <Sparkles className="mr-2 h-4 w-4" /> Visual Editor
+                <Sparkles className="mr-2 h-4 w-4 text-cyan-300" /> Open Builder
               </Button>
               <Button 
                 variant="outline" 

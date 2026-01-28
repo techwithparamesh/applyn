@@ -11,6 +11,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { AppBuilderStepper } from "@/components/app-builder-stepper";
+import { PageLoading, PageState } from "@/components/page-state";
+import { AlertTriangle, ArrowLeft, RefreshCw } from "lucide-react";
 
 import type { App, AppModule } from "@shared/schema";
 
@@ -93,6 +96,25 @@ export default function Publish() {
   const qc = useQueryClient();
   const { toast } = useToast();
 
+  if (!id) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="container mx-auto px-4 py-10 max-w-3xl">
+          <PageState
+            icon={<AlertTriangle className="h-5 w-5 text-amber-300" />}
+            title="Missing app id"
+            description="Open Publish Checklist from an app." 
+          >
+            <Link href="/dashboard">
+              <Button variant="outline" className="border-white/10">Back to dashboard</Button>
+            </Link>
+          </PageState>
+        </main>
+      </div>
+    );
+  }
+
   const appQuery = useQuery({
     queryKey: ["app", id],
     queryFn: () => fetchApp(id),
@@ -163,7 +185,6 @@ export default function Publish() {
 
   const downloadPublishPack = async () => {
     try {
-      if (!id) throw new Error("Missing app id");
       const res = await fetch(`/api/apps/${id}/publish-pack`, { credentials: "include" });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
@@ -188,29 +209,74 @@ export default function Publish() {
       <Navbar />
 
       <main className="container mx-auto px-4 py-10 max-w-3xl">
-        <div className="flex items-center justify-between gap-4 mb-6">
+        <div className="flex items-start justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-white">Publish Checklist</h1>
-            <p className="text-muted-foreground">
-              Make the app store-ready (assets, privacy, descriptions).
-            </p>
+            <p className="text-muted-foreground">Make the app store-ready (assets, privacy, descriptions).</p>
           </div>
-          {id && (
-            <Link href={`/apps/${id}/visual-editor`}>
-              <Button variant="outline" className="border-white/10">Back to editor</Button>
-            </Link>
-          )}
+          <div className="hidden md:block">
+            <AppBuilderStepper appId={id} current="publish" tone="app" />
+          </div>
         </div>
 
-        {!publishingModule ? (
-          <Card className="glass border-white/10">
-            <CardHeader>
-              <CardTitle className="text-white">Publish checklist not enabled</CardTitle>
-              <CardDescription>
-                Create the app from prompt with “Publish Checklist” enabled, or add a module of type "publishing".
-              </CardDescription>
-            </CardHeader>
-          </Card>
+        <div className="md:hidden mb-6">
+          <AppBuilderStepper appId={id} current="publish" tone="app" />
+        </div>
+
+        {appQuery.isLoading && (
+          <div className="mt-2">
+            <PageLoading label="Loading publish checklist…" />
+          </div>
+        )}
+
+        {appQuery.isError && !appQuery.isLoading && (
+          <PageState
+            icon={<AlertTriangle className="h-5 w-5 text-red-300" />}
+            title="Couldn’t load this app"
+            description={(appQuery.error as any)?.message || "Please try again."}
+          >
+            <Button variant="outline" className="border-white/10" onClick={() => void appQuery.refetch()}>
+              <RefreshCw className="mr-2 h-4 w-4" /> Retry
+            </Button>
+            <Link href="/dashboard">
+              <Button variant="outline" className="border-white/10">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Dashboard
+              </Button>
+            </Link>
+          </PageState>
+        )}
+
+        {!appQuery.isLoading && !appQuery.isError && !app && (
+          <PageState
+            icon={<AlertTriangle className="h-5 w-5 text-amber-300" />}
+            title="App not found"
+            description="This app doesn’t exist or you don’t have access."
+          >
+            <Link href="/dashboard">
+              <Button variant="outline" className="border-white/10">
+                Back to dashboard
+              </Button>
+            </Link>
+          </PageState>
+        )}
+
+        {appQuery.isLoading || appQuery.isError || !app ? null : !publishingModule ? (
+          <PageState
+            icon={<AlertTriangle className="h-5 w-5 text-amber-300" />}
+            title="Publish checklist not enabled"
+            description='Create the app with “Publish Checklist” enabled, or add a module of type "publishing".'
+          >
+            <Link href={`/apps/${id}/visual-editor`}>
+              <Button variant="outline" className="border-white/10">
+                Open builder
+              </Button>
+            </Link>
+            <Link href={`/apps/${id}/preview`}>
+              <Button variant="outline" className="border-white/10">
+                Preview
+              </Button>
+            </Link>
+          </PageState>
         ) : (
           <>
             <Card className="glass border-white/10 mb-6">
@@ -220,72 +286,132 @@ export default function Publish() {
                   Required items completed: {progress.requiredDone}/{progress.requiredTotal}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <Progress value={progress.percent} />
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant={progress.percent === 100 ? "default" : "secondary"}>
-                    {progress.percent}% ready
-                  </Badge>
-                  <Badge variant="outline">App: {normalizeString(app?.name)}</Badge>
+              <CardContent>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground">Progress</span>
+                  <span className="text-sm font-medium text-white">{progress.percent}%</span>
+                </div>
+                <Progress value={progress.percent} className="h-2" />
+              </CardContent>
+            </Card>
+
+            <div className="flex items-center gap-2 mb-6">
+              <Button
+                onClick={() => saveMutation.mutate()}
+                disabled={saveMutation.isPending}
+                className="bg-cyan-600 hover:bg-cyan-500 text-white"
+              >
+                {saveMutation.isPending ? "Saving…" : "Save"}
+              </Button>
+              <Button variant="outline" className="border-white/10" onClick={() => void downloadPublishPack()}>
+                Export
+              </Button>
+              <Link href={`/apps/${id}/preview`}>
+                <Button variant="outline" className="border-white/10">
+                  Preview
+                </Button>
+              </Link>
+            </div>
+
+            <Card className="glass border-white/10 mb-6">
+              <CardHeader>
+                <CardTitle className="text-white">Required Store Assets</CardTitle>
+                <CardDescription>Most app stores require these details.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm text-white font-medium">Support email</label>
+                  <Input
+                    value={supportEmail}
+                    onChange={(e) => setSupportEmail(e.target.value)}
+                    placeholder="support@yourcompany.com"
+                    className="bg-white/5 border-white/10"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-white font-medium">Privacy policy URL</label>
+                  <Input
+                    value={privacyPolicyUrl}
+                    onChange={(e) => setPrivacyPolicyUrl(e.target.value)}
+                    placeholder="https://example.com/privacy"
+                    className="bg-white/5 border-white/10"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-white font-medium">Terms URL</label>
+                  <Input
+                    value={termsUrl}
+                    onChange={(e) => setTermsUrl(e.target.value)}
+                    placeholder="https://example.com/terms"
+                    className="bg-white/5 border-white/10"
+                  />
                 </div>
               </CardContent>
             </Card>
 
             <Card className="glass border-white/10 mb-6">
               <CardHeader>
-                <CardTitle className="text-white">Legal & Support</CardTitle>
-                <CardDescription>These are common reasons for store rejection.</CardDescription>
+                <CardTitle className="text-white">Descriptions</CardTitle>
+                <CardDescription>Use clear, benefit-driven copy.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <div className="text-sm text-white">Support email</div>
-                  <Input value={supportEmail} onChange={(e) => setSupportEmail(e.target.value)} placeholder="support@yourdomain.com" />
+                  <label className="text-sm text-white font-medium">Short description</label>
+                  <Textarea
+                    value={shortDescription}
+                    onChange={(e) => setShortDescription(e.target.value)}
+                    placeholder="A short summary for the store listing"
+                    className="bg-white/5 border-white/10"
+                    rows={3}
+                  />
+                  <div className="text-xs text-muted-foreground">Minimum 10 characters (Play Store).</div>
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm text-white">Privacy policy URL *</div>
-                  <Input value={privacyPolicyUrl} onChange={(e) => setPrivacyPolicyUrl(e.target.value)} placeholder="https://yourdomain.com/privacy" />
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm text-white">Terms URL</div>
-                  <Input value={termsUrl} onChange={(e) => setTermsUrl(e.target.value)} placeholder="https://yourdomain.com/terms" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="glass border-white/10 mb-6">
-              <CardHeader>
-                <CardTitle className="text-white">Store Listing</CardTitle>
-                <CardDescription>Descriptions and screenshots drive installs.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="text-sm text-white">Short description *</div>
-                  <Textarea value={shortDescription} onChange={(e) => setShortDescription(e.target.value)} placeholder="A one-line pitch for your app" />
-                  <div className="text-xs text-muted-foreground">Recommended: 10+ characters</div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm text-white">Full description *</div>
-                  <Textarea value={fullDescription} onChange={(e) => setFullDescription(e.target.value)} placeholder="Explain features, benefits, and how it works" className="min-h-[140px]" />
-                  <div className="text-xs text-muted-foreground">Recommended: 50+ characters</div>
+                  <label className="text-sm text-white font-medium">Full description</label>
+                  <Textarea
+                    value={fullDescription}
+                    onChange={(e) => setFullDescription(e.target.value)}
+                    placeholder="Describe features, benefits, and target users"
+                    className="bg-white/5 border-white/10"
+                    rows={7}
+                  />
+                  <div className="text-xs text-muted-foreground">Minimum 50 characters (Play Store).</div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="glass border-white/10">
               <CardHeader>
-                <CardTitle className="text-white">Save</CardTitle>
-                <CardDescription>Updates are stored inside the app’s publishing module.</CardDescription>
+                <CardTitle className="text-white">Checklist</CardTitle>
+                <CardDescription>Track what’s required before submission.</CardDescription>
               </CardHeader>
-              <CardContent className="flex gap-3">
-                <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-                  {saveMutation.isPending ? "Saving..." : "Save checklist"}
-                </Button>
-                <Button variant="outline" className="border-white/10" onClick={downloadPublishPack}>
-                  Download publish pack
-                </Button>
-                <Link href={`/apps/${id}/preview`}>
-                  <Button variant="outline" className="border-white/10">Preview app</Button>
-                </Link>
+              <CardContent>
+                <div className="space-y-3">
+                  {safeArray<any>(initialConfig.checklist).map((item) => (
+                    <div
+                      key={item.key}
+                      className="flex items-start justify-between gap-3 border-b border-white/10 pb-3 last:border-b-0 last:pb-0"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={`h-2.5 w-2.5 rounded-full ${item.done ? "bg-green-500" : "bg-white/20"}`}
+                          />
+                          <div className="text-sm text-white font-medium truncate">{item.label}</div>
+                          {item.required ? (
+                            <Badge variant="outline" className="text-[10px]">
+                              Required
+                            </Badge>
+                          ) : null}
+                        </div>
+                        {item.description ? (
+                          <div className="text-xs text-muted-foreground mt-1">{item.description}</div>
+                        ) : null}
+                      </div>
+                      <div className="text-xs text-muted-foreground shrink-0">{item.done ? "Done" : "Pending"}</div>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </>

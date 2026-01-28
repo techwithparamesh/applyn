@@ -1,6 +1,6 @@
 ﻿/**
  * Visual App Editor - Appy Pie Style Component Editor
- * 
+ *
  * A drag-and-drop visual editor for building native app screens
  * with components like Text, Image, Button, Gallery, Forms, etc.
  */
@@ -21,25 +21,9 @@ import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Reorder } from "framer-motion";
 import {
   ArrowLeft,
@@ -68,6 +52,8 @@ import {
   Sparkles,
   Layers,
   GripVertical,
+  ChevronDown,
+  ChevronUp,
   ChevronRight,
   Menu,
   MoreHorizontal,
@@ -85,14 +71,15 @@ import {
 } from "lucide-react";
 
 import { QRCodeSVG } from "qrcode.react";
+import { AppBuilderStepper } from "@/components/app-builder-stepper";
 
 // Component types for the editor (extended to support industry templates)
-type ComponentType = 
-  | "text" 
-  | "heading" 
-  | "image" 
-  | "button" 
-  | "container" 
+type ComponentType =
+  | "text"
+  | "heading"
+  | "image"
+  | "button"
+  | "container"
   | "fixedContainer"
   | "grid"
   | "gallery"
@@ -173,7 +160,7 @@ const SECTION_TEMPLATES = [
   {
     id: "hero-1",
     name: "Hero Banner",
-    preview: "ðŸ–¼ï¸",
+    preview: "🖼️",
     components: [
       {
         id: "hero-container",
@@ -183,14 +170,14 @@ const SECTION_TEMPLATES = [
           { id: "hero-title", type: "heading" as ComponentType, props: { text: "Welcome to Our App", level: 1, color: "#000" } },
           { id: "hero-subtitle", type: "text" as ComponentType, props: { text: "Discover amazing features and services", fontSize: 16, color: "#666" } },
           { id: "hero-btn", type: "button" as ComponentType, props: { text: "Get Started", variant: "primary" } },
-        ]
-      }
-    ]
+        ],
+      },
+    ],
   },
   {
     id: "features-grid",
     name: "Features Grid",
-    preview: "â¬›â¬›â¬›",
+    preview: "⬛⬛⬛",
     components: [
       {
         id: "features-section",
@@ -202,9 +189,9 @@ const SECTION_TEMPLATES = [
             type: "grid" as ComponentType,
             props: { columns: 3, gap: 16 },
             children: [
-              { id: "f1", type: "card" as ComponentType, props: { title: "Feature 1", description: "Description here", icon: "âš¡" } },
-              { id: "f2", type: "card" as ComponentType, props: { title: "Feature 2", description: "Description here", icon: "ðŸš€" } },
-              { id: "f3", type: "card" as ComponentType, props: { title: "Feature 3", description: "Description here", icon: "ðŸ’¡" } },
+              { id: "f1", type: "card" as ComponentType, props: { title: "Feature 1", description: "Description here", icon: "⚡" } },
+              { id: "f2", type: "card" as ComponentType, props: { title: "Feature 2", description: "Description here", icon: "🚀" } },
+              { id: "f3", type: "card" as ComponentType, props: { title: "Feature 3", description: "Description here", icon: "💡" } },
             ]
           }
         ]
@@ -214,7 +201,7 @@ const SECTION_TEMPLATES = [
   {
     id: "contact-form",
     name: "Contact Form",
-    preview: "ðŸ“",
+    preview: "📝",
     components: [
       {
         id: "contact-section",
@@ -246,16 +233,16 @@ const getDefaultProps = (type: ComponentType): Record<string, any> => {
     case "text": return { text: "Enter your text here", fontSize: 16, color: "#333333" };
     case "heading": return { text: "Heading", level: 2, color: "#000000" };
     case "image": return { src: "", alt: "Image", width: "100%", height: "auto" };
-    case "button": return { text: "Button", variant: "primary", action: "none" };
+    case "button": return { text: "Button", variant: "primary", action: "none", backgroundColor: "#06b6d4", textColor: "#ffffff" };
     case "container": return { padding: 16, backgroundColor: "transparent", direction: "column", gap: 12 };
     case "fixedContainer": return { padding: 12, backgroundColor: "#ffffff", direction: "row", gap: 12, top: 0, zIndex: 20, shadow: true };
     case "grid": return { columns: 2, gap: 16 };
     case "gallery": return { columns: 2, images: [] };
     case "section": return { title: "Section Title", padding: 20 };
-    case "card": return { title: "Card Title", description: "Card description", icon: "ðŸ“¦" };
+    case "card": return { title: "Card Title", description: "Card description", icon: "📦" };
     case "divider": return { color: "#e5e7eb", thickness: 1 };
     case "spacer": return { height: 20 };
-    case "icon": return { icon: "â­", size: 24 };
+    case "icon": return { icon: "⭐", size: 24 };
     case "list": return { items: ["Item 1", "Item 2", "Item 3"], ordered: false };
     case "form": return { submitText: "Submit" };
     case "input": return { label: "Label", placeholder: "Enter value", type: "text", required: false };
@@ -350,26 +337,42 @@ function ComponentPreview({
             ? (component.props.text === activeCategory ? "primary" : "outline")
             : component.props.variant;
 
-          const customColor: string | undefined =
+          const bg: string | undefined =
             typeof component.props.backgroundColor === "string" && component.props.backgroundColor.trim()
               ? component.props.backgroundColor.trim()
+              : undefined;
+          const textColor: string | undefined =
+            typeof component.props.textColor === "string" && component.props.textColor.trim()
+              ? component.props.textColor.trim()
               : undefined;
 
           const className = `${paddingClass} rounded-lg font-medium transition-colors border ${
             variant === "primary"
-              ? "text-white border-transparent"
+              ? bg
+                ? "text-white border-transparent"
+                : "bg-cyan-500 hover:bg-cyan-400 text-white border-transparent"
               : variant === "secondary" || variant === "outline"
-                ? "bg-transparent text-slate-900 border-slate-300"
-                : "bg-transparent text-slate-900 border-transparent"
+                ? "bg-transparent text-slate-900 border-slate-300 hover:bg-slate-100/60"
+                : "bg-transparent text-slate-900 border-transparent hover:bg-slate-100/60"
           }`;
 
-          const style: React.CSSProperties | undefined = customColor
-            ? variant === "primary"
-              ? { backgroundColor: customColor }
-              : variant === "secondary" || variant === "outline"
-                ? { borderColor: customColor, color: customColor }
-                : { color: customColor }
-            : undefined;
+          const style: React.CSSProperties | undefined = (() => {
+            const s: React.CSSProperties = {};
+
+            if (variant === "primary") {
+              if (bg) s.backgroundColor = bg;
+              if (textColor) s.color = textColor;
+              return Object.keys(s).length ? s : undefined;
+            }
+
+            // secondary/outline/ghost: treat backgroundColor as an accent unless textColor explicitly provided
+            if (bg) {
+              s.borderColor = bg;
+              s.color = textColor || bg;
+            }
+            if (textColor) s.color = textColor;
+            return Object.keys(s).length ? s : undefined;
+          })();
 
           return (
             <button
@@ -485,14 +488,14 @@ function ComponentPreview({
                 <img src={image} alt={title || "Card"} className="w-14 h-14 rounded-lg object-cover" />
               ) : (
                 <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center text-xl">
-                  {icon || "ðŸ“¦"}
+                  {icon || "📦"}
                 </div>
               )}
               <div className="flex-1 min-w-0">
                 {title && <div className="text-sm font-semibold text-gray-900 truncate">{title}</div>}
                 {subtitle && <div className="text-[11px] text-gray-500 truncate">{subtitle}</div>}
               </div>
-              <div className="text-gray-400">â€º</div>
+              <ChevronRight className="h-4 w-4 text-gray-400" />
             </div>
           );
         }
@@ -730,7 +733,7 @@ function ComponentPreview({
                   <div className="text-xs font-medium truncate">{product.name}</div>
                   <div className="flex items-center justify-between mt-1">
                     <div className="text-sm font-bold text-cyan-600">{product.price}</div>
-                    {product.rating && <div className="text-[10px] text-amber-600">â˜… {product.rating}</div>}
+                    {product.rating && <div className="text-[10px] text-amber-600">★ {product.rating}</div>}
                   </div>
                 </div>
               </div>
@@ -773,7 +776,7 @@ function ComponentPreview({
                 <div className="text-[11px] text-gray-700 leading-relaxed">"{t?.quote || t?.text || "Great experience!"}"</div>
                 <div className="mt-2 flex items-center justify-between">
                   <div className="text-[11px] font-semibold text-gray-900 truncate">{t?.name || "Customer"}</div>
-                  {t?.rating && <div className="text-[10px] text-amber-600">â˜… {t.rating}</div>}
+                  {t?.rating && <div className="text-[10px] text-amber-600">★ {t.rating}</div>}
                 </div>
               </div>
             ))}
@@ -860,7 +863,7 @@ function ComponentPreview({
                 className="px-3 py-2 rounded-xl border border-gray-200 bg-white text-xs font-medium text-gray-800"
                 style={l?.color ? { borderColor: `${l.color}40` } : undefined}
               >
-                <span className="mr-1">{l?.icon || "ðŸ”—"}</span>
+                <span className="mr-1">{l?.icon || "🔗"}</span>
                 {l?.label || l?.name || "Link"}
               </button>
             ))}
@@ -1120,6 +1123,23 @@ function PropertiesPanel({
               <p className="text-[11px] text-slate-500 mt-1">Works best with Primary (filled) style.</p>
             </div>
             <div>
+              <Label className="text-xs text-slate-500">Text Color (Optional)</Label>
+              <div className="flex gap-2 mt-1.5">
+                <input
+                  type="color"
+                  value={component.props.textColor || "#ffffff"}
+                  onChange={(e) => onUpdate({ ...component.props, textColor: e.target.value })}
+                  className="h-9 w-12 rounded-lg cursor-pointer bg-slate-800 border border-slate-700"
+                />
+                <Input
+                  value={component.props.textColor || ""}
+                  onChange={(e) => onUpdate({ ...component.props, textColor: e.target.value })}
+                  placeholder="#ffffff"
+                  className="mt-0 font-mono text-sm"
+                />
+              </div>
+            </div>
+            <div>
               <Label className="text-xs text-slate-500">Action</Label>
               <Select value={component.props.action} onValueChange={(v) => onUpdate({ ...component.props, action: v })}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
@@ -1286,7 +1306,7 @@ function PropertiesPanel({
       <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center border border-cyan-500/30">
-            <span className="text-sm">âœ¨</span>
+            <span className="text-sm">✨</span>
           </div>
           <span className="text-sm font-medium text-white capitalize">{component.type}</span>
         </div>
@@ -1312,7 +1332,7 @@ export default function VisualEditor() {
   
   // Editor state
   const [screens, setScreens] = useState<EditorScreen[]>([
-    { id: "home", name: "Home", icon: "ðŸ ", components: [], isHome: true }
+    { id: "home", name: "Home", icon: "🏠", components: [], isHome: true }
   ]);
   const [activeScreenId, setActiveScreenId] = useState("home");
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
@@ -1326,6 +1346,7 @@ export default function VisualEditor() {
   const [agentSending, setAgentSending] = useState(false);
   const [aiStatus, setAiStatus] = useState<{ available: boolean; provider?: string } | null>(null);
   const [agentAutoScroll, setAgentAutoScroll] = useState(true);
+  const [agentShowSuggestions, setAgentShowSuggestions] = useState(true);
   const [agentMessages, setAgentMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([
     {
       role: "assistant",
@@ -1334,12 +1355,41 @@ export default function VisualEditor() {
     },
   ]);
 
+  const agentScrollRef = useRef<HTMLDivElement | null>(null);
   const agentEndRef = useRef<HTMLDivElement | null>(null);
+  const [agentIsNearBottom, setAgentIsNearBottom] = useState(true);
+  const [agentIsNearTop, setAgentIsNearTop] = useState(true);
+
+  const scrollAgentToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    agentEndRef.current?.scrollIntoView({ behavior, block: "end" });
+  }, []);
+
+  const scrollAgentToTop = useCallback(() => {
+    const el = agentScrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
+  const handleAgentScroll = useCallback(() => {
+    const el = agentScrollRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 24;
+    const nearTop = el.scrollTop <= 12;
+    setAgentIsNearBottom(nearBottom);
+    setAgentIsNearTop(nearTop);
+  }, []);
+
+  useEffect(() => {
+    // Hide suggestions once the user starts chatting (keeps the chat area visible).
+    const hasUserMsg = agentMessages.some((m) => m.role === "user");
+    if (hasUserMsg) setAgentShowSuggestions(false);
+  }, [agentMessages.length]);
 
   useEffect(() => {
     // Keep the latest message visible when chatting.
     if (!agentAutoScroll) return;
-    agentEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    if (!agentIsNearBottom) return;
+    scrollAgentToBottom("smooth");
   }, [agentMessages.length]);
 
   const clearAgentChat = useCallback(() => {
@@ -1463,7 +1513,7 @@ export default function VisualEditor() {
         id: String(p.id || p.url),
         label: String(p.label || p.url),
         url: String(p.url),
-        icon: typeof p.icon === "string" ? p.icon : "ðŸŒ",
+        icon: typeof p.icon === "string" ? p.icon : "🌐",
       }));
   }, [app]);
 
@@ -1645,7 +1695,7 @@ export default function VisualEditor() {
         setTemplatesLoaded(true);
         
         toast({
-          title: "âœ¨ Template loaded!",
+          title: "✨ Template loaded!",
           description: `${template.name} template personalized for ${app.name}. ${templateScreens.length} screens ready to customize.`,
         });
         return;
@@ -1665,7 +1715,7 @@ export default function VisualEditor() {
         {
           id: homeId,
           name: "Home",
-          icon: "ðŸ ",
+          icon: "🏠",
           isHome: true,
           components: [
             {
@@ -1684,7 +1734,7 @@ export default function VisualEditor() {
               id: generateId(),
               type: "text",
               props: {
-                text: "ðŸ’¡ These are optional native screens for your website app. Your main content comes from your website. Use these screens for features like push notifications landing, offline content, or special promotions.",
+                text: "These are optional native screens for your website app. Your main content comes from your website. Use these screens for features like push-notification landing, offline messaging, or special promotions.",
                 fontSize: 13,
                 color: "#6B7280"
               }
@@ -1693,7 +1743,7 @@ export default function VisualEditor() {
               id: generateId(),
               type: "button",
               props: {
-                text: "ðŸŒ View Website Mode",
+                text: "View Website Mode",
                 variant: "outline",
                 action: "switch-to-website"
               }
@@ -1703,7 +1753,7 @@ export default function VisualEditor() {
         {
           id: generateId(),
           name: "Notifications",
-          icon: "ðŸ””",
+          icon: "🔔",
           isHome: false,
           components: [
             {
@@ -1729,7 +1779,7 @@ export default function VisualEditor() {
         {
           id: generateId(),
           name: "Offline",
-          icon: "ðŸ“´",
+          icon: "📴",
           isHome: false,
           components: [
             {
@@ -1776,7 +1826,7 @@ export default function VisualEditor() {
         {
           id: homeId,
           name: "Home",
-          icon: "ðŸ ",
+          icon: "🏠",
           isHome: true,
           components: [
             {
@@ -1805,7 +1855,7 @@ export default function VisualEditor() {
         {
           id: generateId(),
           name: "About",
-          icon: "â„¹ï¸",
+          icon: "ℹ️",
           isHome: false,
           components: [
             {
@@ -1839,7 +1889,7 @@ export default function VisualEditor() {
         {
           id: generateId(),
           name: "Contact",
-          icon: "ðŸ“ž",
+          icon: "📞",
           isHome: false,
           components: [
             {
@@ -1864,7 +1914,7 @@ export default function VisualEditor() {
               id: generateId(),
               type: "button",
               props: {
-                text: "ðŸ“§ Email Us",
+                text: "Email Us",
                 url: "mailto:contact@example.com",
                 backgroundColor: "#2563EB",
                 textColor: "#FFFFFF"
@@ -1874,7 +1924,7 @@ export default function VisualEditor() {
               id: generateId(),
               type: "button",
               props: {
-                text: "ðŸ“ž Call Us",
+                text: "Call Us",
                 url: "tel:+1234567890",
                 backgroundColor: "#059669",
                 textColor: "#FFFFFF"
@@ -2075,10 +2125,20 @@ export default function VisualEditor() {
       if (/(color|colour|background)\b/.test(lower)) {
         if (!color) return { applied: false, message: "Tell me a color name (blue/red/green...) or a hex code like #3b82f6." };
 
-        // Prefer button background when it looks like a button request
+        const wantsTextColor = /(text\s*color|font\s*color)\b/.test(lower);
+
         if (selectedComponent.type === "button") {
+          if (wantsTextColor) {
+            updateComponentById(selectedComponent.id, { ...base, textColor: color });
+            return { applied: true, message: "Updated the button text color." };
+          }
           updateComponentById(selectedComponent.id, { ...base, backgroundColor: color });
           return { applied: true, message: "Updated the button color." };
+        }
+
+        if (wantsTextColor && (selectedComponent.type === "text" || selectedComponent.type === "heading")) {
+          updateComponentById(selectedComponent.id, { ...base, color });
+          return { applied: true, message: "Updated the text color." };
         }
 
         // Generic background
@@ -2092,6 +2152,40 @@ export default function VisualEditor() {
 
     return { applied: false, message: replyHelp() };
   }, [addComponent, selectedComponent, updateComponentById]);
+
+  const normalizePropsForType = useCallback((type: string | undefined, props: Record<string, any>) => {
+    if (!props || typeof props !== "object") return props;
+    const t = String(type || "");
+
+    if (t === "button") {
+      const next: Record<string, any> = { ...props };
+
+      // Common synonyms -> canonical keys
+      if (next.bgColor && !next.backgroundColor) {
+        next.backgroundColor = next.bgColor;
+        delete next.bgColor;
+      }
+      if (next.background && !next.backgroundColor) {
+        next.backgroundColor = next.background;
+        delete next.background;
+      }
+      if (next.label && !next.text) {
+        next.text = next.label;
+        delete next.label;
+      }
+
+      // If model sends `color` for a button, treat it as backgroundColor unless it already specified background/text.
+      if (typeof next.color === "string" && !next.backgroundColor && !next.textColor) {
+        next.backgroundColor = next.color;
+        delete next.color;
+      }
+
+      return next;
+    }
+
+    if (props.bgColor && !props.backgroundColor) return { ...props, backgroundColor: props.bgColor };
+    return props;
+  }, []);
 
   const buildAiEditorContext = useCallback(() => {
     const screen = activeScreen
@@ -2134,7 +2228,7 @@ export default function VisualEditor() {
           if (!t) continue;
           const newId = addComponent(t);
           if (typeof newId === "string") {
-            const nextProps = op?.props && typeof op.props === "object" ? { ...getDefaultProps(t), ...op.props } : undefined;
+            const nextProps = op?.props && typeof op.props === "object" ? { ...getDefaultProps(t), ...normalizePropsForType(t, op.props) } : undefined;
             if (nextProps) updateComponentById(newId, nextProps);
             if (op?.select === false) {
               // leave selection as-is
@@ -2148,7 +2242,7 @@ export default function VisualEditor() {
           if (!selectedComponent) continue;
           const props = op?.props;
           if (!props || typeof props !== "object") continue;
-          updateComponentById(selectedComponent.id, { ...selectedComponent.props, ...props });
+          updateComponentById(selectedComponent.id, normalizePropsForType(selectedComponent.type, props));
           applied++;
           continue;
         }
@@ -2157,7 +2251,8 @@ export default function VisualEditor() {
           const targetId = typeof op?.id === "string" ? op.id : "";
           const props = op?.props;
           if (!targetId || !props || typeof props !== "object") continue;
-          updateComponentById(targetId, props);
+          const target = activeScreen ? findComponent(activeScreen.components, targetId) : null;
+          updateComponentById(targetId, normalizePropsForType(target?.type, props));
           applied++;
           continue;
         }
@@ -2188,7 +2283,7 @@ export default function VisualEditor() {
 
       return applied;
     },
-    [activeScreen, activeScreenId, addComponent, selectedComponent, updateComponentById],
+    [activeScreen, activeScreenId, addComponent, selectedComponent, updateComponentById, normalizePropsForType],
   );
 
   const handleAgentSend = useCallback(async () => {
@@ -2333,7 +2428,7 @@ export default function VisualEditor() {
     const newScreen: EditorScreen = {
       id: generateId(),
       name: `Screen ${screens.length + 1}`,
-      icon: "ðŸ“„",
+      icon: "📄",
       components: [],
     };
     setScreens(prev => [...prev, newScreen]);
@@ -2370,28 +2465,28 @@ export default function VisualEditor() {
   const isNativeApp = app?.isNativeOnly || app?.url === "native://app" || !app?.url;
 
   return (
-    <div className="h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col overflow-hidden">
+    <div className="h-screen bg-slate-950 text-slate-100 flex flex-col overflow-hidden">
       {/* Top Toolbar - Modern Dark Theme */}
-      <header className="h-16 bg-slate-900/80 backdrop-blur-sm border-b border-slate-700/50 flex items-center justify-between px-6 shrink-0">
-        <div className="flex items-center gap-4">
+      <header className="h-14 bg-slate-950/80 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-4 shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
           <Button 
             variant="ghost" 
             size="icon" 
             onClick={() => setLocation(`/apps/${id}/preview`)}
-            className="text-slate-300 hover:text-white hover:bg-slate-700/50"
+            className="text-slate-300 hover:text-white hover:bg-slate-800/60"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
           
           {/* App Name & Info */}
-          <div className="flex items-center gap-3 border-l border-slate-700/50 pl-4">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-purple-500 flex items-center justify-center text-lg shadow-lg">
-              {app?.icon || "ðŸ“±"}
+          <div className="flex items-center gap-3 border-l border-slate-800 pl-3 min-w-0">
+            <div className="w-9 h-9 rounded-lg bg-slate-900/40 border border-slate-800 flex items-center justify-center text-lg">
+              {app?.icon || "📱"}
             </div>
-            <div>
-              <h1 className="text-white font-semibold text-sm">{app?.name || "My App"}</h1>
-              <p className="text-slate-400 text-xs">
-                {isNativeApp ? "Native App" : "Web App"} â€¢ {activeScreen?.name || "Home"}
+            <div className="min-w-0">
+              <h1 className="text-white font-semibold text-sm truncate">{app?.name || "My App"}</h1>
+              <p className="text-slate-400 text-xs truncate">
+                {isNativeApp ? "Native App" : "Web App"} • {activeScreen?.name || "Home"}
               </p>
             </div>
           </div>
@@ -2399,15 +2494,15 @@ export default function VisualEditor() {
           {/* Editor Mode Toggle - Only show for non-native apps */}
           {!isNativeApp && (
             <TooltipProvider>
-              <div className="flex items-center gap-1 p-1 bg-slate-800/80 rounded-xl ml-4 border border-slate-700/50">
+              <div className="flex items-center gap-1 p-1 bg-slate-900/40 rounded-lg ml-2 border border-slate-800">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       size="sm"
                       onClick={() => setEditorMode("website")}
-                      className={`h-8 px-4 font-medium rounded-lg transition-all ${editorMode === "website" 
-                        ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/25" 
-                        : "bg-transparent hover:bg-slate-700/50 text-slate-400"}`}
+                      className={`h-8 px-3 font-medium rounded-md transition-colors border ${editorMode === "website" 
+                        ? "bg-slate-800/80 text-white border-slate-700" 
+                        : "bg-transparent hover:bg-slate-800/50 text-slate-400 border-transparent"}`}
                     >
                       <Globe className="h-4 w-4 mr-2" />
                       Website
@@ -2423,9 +2518,9 @@ export default function VisualEditor() {
                     <Button
                       size="sm"
                       onClick={() => setEditorMode("components")}
-                      className={`h-8 px-4 font-medium rounded-lg transition-all ${editorMode === "components" 
-                        ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/25" 
-                        : "bg-transparent hover:bg-slate-700/50 text-slate-400"}`}
+                      className={`h-8 px-3 font-medium rounded-md transition-colors border ${editorMode === "components" 
+                        ? "bg-slate-800/80 text-white border-slate-700" 
+                        : "bg-transparent hover:bg-slate-800/50 text-slate-400 border-transparent"}`}
                     >
                       <Layout className="h-4 w-4 mr-2" />
                       Screens
@@ -2441,16 +2536,22 @@ export default function VisualEditor() {
           )}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Workflow stepper */}
+          {id && (
+            <div className="hidden lg:flex mr-2">
+              <AppBuilderStepper appId={id} current="builder" tone="editor" />
+            </div>
+          )}
           {/* Device Toggle */}
-          <div className="flex items-center gap-1 p-1 bg-slate-800/80 rounded-lg border border-slate-700/50">
+          <div className="flex items-center gap-1 p-1 bg-slate-900/40 rounded-lg border border-slate-800">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setDeviceView("mobile")}
               className={`h-8 w-8 p-0 ${deviceView === "mobile" 
-                ? "text-cyan-400 bg-cyan-500/10" 
-                : "text-slate-400 hover:text-white"}`}
+                ? "text-white bg-slate-800/70" 
+                : "text-slate-400 hover:text-white hover:bg-slate-800/50"}`}
             >
               <Smartphone className="h-4 w-4" />
             </Button>
@@ -2459,8 +2560,8 @@ export default function VisualEditor() {
               size="sm"
               onClick={() => setDeviceView("desktop")}
               className={`h-8 w-8 p-0 ${deviceView === "desktop" 
-                ? "text-cyan-400 bg-cyan-500/10" 
-                : "text-slate-400 hover:text-white"}`}
+                ? "text-white bg-slate-800/70" 
+                : "text-slate-400 hover:text-white hover:bg-slate-800/50"}`}
             >
               <Monitor className="h-4 w-4" />
             </Button>
@@ -2468,14 +2569,14 @@ export default function VisualEditor() {
 
           {/* In-canvas preview mode (Edit vs Live) */}
           {editorMode === "components" && (
-            <div className="flex items-center gap-1 p-1 bg-slate-800/80 rounded-lg border border-slate-700/50">
+            <div className="flex items-center gap-1 p-1 bg-slate-900/40 rounded-lg border border-slate-800">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setCanvasPreviewMode("edit")}
                 className={`h-8 px-3 ${canvasPreviewMode === "edit"
-                  ? "text-cyan-300 bg-cyan-500/10"
-                  : "text-slate-400 hover:text-white"}`}
+                  ? "text-white bg-slate-800/70"
+                  : "text-slate-400 hover:text-white hover:bg-slate-800/50"}`}
               >
                 <MousePointer className="h-4 w-4 mr-2" /> Edit
               </Button>
@@ -2484,15 +2585,15 @@ export default function VisualEditor() {
                 size="sm"
                 onClick={() => { setSelectedComponentId(null); setCanvasPreviewMode("live"); }}
                 className={`h-8 px-3 ${canvasPreviewMode === "live"
-                  ? "text-purple-300 bg-purple-500/10"
-                  : "text-slate-400 hover:text-white"}`}
+                  ? "text-white bg-slate-800/70"
+                  : "text-slate-400 hover:text-white hover:bg-slate-800/50"}`}
               >
                 <Eye className="h-4 w-4 mr-2" /> Live
               </Button>
             </div>
           )}
 
-          <div className="h-6 w-px bg-slate-700" />
+          <div className="h-6 w-px bg-slate-800" />
 
           <Button variant="ghost" size="icon" title="Undo" className="text-slate-400 hover:text-white">
             <Undo2 className="h-4 w-4" />
@@ -2501,13 +2602,13 @@ export default function VisualEditor() {
             <Redo2 className="h-4 w-4" />
           </Button>
           
-          <div className="h-6 w-px bg-slate-700" />
+          <div className="h-6 w-px bg-slate-800" />
           
           <Button 
             variant="outline"
             size="sm"
             onClick={() => setLocation(`/apps/${id}/structure`)}
-            className="border-slate-600 text-slate-300 hover:bg-slate-700/50 hover:text-white"
+            className="border-slate-800 bg-slate-950/40 text-slate-200 hover:bg-slate-800/50 hover:text-white"
           >
             <ListTree className="h-4 w-4 mr-2" /> Structure
           </Button>
@@ -2517,7 +2618,7 @@ export default function VisualEditor() {
               variant="outline"
               size="sm"
               onClick={() => setLocation(`/apps/${id}/import`)}
-              className="border-slate-600 text-slate-300 hover:bg-slate-700/50 hover:text-white"
+              className="border-slate-800 bg-slate-950/40 text-slate-200 hover:bg-slate-800/50 hover:text-white"
             >
               <Link2 className="h-4 w-4 mr-2" /> Import
             </Button>
@@ -2527,14 +2628,14 @@ export default function VisualEditor() {
             variant="outline"
             size="sm"
             onClick={() => window.open(`/live-preview/${id}`, "_blank")}
-            className="border-slate-600 text-slate-300 hover:bg-slate-700/50 hover:text-white"
+            className="border-slate-800 bg-slate-950/40 text-slate-200 hover:bg-slate-800/50 hover:text-white"
           >
             <Eye className="h-4 w-4 mr-2" /> Preview
           </Button>
           <Button 
             onClick={() => saveMutation.mutate()}
             disabled={!hasChanges || saveMutation.isPending}
-            className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white shadow-lg shadow-cyan-500/25"
+            className="bg-cyan-600 hover:bg-cyan-500 text-white disabled:opacity-60 disabled:hover:bg-cyan-600"
           >
             {saveMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
             Save
@@ -2544,14 +2645,14 @@ export default function VisualEditor() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar - Components Panel */}
-        <aside className="w-72 bg-slate-900/95 border-r border-slate-700/50 flex flex-col overflow-hidden shrink-0">
-          <div className="p-3 border-b border-slate-700/50 shrink-0">
-            <Label className="text-[11px] text-slate-500">Search</Label>
+        <aside className="w-72 bg-slate-950/70 border-r border-slate-800 flex flex-col overflow-hidden shrink-0">
+          <div className="p-3 border-b border-slate-800 shrink-0">
+            <Label className="text-[11px] text-slate-400">Search</Label>
             <Input
               value={paletteSearch}
               onChange={(e) => setPaletteSearch(e.target.value)}
               placeholder="Pages, screens, components, sections..."
-              className="mt-1.5 bg-slate-800/50 border-slate-700/50 text-white placeholder:text-slate-500 focus:border-cyan-500/50 focus:ring-cyan-500/20"
+              className="mt-1.5 bg-slate-900/40 border-slate-800 text-white placeholder:text-slate-500 focus:border-cyan-500/50 focus:ring-cyan-500/20"
             />
           </div>
 
@@ -2577,7 +2678,7 @@ export default function VisualEditor() {
                                 className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all text-slate-400 hover:bg-slate-800/50 hover:text-white border border-transparent"
                                 title={p.url}
                               >
-                                <span className="text-base">{p.icon || "ðŸŒ"}</span>
+                                <span className="text-base">{p.icon || "🌐"}</span>
                                 <span className="flex-1 text-left truncate">{p.label}</span>
                                 <ChevronRight className="h-4 w-4 text-slate-600" />
                               </button>
@@ -2648,8 +2749,8 @@ export default function VisualEditor() {
                             }}
                             className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all ${
                               activeScreenId === screen.id
-                                ? "bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-white border border-cyan-500/30"
-                                : "text-slate-400 hover:bg-slate-800/50 hover:text-white border border-transparent"
+                                ? "bg-slate-900/60 text-white border border-cyan-500/20"
+                                : "text-slate-400 hover:bg-slate-900/40 hover:text-white border border-transparent"
                             }`}
                           >
                             <span className="text-base">{screen.icon}</span>
@@ -2701,9 +2802,12 @@ export default function VisualEditor() {
                               }}
                               className="w-full p-3 rounded-xl border border-slate-700/50 bg-slate-800/50 hover:border-purple-500/50 hover:bg-purple-500/10 transition-all text-left group"
                             >
-                              <div className="flex items-center gap-3">
-                                <span className="text-xl">{template.preview}</span>
-                                <span className="text-sm font-medium text-slate-400 group-hover:text-white transition-colors">{template.name}</span>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-xl">{template.preview}</span>
+                                  <span className="text-sm font-medium text-slate-400 group-hover:text-white transition-colors">{template.name}</span>
+                                </div>
+                                <ChevronRight className="h-4 w-4 text-slate-600 group-hover:text-purple-400 transition-colors" />
                               </div>
                             </button>
                           ))}
@@ -2788,7 +2892,7 @@ export default function VisualEditor() {
                       style={{ backgroundColor: app?.primaryColor || "#2563EB" }}
                     >
                       <div className="text-white font-bold flex items-center gap-2 text-sm">
-                        <span className="text-lg">{app?.icon || "ðŸ“±"}</span>
+                        <span className="text-lg">{app?.icon || "📱"}</span>
                         <span className="truncate max-w-[180px]">{app?.name || "My App"}</span>
                       </div>
                       <Menu className="w-5 h-5 text-white/80" />
@@ -2899,7 +3003,7 @@ export default function VisualEditor() {
                         url={"native://app"}
                         appName={app?.name || "My App"}
                         primaryColor={app?.primaryColor || ""}
-                        icon={String((app as any)?.iconUrl || app?.icon || "ðŸ“±")}
+                        icon={String((app as any)?.iconUrl || app?.icon || "📱")}
                         preferLivePreview={true}
                         screens={screens as any}
                         industry={app?.industry || undefined}
@@ -2933,7 +3037,7 @@ export default function VisualEditor() {
                                 <div className="min-w-0">
                                   <div className="text-[17px] font-semibold text-gray-900 truncate">{activeScreen?.name || "Home"}</div>
                                   <div className="text-[11px] text-gray-500 mt-0.5">
-                                    Click components to edit â€¢ Drag to reorder
+                                    Click components to edit • Drag to reorder
                                   </div>
                                 </div>
                                 <div
@@ -2981,7 +3085,7 @@ export default function VisualEditor() {
                                   </div>
                                   <p className="text-slate-600 font-medium">Ready to build!</p>
                                   <p className="text-sm text-slate-400 mt-2">Click components on the left to add them here</p>
-                                  <p className="text-xs text-slate-400 mt-1">Drag to reorder â€¢ Click to edit</p>
+                                  <p className="text-xs text-slate-400 mt-1">Drag to reorder • Click to edit</p>
                                 </div>
                               )}
                             </div>
@@ -2995,7 +3099,7 @@ export default function VisualEditor() {
                     url={"native://app"}
                     appName={app?.name || "My App"}
                     primaryColor={app?.primaryColor || ""}
-                    icon={String((app as any)?.iconUrl || app?.icon || "ðŸ“±")}
+                    icon={String((app as any)?.iconUrl || app?.icon || "📱")}
                     preferLivePreview={true}
                     screens={screens as any}
                     industry={app?.industry || undefined}
@@ -3057,7 +3161,7 @@ export default function VisualEditor() {
                             <div className="min-w-0">
                               <div className="text-[17px] font-semibold text-gray-900 truncate">{activeScreen?.name || "Home"}</div>
                               <div className="text-[11px] text-gray-500 mt-0.5">
-                                Click components to edit â€¢ Drag to reorder
+                                Click components to edit • Drag to reorder
                               </div>
                             </div>
                             <div
@@ -3106,7 +3210,7 @@ export default function VisualEditor() {
                           </div>
                           <p className="text-slate-600 font-medium">Ready to build!</p>
                           <p className="text-sm text-slate-400 mt-2">Click components on the left to add them here</p>
-                          <p className="text-xs text-slate-400 mt-1">Drag to reorder â€¢ Click to edit</p>
+                          <p className="text-xs text-slate-400 mt-1">Drag to reorder • Click to edit</p>
                         </div>
                       )}
                       </div>
@@ -3152,7 +3256,7 @@ export default function VisualEditor() {
               {/* Screen info */}
               <div className="text-center">
                 <p className="text-sm text-slate-400 font-medium">
-                  {activeScreen?.name} â€¢ {activeScreen?.components.length || 0} components
+                  {activeScreen?.name} • {activeScreen?.components.length || 0} components
                 </p>
               </div>
             </div>
@@ -3160,12 +3264,12 @@ export default function VisualEditor() {
         </main>
 
         {/* Right Sidebar - Tools Panel (AppyPie-style) */}
-        <aside className={`w-80 bg-slate-900/95 border-l border-slate-700/50 flex flex-col overflow-hidden shrink-0 ${editorMode === "website" ? "hidden" : ""}`}>
+        <aside className={`w-80 bg-slate-950/70 border-l border-slate-800 flex flex-col overflow-hidden shrink-0 ${editorMode === "website" ? "hidden" : ""}`}>
           <Tabs value={rightSidebarTab} onValueChange={(v) => setRightSidebarTab(v as any)} className="flex-1 flex flex-col">
-            <div className="p-4 border-b border-slate-700/50 shrink-0">
+            <div className="p-4 border-b border-slate-800 shrink-0">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center">
-                  <Sparkles className="h-4 w-4 text-white" />
+                <div className="w-8 h-8 rounded-lg bg-slate-900/40 border border-slate-800 flex items-center justify-center">
+                  <Sparkles className="h-4 w-4 text-cyan-300" />
                 </div>
                 <div className="min-w-0">
                   <span className="text-sm font-semibold text-white">Tools</span>
@@ -3175,24 +3279,24 @@ export default function VisualEditor() {
                 </div>
               </div>
 
-              <TabsList className="grid w-full grid-cols-4 p-1 bg-slate-800/50 rounded-xl border border-slate-700/50">
-                <TabsTrigger value="agent" className="text-xs rounded-lg data-[state=active]:bg-slate-700 data-[state=active]:text-white">
+              <TabsList className="grid w-full grid-cols-4 p-1 bg-slate-900/40 rounded-xl border border-slate-800">
+                <TabsTrigger value="agent" className="text-xs rounded-lg border border-transparent data-[state=active]:bg-slate-800 data-[state=active]:text-white data-[state=active]:border-slate-700">
                   <Bot className="h-3.5 w-3.5 mr-1.5" /> Agent
                 </TabsTrigger>
-                <TabsTrigger value="properties" className="text-xs rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
+                <TabsTrigger value="properties" className="text-xs rounded-lg border border-transparent data-[state=active]:bg-slate-800 data-[state=active]:text-white data-[state=active]:border-cyan-500/20">
                   <Sparkles className="h-3.5 w-3.5 mr-1.5" /> Props
                 </TabsTrigger>
-                <TabsTrigger value="code" className="text-xs rounded-lg data-[state=active]:bg-slate-700 data-[state=active]:text-white">
+                <TabsTrigger value="code" className="text-xs rounded-lg border border-transparent data-[state=active]:bg-slate-800 data-[state=active]:text-white data-[state=active]:border-slate-700">
                   <Code2 className="h-3.5 w-3.5 mr-1.5" /> Code
                 </TabsTrigger>
-                <TabsTrigger value="qr" className="text-xs rounded-lg data-[state=active]:bg-slate-700 data-[state=active]:text-white">
+                <TabsTrigger value="qr" className="text-xs rounded-lg border border-transparent data-[state=active]:bg-slate-800 data-[state=active]:text-white data-[state=active]:border-slate-700">
                   <QrCode className="h-3.5 w-3.5 mr-1.5" /> QR
                 </TabsTrigger>
               </TabsList>
             </div>
 
             <TabsContent value="properties" className="flex-1 m-0">
-              <ScrollArea className="h-full bg-slate-800/30">
+              <ScrollArea className="h-full bg-slate-900/20">
                 <div className="p-4">
                   <PropertiesPanel
                     component={selectedComponent}
@@ -3204,7 +3308,7 @@ export default function VisualEditor() {
             </TabsContent>
 
             <TabsContent value="code" className="flex-1 m-0">
-              <ScrollArea className="h-full bg-slate-800/30">
+              <ScrollArea className="h-full bg-slate-900/20">
                 <div className="p-4 space-y-3">
                   <div className="flex items-center gap-2">
                     <Button
@@ -3246,7 +3350,7 @@ export default function VisualEditor() {
             </TabsContent>
 
             <TabsContent value="qr" className="flex-1 m-0">
-              <ScrollArea className="h-full bg-slate-800/30">
+              <ScrollArea className="h-full bg-slate-900/20">
                 <div className="p-4 space-y-4">
                   <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 flex flex-col items-center gap-3">
                     <QRCodeSVG
@@ -3285,124 +3389,165 @@ export default function VisualEditor() {
 
             <TabsContent value="agent" className="flex-1 m-0 flex flex-col overflow-hidden">
               <div className="flex flex-col h-full">
-                <ScrollArea className="flex-1 bg-slate-800/30">
-                  <div className="p-4 space-y-3">
-                    <div className="rounded-xl border border-slate-700/50 bg-slate-900/40 p-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-xs text-slate-300 font-medium truncate">
-                            {selectedComponent ? `Selected: ${selectedComponent.type}` : `Screen: ${activeScreen?.name || "Home"}`}
-                          </p>
-                          <p className="text-[11px] text-slate-500 truncate">
-                            {aiStatus?.available
-                              ? `AI enabled (${aiStatus?.provider || "configured"})`
-                              : "AI disabled (set OPENAI_API_KEY or ANTHROPIC_API_KEY)"}
-                          </p>
-                        </div>
-                        <div className="shrink-0">
-                          <Badge
-                            className={
-                              aiStatus?.available
-                                ? "bg-emerald-500/15 text-emerald-200 border border-emerald-500/20"
-                                : "bg-slate-700/40 text-slate-300 border border-slate-600/40"
-                            }
-                          >
-                            {aiStatus?.available ? "Live" : "Offline"}
-                          </Badge>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className={
-                              agentAutoScroll
-                                ? "h-7 px-2 text-[11px] border-slate-700/60 bg-slate-900/30 text-slate-200 hover:bg-slate-800/40"
-                                : "h-7 px-2 text-[11px] border-slate-700/60 bg-slate-900/10 text-slate-400 hover:bg-slate-800/30"
-                            }
-                            onClick={() => setAgentAutoScroll((v) => !v)}
-                          >
-                            {agentAutoScroll ? "Auto-scroll: On" : "Auto-scroll: Off"}
-                          </Button>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-[11px] text-slate-300 hover:bg-slate-800/40"
-                          onClick={clearAgentChat}
-                        >
-                          <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Clear
-                        </Button>
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {agentQuickPrompts.map((p) => (
-                          <button
-                            key={p}
-                            type="button"
-                            className="text-[11px] px-2 py-1 rounded-full border border-slate-700/60 bg-slate-900/30 text-slate-200 hover:bg-slate-800/40 transition-colors"
-                            onClick={() => setAgentInput((cur) => (cur ? `${cur.trim()} ${p}` : p))}
-                          >
-                            {p}
-                          </button>
-                        ))}
-                      </div>
+                {/* Fixed Agent header */}
+                <div className="p-4 border-b border-slate-800 bg-slate-950/60 shrink-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-white truncate">AI Agent</p>
+                      <p className="text-xs text-slate-400 truncate">
+                        {selectedComponent ? `Selected: ${selectedComponent.type}` : `Screen: ${activeScreen?.name || "Home"}`}
+                      </p>
                     </div>
-
-                    {/* Agent Chat Messages Area */}
-                    <div className="space-y-3 min-h-[200px] pb-6">
-                      {agentMessages.map((m, idx) => (
-                        <div key={idx} className={`flex gap-3 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                          {m.role === "assistant" && (
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center shrink-0">
-                              <Bot className="h-4 w-4 text-white" />
-                            </div>
-                          )}
-                          <div
-                            className={
-                              m.role === "user"
-                                ? "max-w-[90%] bg-slate-700/50 rounded-2xl px-3.5 py-3 border border-slate-600/50"
-                                : "max-w-[90%] bg-slate-900/55 rounded-2xl px-3.5 py-3 border border-slate-700/60"
-                            }
-                          >
-                            <p className="text-sm text-slate-100 whitespace-pre-wrap leading-relaxed">{m.content}</p>
-                          </div>
-                        </div>
-                      ))}
-
-                      {agentSending && (
-                        <div className="flex gap-3 justify-start">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center shrink-0">
-                            <Bot className="h-4 w-4 text-white" />
-                          </div>
-                          <div className="max-w-[90%] bg-slate-900/55 rounded-2xl px-3.5 py-3 border border-slate-700/60">
-                            <div className="flex items-center gap-2 text-sm text-slate-300">
-                              <Loader2 className="h-4 w-4 animate-spin" /> Thinking...
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      <div ref={agentEndRef} />
+                    <div className="shrink-0 flex items-center gap-2">
+                      <Badge
+                        className={
+                          aiStatus?.available
+                            ? "bg-emerald-500/15 text-emerald-200 border border-emerald-500/20"
+                            : "bg-slate-700/40 text-slate-300 border border-slate-600/40"
+                        }
+                      >
+                        {aiStatus?.available ? "Live" : "Offline"}
+                      </Badge>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs text-slate-300 hover:bg-slate-800/50"
+                        onClick={clearAgentChat}
+                        title="Clear chat"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
-                </ScrollArea>
+
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className={
+                          agentAutoScroll
+                            ? "h-8 px-2 text-xs border-slate-800 bg-slate-950/40 text-slate-200 hover:bg-slate-800/40"
+                            : "h-8 px-2 text-xs border-slate-800 bg-slate-950/20 text-slate-400 hover:bg-slate-800/30"
+                        }
+                        onClick={() => setAgentAutoScroll((v) => !v)}
+                      >
+                        {agentAutoScroll ? "Auto-scroll: On" : "Auto-scroll: Off"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className={
+                          agentShowSuggestions
+                            ? "h-8 px-2 text-xs border-slate-800 bg-slate-950/40 text-slate-200 hover:bg-slate-800/40"
+                            : "h-8 px-2 text-xs border-slate-800 bg-slate-950/20 text-slate-400 hover:bg-slate-800/30"
+                        }
+                        onClick={() => setAgentShowSuggestions((v) => !v)}
+                      >
+                        {agentShowSuggestions ? "Suggestions: On" : "Suggestions: Off"}
+                      </Button>
+                    </div>
+                    <p className="text-[11px] text-slate-500 truncate">
+                      {aiStatus?.available ? `Provider: ${aiStatus?.provider || "configured"}` : "Add OPENAI_API_KEY or ANTHROPIC_API_KEY"}
+                    </p>
+                  </div>
+
+                  {agentShowSuggestions && (
+                    <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                      {agentQuickPrompts.map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          className="shrink-0 text-[11px] px-2 py-1 rounded-full border border-slate-800 bg-slate-950/40 text-slate-200 hover:bg-slate-800/40 transition-colors"
+                          onClick={() => setAgentInput((cur) => (cur ? `${cur.trim()} ${p}` : p))}
+                        >
+                          {p}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Messages (scrollable) */}
+                <div className="relative flex-1 min-h-0 bg-slate-900/20">
+                  <div
+                    ref={agentScrollRef}
+                    onScroll={handleAgentScroll}
+                    className="h-full overflow-y-auto p-4 space-y-3"
+                  >
+                    {agentMessages.map((m, idx) => (
+                      <div key={idx} className={`flex gap-3 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                        {m.role === "assistant" && (
+                          <div className="w-8 h-8 rounded-full bg-slate-900/60 border border-slate-800 flex items-center justify-center shrink-0">
+                            <Bot className="h-4 w-4 text-cyan-300" />
+                          </div>
+                        )}
+                        <div
+                          className={
+                            m.role === "user"
+                              ? "max-w-[92%] bg-slate-800/70 rounded-2xl px-3.5 py-3 border border-slate-700/60"
+                              : "max-w-[92%] bg-slate-950/60 rounded-2xl px-3.5 py-3 border border-slate-800"
+                          }
+                        >
+                          <p className="text-sm text-slate-100 whitespace-pre-wrap leading-relaxed">{m.content}</p>
+                        </div>
+                      </div>
+                    ))}
+
+                    {agentSending && (
+                      <div className="flex gap-3 justify-start">
+                        <div className="w-8 h-8 rounded-full bg-slate-900/60 border border-slate-800 flex items-center justify-center shrink-0">
+                          <Bot className="h-4 w-4 text-cyan-300" />
+                        </div>
+                        <div className="max-w-[92%] bg-slate-950/60 rounded-2xl px-3.5 py-3 border border-slate-800">
+                          <div className="flex items-center gap-2 text-sm text-slate-300">
+                            <Loader2 className="h-4 w-4 animate-spin" /> Thinking…
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div ref={agentEndRef} />
+                  </div>
+
+                  {/* Scroll controls */}
+                  {!agentIsNearTop && (
+                    <button
+                      type="button"
+                      className="absolute right-3 top-3 h-9 w-9 rounded-full border border-slate-800 bg-slate-950/80 text-slate-200 hover:bg-slate-800/60 flex items-center justify-center"
+                      onClick={scrollAgentToTop}
+                      title="Scroll to top"
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </button>
+                  )}
+                  {!agentIsNearBottom && (
+                    <button
+                      type="button"
+                      className="absolute right-3 bottom-3 h-9 w-9 rounded-full border border-slate-800 bg-slate-950/80 text-slate-200 hover:bg-slate-800/60 flex items-center justify-center"
+                      onClick={() => scrollAgentToBottom("smooth")}
+                      title="Scroll to latest"
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+
                 {/* Chat Input */}
-                <div className="p-3 border-t border-slate-700/50 bg-slate-900/80">
+                <div className="p-3 border-t border-slate-800 bg-slate-950/60 shrink-0">
                   <div className="flex gap-2 items-end">
                     <Textarea
                       placeholder={
                         selectedComponent
-                          ? "Ask me to change this selected component…"
+                          ? "Ask me to change the selected component…"
                           : "Ask me to add something… (Tip: click a component to edit it)"
                       }
                       value={agentInput}
                       onChange={(e) => setAgentInput(e.target.value)}
-                      className="flex-1 bg-slate-800/50 border-slate-700/50 text-slate-100 placeholder:text-slate-500 text-sm resize-none min-h-[42px] max-h-[120px]"
+                      className="flex-1 bg-slate-900/40 border-slate-800 text-slate-100 placeholder:text-slate-500 text-sm resize-none min-h-[42px] max-h-[120px]"
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
@@ -3414,9 +3559,10 @@ export default function VisualEditor() {
                     />
                     <Button
                       size="sm"
-                      className="h-[42px] bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400"
+                      className="h-[42px] bg-cyan-600 hover:bg-cyan-500 text-white"
                       onClick={() => void handleAgentSend()}
                       disabled={agentSending || !agentInput.trim()}
+                      title="Send"
                     >
                       {agentSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                     </Button>

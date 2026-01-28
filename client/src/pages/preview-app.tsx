@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { getAppUrlDisplay, isHttpUrl } from "@/lib/utils";
+import { AppBuilderStepper } from "@/components/app-builder-stepper";
 
 type AppItem = {
   id: string;
@@ -190,20 +191,20 @@ export default function PreviewApp() {
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8"
+          className="rounded-2xl border border-white/[0.06] bg-[#0d1117] p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8"
         >
           <div className="flex items-center gap-4">
             <Button 
               variant="ghost" 
               size="icon" 
               onClick={() => setLocation("/dashboard")}
-              className="text-muted-foreground hover:text-white"
+              className="text-muted-foreground hover:text-white hover:bg-white/[0.06]"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div className="flex items-center gap-3">
               <div 
-                className="h-12 w-12 rounded-xl flex items-center justify-center text-2xl"
+                className="h-12 w-12 rounded-xl flex items-center justify-center text-2xl border border-white/[0.06]"
                 style={{ backgroundColor: `${app.primaryColor}20` }}
               >
                 {app.iconUrl ? (
@@ -230,27 +231,26 @@ export default function PreviewApp() {
               variant="outline"
               size="sm"
               onClick={() => void shareOrCopyPreviewUrl()}
-              className="border-white/10 bg-white/5 hover:bg-white/10 rounded-xl"
+              className="border-white/[0.10] bg-white/[0.03] hover:bg-white/[0.06] rounded-xl"
             >
-              <Share2 className="mr-2 h-4 w-4" /> Share Preview
+              <Share2 className="mr-2 h-4 w-4 text-slate-200" /> Share Preview
             </Button>
 
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowQRModal(true)}
-              className="border-cyan-500/20 bg-cyan-500/5 hover:bg-cyan-500/10 text-cyan-400 rounded-xl"
+              className="border-white/[0.10] bg-white/[0.03] hover:bg-white/[0.06] rounded-xl"
             >
-              <QrCode className="mr-2 h-4 w-4" /> QR Code
+              <QrCode className="mr-2 h-4 w-4 text-cyan-300" /> QR Code
             </Button>
 
             <Button
-              variant="outline"
               size="sm"
               onClick={() => setLocation(`/apps/${app.id}/visual-editor`)}
-              className="border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10 text-purple-400 rounded-xl"
+              className="bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl"
             >
-              <Wand2 className="mr-2 h-4 w-4" /> Open Editor
+              <Wand2 className="mr-2 h-4 w-4" /> Open Builder
             </Button>
             
             {/* Download buttons - Only for paid plans with live status */}
@@ -260,7 +260,7 @@ export default function PreviewApp() {
                   <Button 
                     size="sm"
                     onClick={() => handleDownload("android")}
-                    className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 rounded-xl"
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl"
                   >
                     <Download className="mr-2 h-4 w-4" /> APK
                   </Button>
@@ -269,13 +269,18 @@ export default function PreviewApp() {
                   <Button 
                     size="sm"
                     onClick={() => handleDownload("ios")}
-                    className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 rounded-xl"
+                    className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl"
                   >
                     <Download className="mr-2 h-4 w-4" /> iOS
                   </Button>
                 )}
               </>
             )}
+          </div>
+
+          {/* Step navigation */}
+          <div className="w-full pt-3 border-t border-white/[0.06]">
+            <AppBuilderStepper appId={app.id} current="preview" tone="app" />
           </div>
         </motion.div>
 
@@ -324,7 +329,7 @@ export default function PreviewApp() {
                       size="sm"
                       variant="outline"
                       onClick={() => void copyPreviewUrl()}
-                      className="border-white/10 bg-white/5 hover:bg-white/10 rounded-xl h-10 w-10 p-0"
+                      className="border-white/[0.10] bg-white/[0.03] hover:bg-white/[0.06] rounded-xl h-10 w-10 p-0"
                       aria-label="Copy preview link"
                     >
                       {copied ? <CheckCircle2 className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
@@ -336,13 +341,13 @@ export default function PreviewApp() {
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
-                    className="flex-1 border-white/10 bg-white/5 hover:bg-white/10 rounded-xl h-11"
+                    className="flex-1 border-white/[0.10] bg-white/[0.03] hover:bg-white/[0.06] rounded-xl h-11"
                     onClick={() => setShowQRModal(true)}
                   >
-                    <QrCode className="mr-2 h-4 w-4" /> QR Code
+                    <QrCode className="mr-2 h-4 w-4 text-cyan-300" /> QR Code
                   </Button>
                   <Button
-                    className="flex-1 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-xl h-11"
+                    className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl h-11"
                     onClick={() => window.open(getPreviewUrl(), "_blank", "noopener,noreferrer")}
                   >
                     <ExternalLink className="mr-2 h-4 w-4" /> Open Preview
@@ -356,17 +361,10 @@ export default function PreviewApp() {
               <div className="px-5 py-3 border-b border-white/[0.06]">
                 <div>
                   <h3 className="text-sm font-semibold text-white">Manage</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">Editor, settings, and delivery.</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Settings and delivery.</p>
                 </div>
               </div>
               <div className="p-3 space-y-1">
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-start text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 rounded-xl"
-                  onClick={() => setLocation(`/apps/${app.id}/visual-editor`)}
-                >
-                  <Wand2 className="mr-3 h-4 w-4" /> Visual Editor
-                </Button>
                 <Button 
                   variant="ghost" 
                   className="w-full justify-start text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl"
@@ -397,7 +395,7 @@ export default function PreviewApp() {
                       <Button
                         size="sm"
                         onClick={() => handleDownload("android")}
-                        className="w-full bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 rounded-xl"
+                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl"
                       >
                         <Download className="mr-2 h-4 w-4" /> Download APK
                       </Button>
@@ -406,7 +404,7 @@ export default function PreviewApp() {
                       <Button
                         size="sm"
                         onClick={() => handleDownload("ios")}
-                        className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 rounded-xl"
+                        className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-xl"
                       >
                         <Download className="mr-2 h-4 w-4" /> Download iOS
                       </Button>
