@@ -790,7 +790,7 @@ export default function PromptCreate() {
                 >
                   <CardContent className="p-8 text-center">
                     <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Globe className="h-10 w-10 text-white" />
+                      <Smartphone className="h-10 w-10 text-white" />
                     </div>
                     <h3 className="text-xl font-bold text-white mb-2">I have a website</h3>
                     <p className="text-muted-foreground text-sm mb-4">
