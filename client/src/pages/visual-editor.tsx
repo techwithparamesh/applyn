@@ -1395,6 +1395,7 @@ export default function VisualEditor() {
   const [activeScreenId, setActiveScreenId] = useState("home");
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [deviceView, setDeviceView] = useState<"mobile" | "desktop">("mobile");
+  const [bottomNavMoreOpen, setBottomNavMoreOpen] = useState(false);
   const [editorMode, setEditorMode] = useState<"components" | "website">("components"); // Default to components for native apps
   const [canvasPreviewMode, setCanvasPreviewMode] = useState<"edit" | "live">("edit");
   const [followActiveScreen, setFollowActiveScreen] = useState(true);
@@ -1510,6 +1511,8 @@ export default function VisualEditor() {
   const [showComponentTree, setShowComponentTree] = useState(true);
   const [templatesLoaded, setTemplatesLoaded] = useState(false);
   const [activeCategoryByScreen, setActiveCategoryByScreen] = useState<Record<string, string>>({});
+
+  const [organizePreset, setOrganizePreset] = useState<"auto" | "ecommerce" | "restaurant" | "realestate" | "healthcare">("auto");
 
   const [layerExpanded, setLayerExpanded] = useState<Record<string, boolean>>({});
 
@@ -1740,6 +1743,168 @@ export default function VisualEditor() {
         icon: typeof p.icon === "string" ? p.icon : "🌐",
       }));
   }, [app]);
+
+  const autoOrganizeNativeScreens = useCallback(() => {
+    const normalize = (v: unknown) => String(v ?? "")
+      .trim()
+      .toLowerCase()
+      .replace(/&/g, "and")
+      .replace(/[^a-z0-9 ]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const matchesAny = (screen: EditorScreen, keys: string[]) => {
+      const id = normalize(screen?.id);
+      const name = normalize(screen?.name);
+      return keys.some((k) => id === k || name === k || id.includes(k) || name.includes(k));
+    };
+
+    const modules = (app as any)?.modules;
+    const hasModule = (type: string) => Array.isArray(modules) && modules.some((m: any) => String(m?.type || "").toLowerCase() === type);
+
+    const domain = {
+      catalog: hasModule("catalog"),
+      booking: hasModule("booking"),
+      contactForm: hasModule("contactform"),
+    };
+    const caps = {
+      auth: hasModule("auth"),
+      payments: hasModule("payments"),
+    };
+
+    const industry = organizePreset === "auto" ? normalize((app as any)?.industry) : organizePreset;
+    const catalogKeys = [
+      "products",
+      "product",
+      "shop",
+      "store",
+      "catalog",
+      "menu",
+      "listings",
+      "listing",
+      "properties",
+      "property",
+      "search",
+      "browse",
+      "explore",
+      "doctors",
+      "doctor",
+      "directory",
+      "services",
+      "categories",
+      "category",
+    ];
+    const bookingKeys = [
+      "booking",
+      "book",
+      "appointments",
+      "appointment",
+      "reservations",
+      "reservation",
+      "schedule",
+    ];
+    const contactKeys = [
+      "contact",
+      "support",
+      "help",
+      "inquiry",
+      "enquiry",
+      "request",
+      "lead",
+      "message",
+    ];
+    const checkoutKeys = [
+      "checkout",
+      "payment",
+      "payments",
+      "billing",
+      "subscribe",
+      "subscription",
+      "plan",
+      "pricing",
+    ];
+    const cartKeys = ["cart", "basket", "bag"];
+    const ordersKeys = ["orders", "order", "tracking", "track"];
+    const accountKeys = ["account", "profile", "login", "sign in", "signin", "sign up", "signup", "register"];
+
+    const priorityKeysByIndustry: Record<string, string[]> = {
+      ecommerce: ["home", "shop", "products", "catalog", "categories", "search", "cart", "checkout", "orders", "tracking", "account", "profile"],
+      ecommerce_bamboo: ["home", "shop", "products", "catalog", "categories", "search", "cart", "checkout", "orders", "tracking", "account", "profile"],
+      restaurant: ["home", "menu", "order", "orders", "reservations", "booking", "offers", "account", "profile", "contact"],
+      realestate: ["search", "listings", "properties", "saved", "agents", "contact", "inquiry", "account", "profile", "more"],
+      healthcare: ["home", "doctors", "appointments", "booking", "records", "profile", "account", "contact"],
+    };
+
+    const industryPriority =
+      priorityKeysByIndustry[industry] ||
+      (industry.includes("ecommerce") ? priorityKeysByIndustry.ecommerce : undefined) ||
+      (industry.includes("restaurant") ? priorityKeysByIndustry.restaurant : undefined) ||
+      (industry.includes("realestate") ? priorityKeysByIndustry.realestate : undefined) ||
+      (industry.includes("health") ? priorityKeysByIndustry.healthcare : undefined) ||
+      [];
+
+    const genericPrimary = [
+      "home",
+      "search",
+      "explore",
+      "browse",
+      "discover",
+      "shop",
+      "products",
+      "menu",
+      "listings",
+      "properties",
+      "doctors",
+      "appointments",
+      "saved",
+      "agents",
+      "offers",
+    ];
+
+    const rank = (screen: EditorScreen) => {
+      if (screen?.isHome) return -100;
+
+      if (industryPriority.length) {
+        const idx = industryPriority.findIndex((k) => matchesAny(screen, [k]));
+        if (idx !== -1) return idx;
+      }
+
+      if (domain.catalog && matchesAny(screen, catalogKeys)) return 50;
+      if (domain.booking && matchesAny(screen, bookingKeys)) return 60;
+      if (caps.payments && (matchesAny(screen, cartKeys) || matchesAny(screen, checkoutKeys) || matchesAny(screen, ordersKeys))) return 70;
+      if (caps.auth && matchesAny(screen, accountKeys)) return 80;
+      if (domain.contactForm && matchesAny(screen, contactKeys)) return 90;
+
+      const g = genericPrimary.findIndex((k) => matchesAny(screen, [k]));
+      if (g !== -1) return 120 + g;
+      return Number.MAX_SAFE_INTEGER;
+    };
+
+    setScreens(
+      (prev) => {
+        const ranked = prev
+          .map((s, originalIndex) => ({ s, originalIndex }))
+          .sort((a, b) => {
+            const ra = rank(a.s);
+            const rb = rank(b.s);
+            if (ra !== rb) return ra - rb;
+            return a.originalIndex - b.originalIndex;
+          })
+          .map((x) => x.s);
+
+        // Ensure one home exists.
+        if (!ranked.some((s) => s.isHome)) {
+          return ranked.map((s, idx) => ({ ...s, isHome: idx === 0 }));
+        }
+        return ranked;
+      },
+      { recordHistory: true },
+    );
+
+    setBottomNavMoreOpen(false);
+    const presetLabel = organizePreset === "auto" ? "Auto" : organizePreset;
+    toast({ title: "Tabs organized", description: `Reordered screens (${presetLabel}). You can undo.` });
+  }, [app, organizePreset, setScreens, toast]);
 
   // Keep a stable website preview URL (use imported pages when available)
   useEffect(() => {
@@ -3190,15 +3355,38 @@ export default function VisualEditor() {
                   <AccordionContent>
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-[11px] text-slate-500">{screens.length} screens</p>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
-                        onClick={addScreen}
-                        title="Add screen"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Select value={organizePreset} onValueChange={(v) => setOrganizePreset(v as any)}>
+                          <SelectTrigger className="h-7 w-[112px] bg-slate-900/30 border-slate-800 text-slate-200 text-xs">
+                            <SelectValue placeholder="Auto" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-slate-950 text-slate-100 border-slate-800">
+                            <SelectItem value="auto">Auto (App category)</SelectItem>
+                            <SelectItem value="ecommerce">E-commerce</SelectItem>
+                            <SelectItem value="restaurant">Restaurant</SelectItem>
+                            <SelectItem value="realestate">Real Estate</SelectItem>
+                            <SelectItem value="healthcare">Healthcare</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-slate-300 hover:text-white hover:bg-slate-800/60"
+                          onClick={autoOrganizeNativeScreens}
+                          title="Auto-organize tabs"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
+                          onClick={addScreen}
+                          title="Add screen"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                     <div className="space-y-1">
                       {screens
@@ -3625,34 +3813,122 @@ export default function VisualEditor() {
 
                   {/* Bottom Navigation - Mobile Only */}
                   {deviceView === "mobile" && (
-                    <div className="h-16 bg-white/90 backdrop-blur border-t border-gray-200 flex items-center justify-around px-1 shrink-0">
-                      {screens.slice(0, 5).map((screen) => {
-                        const isActive = screen.id === activeScreenId;
-                        return (
-                          <button
-                            key={screen.id}
-                            onClick={() => { setActiveScreenId(screen.id); setSelectedComponentId(null); }}
-                            className={
-                              "relative flex flex-col items-center justify-center gap-1 min-w-0 w-full h-full px-2 transition-colors " +
-                              (isActive ? "text-gray-900" : "text-gray-500")
-                            }
-                          >
-                            {isActive && (
-                              <span
-                                className="absolute top-0 left-1/2 -translate-x-1/2 h-[3px] w-10 rounded-full"
-                                style={{ backgroundColor: app?.primaryColor || "#2563EB" }}
-                              />
-                            )}
-                            <span className={"text-[20px] leading-none " + (isActive ? "" : "opacity-90")}>{screen.icon}</span>
-                            <span
-                              className="text-[10px] font-medium truncate max-w-[74px]"
-                              style={{ color: isActive ? app?.primaryColor || "#2563EB" : undefined }}
+                    <div className="relative h-16 bg-white/90 backdrop-blur border-t border-gray-200 flex items-center justify-around px-1 shrink-0">
+                      {(() => {
+                        const hasOverflow = screens.length > 5;
+                        const tabScreens = hasOverflow ? screens.slice(0, 4) : screens.slice(0, 5);
+                        const overflowScreens = hasOverflow ? screens.slice(4) : [];
+                        const themeColor = app?.primaryColor || "#2563EB";
+
+                        const tabIds = new Set(tabScreens.map((s) => s.id));
+                        const isMoreActive = hasOverflow && !tabIds.has(activeScreenId);
+
+                        const renderTab = (screen: any) => {
+                          const isActive = screen.id === activeScreenId;
+                          return (
+                            <button
+                              key={screen.id}
+                              onClick={() => {
+                                setBottomNavMoreOpen(false);
+                                setActiveScreenId(screen.id);
+                                setSelectedComponentId(null);
+                              }}
+                              className={
+                                "relative flex flex-col items-center justify-center gap-1 min-w-0 w-full h-full px-2 transition-colors " +
+                                (isActive ? "text-gray-900" : "text-gray-500")
+                              }
                             >
-                              {screen.name}
-                            </span>
-                          </button>
+                              {isActive && (
+                                <span
+                                  className="absolute top-0 left-1/2 -translate-x-1/2 h-[3px] w-10 rounded-full"
+                                  style={{ backgroundColor: themeColor }}
+                                />
+                              )}
+                              <span className={"text-[20px] leading-none " + (isActive ? "" : "opacity-90")}>{screen.icon}</span>
+                              <span
+                                className="text-[10px] font-medium truncate max-w-[74px]"
+                                style={{ color: isActive ? themeColor : undefined }}
+                              >
+                                {screen.name}
+                              </span>
+                            </button>
+                          );
+                        };
+
+                        return (
+                          <>
+                            {tabScreens.map(renderTab)}
+
+                            {hasOverflow && (
+                              <button
+                                key="__more"
+                                onClick={() => setBottomNavMoreOpen((v) => !v)}
+                                className={
+                                  "relative flex flex-col items-center justify-center gap-1 min-w-0 w-full h-full px-2 transition-colors " +
+                                  (isMoreActive ? "text-gray-900" : "text-gray-500")
+                                }
+                                aria-haspopup="menu"
+                                aria-expanded={bottomNavMoreOpen}
+                              >
+                                {isMoreActive && (
+                                  <span
+                                    className="absolute top-0 left-1/2 -translate-x-1/2 h-[3px] w-10 rounded-full"
+                                    style={{ backgroundColor: themeColor }}
+                                  />
+                                )}
+                                <span className={"text-[20px] leading-none " + (isMoreActive ? "" : "opacity-90")}>⋯</span>
+                                <span
+                                  className="text-[10px] font-medium truncate max-w-[74px]"
+                                  style={{ color: isMoreActive ? themeColor : undefined }}
+                                >
+                                  More
+                                </span>
+                              </button>
+                            )}
+
+                            {hasOverflow && bottomNavMoreOpen && (
+                              <div
+                                role="menu"
+                                className="absolute bottom-full left-3 right-3 mb-2 rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden"
+                              >
+                                <div className="px-3 py-2 text-[11px] font-semibold text-gray-700 border-b border-gray-100">
+                                  More screens
+                                </div>
+                                <div className="max-h-48 overflow-y-auto">
+                                  {overflowScreens.map((s: any) => {
+                                    const isActive = s.id === activeScreenId;
+                                    return (
+                                      <button
+                                        key={s.id}
+                                        role="menuitem"
+                                        onClick={() => {
+                                          setBottomNavMoreOpen(false);
+                                          setActiveScreenId(s.id);
+                                          setSelectedComponentId(null);
+                                        }}
+                                        className={
+                                          "w-full px-3 py-2.5 flex items-center justify-between text-left text-sm " +
+                                          (isActive ? "bg-gray-50 text-gray-900" : "text-gray-700 hover:bg-gray-50")
+                                        }
+                                      >
+                                        <span className="flex items-center gap-2 min-w-0">
+                                          <span className="text-lg leading-none">{s.icon}</span>
+                                          <span className="truncate">{s.name}</span>
+                                        </span>
+                                        {isActive && (
+                                          <span className="text-xs font-semibold" style={{ color: themeColor }}>
+                                            Active
+                                          </span>
+                                        )}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </>
                         );
-                      })}
+                      })()}
                     </div>
                   )}
                 </div>

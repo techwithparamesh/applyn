@@ -1151,6 +1151,7 @@ function NativeScreensPreview({
   onScreenChange: (index: number) => void;
 }) {
   const [activeCategory, setActiveCategory] = useState("All");
+  const [moreOpen, setMoreOpen] = useState(false);
   const activeScreen = screens[activeScreenIndex] || screens[0];
 
   const screenTitle = activeScreen?.name || "Home";
@@ -1192,35 +1193,119 @@ function NativeScreensPreview({
       </div>
 
       {/* Native-style bottom navigation */}
-      <div className="h-16 bg-white/90 backdrop-blur border-t border-gray-200 flex items-center justify-around px-1 shrink-0">
-        {screens.slice(0, 5).map((screen, i) => {
-          const isActive = i === activeScreenIndex;
-          return (
-            <button
-              key={screen.id}
-              onClick={() => onScreenChange(i)}
-              className={
-                "relative flex flex-col items-center justify-center gap-1 min-w-0 w-full h-full px-2 transition-colors " +
-                (isActive ? "text-gray-900" : "text-gray-500")
-              }
-            >
-              {/* Active indicator */}
-              {isActive && (
-                <span
-                  className="absolute top-0 left-1/2 -translate-x-1/2 h-[3px] w-10 rounded-full"
-                  style={{ backgroundColor: themeColor }}
-                />
-              )}
-              <span className={"text-[20px] leading-none " + (isActive ? "" : "opacity-90")}>{screen.icon || "📄"}</span>
-              <span
-                className={"text-[10px] font-medium truncate max-w-[74px] " + (isActive ? "" : "")}
-                style={isActive ? { color: themeColor } : undefined}
+      <div className="relative h-16 bg-white/90 backdrop-blur border-t border-gray-200 flex items-center justify-around px-1 shrink-0">
+        {(() => {
+          const hasOverflow = screens.length > 5;
+          const tabScreens = hasOverflow ? screens.slice(0, 4) : screens.slice(0, 5);
+          const overflowScreens = hasOverflow ? screens.slice(4) : [];
+
+          const renderTab = (screen: NativeScreen, i: number) => {
+            const isActive = i === activeScreenIndex;
+            return (
+              <button
+                key={screen.id}
+                onClick={() => {
+                  setMoreOpen(false);
+                  onScreenChange(i);
+                }}
+                className={
+                  "relative flex flex-col items-center justify-center gap-1 min-w-0 w-full h-full px-2 transition-colors " +
+                  (isActive ? "text-gray-900" : "text-gray-500")
+                }
               >
-                {screen.name}
-              </span>
-            </button>
+                {isActive && (
+                  <span
+                    className="absolute top-0 left-1/2 -translate-x-1/2 h-[3px] w-10 rounded-full"
+                    style={{ backgroundColor: themeColor }}
+                  />
+                )}
+                <span className={"text-[20px] leading-none " + (isActive ? "" : "opacity-90")}>{screen.icon || "📄"}</span>
+                <span
+                  className="text-[10px] font-medium truncate max-w-[74px]"
+                  style={isActive ? { color: themeColor } : undefined}
+                >
+                  {screen.name}
+                </span>
+              </button>
+            );
+          };
+
+          const isMoreActive = hasOverflow && activeScreenIndex >= 4;
+
+          return (
+            <>
+              {tabScreens.map((s, i) => renderTab(s, i))}
+
+              {hasOverflow && (
+                <button
+                  key="__more"
+                  onClick={() => setMoreOpen((v) => !v)}
+                  className={
+                    "relative flex flex-col items-center justify-center gap-1 min-w-0 w-full h-full px-2 transition-colors " +
+                    (isMoreActive ? "text-gray-900" : "text-gray-500")
+                  }
+                  aria-haspopup="menu"
+                  aria-expanded={moreOpen}
+                >
+                  {isMoreActive && (
+                    <span
+                      className="absolute top-0 left-1/2 -translate-x-1/2 h-[3px] w-10 rounded-full"
+                      style={{ backgroundColor: themeColor }}
+                    />
+                  )}
+                  <span className={"text-[20px] leading-none " + (isMoreActive ? "" : "opacity-90")}>⋯</span>
+                  <span
+                    className="text-[10px] font-medium truncate max-w-[74px]"
+                    style={isMoreActive ? { color: themeColor } : undefined}
+                  >
+                    More
+                  </span>
+                </button>
+              )}
+
+              {hasOverflow && moreOpen && (
+                <div
+                  role="menu"
+                  className="absolute bottom-full left-3 right-3 mb-2 rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden"
+                >
+                  <div className="px-3 py-2 text-[11px] font-semibold text-gray-700 border-b border-gray-100">
+                    More screens
+                  </div>
+                  <div className="max-h-48 overflow-y-auto">
+                    {overflowScreens.map((s, idx) => {
+                      const absoluteIndex = idx + 4;
+                      const isActive = absoluteIndex === activeScreenIndex;
+                      return (
+                        <button
+                          key={s.id}
+                          role="menuitem"
+                          onClick={() => {
+                            setMoreOpen(false);
+                            onScreenChange(absoluteIndex);
+                          }}
+                          className={
+                            "w-full px-3 py-2.5 flex items-center justify-between text-left text-sm " +
+                            (isActive ? "bg-gray-50 text-gray-900" : "text-gray-700 hover:bg-gray-50")
+                          }
+                        >
+                          <span className="flex items-center gap-2 min-w-0">
+                            <span className="text-lg leading-none">{s.icon || "📄"}</span>
+                            <span className="truncate">{s.name}</span>
+                          </span>
+                          {isActive && (
+                            <span className="text-xs font-semibold" style={{ color: themeColor }}>
+                              Active
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
           );
-        })}
+        })()}
       </div>
     </div>
   );

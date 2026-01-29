@@ -87,6 +87,263 @@ type BusinessCapabilities = {
   publishingChecklist: boolean;
 };
 
+type DomainModules = {
+  catalog: boolean;
+  booking: boolean;
+  contactForm: boolean;
+};
+
+type SeededEditorScreen = {
+  id?: string;
+  name?: string;
+  icon?: string;
+  isHome?: boolean;
+  components?: any[];
+};
+
+function pruneEditorScreensForCapabilities(args: {
+  screens: any[] | null;
+  industryId: string;
+  caps: BusinessCapabilities;
+  domain: DomainModules;
+}): any[] | null {
+  const { screens, industryId, caps, domain } = args;
+  if (!screens || !Array.isArray(screens)) return screens;
+
+  const normalize = (v: unknown) => String(v ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const matchesAny = (screen: SeededEditorScreen, keys: string[]) => {
+    const id = normalize(screen?.id);
+    const name = normalize(screen?.name);
+    return keys.some((k) => id === k || name === k || id.includes(k) || name.includes(k));
+  };
+
+  const catalogKeys = [
+    "products",
+    "product",
+    "shop",
+    "store",
+    "catalog",
+    "menu",
+    "listings",
+    "listing",
+    "properties",
+    "property",
+    "search",
+    "browse",
+    "explore",
+    "doctors",
+    "doctor",
+    "directory",
+    "services",
+  ];
+  const bookingKeys = [
+    "booking",
+    "book",
+    "appointments",
+    "appointment",
+    "reservations",
+    "reservation",
+    "schedule",
+  ];
+  const contactKeys = [
+    "contact",
+    "support",
+    "help",
+    "inquiry",
+    "enquiry",
+    "request",
+    "lead",
+    "message",
+  ];
+  const checkoutKeys = [
+    "checkout",
+    "payment",
+    "payments",
+    "billing",
+    "subscribe",
+    "subscription",
+    "plan",
+    "pricing",
+  ];
+  const cartKeys = ["cart", "basket", "bag"];
+  const ordersKeys = ["orders", "order", "tracking", "track"];
+  const accountKeys = ["account", "profile", "login", "sign in", "signin", "sign up", "signup", "register"];
+
+  const isEcommerceLike = normalize(industryId).includes("ecommerce");
+  const industry = normalize(industryId);
+
+  const priorityKeysByIndustry: Record<string, string[]> = {
+    ecommerce: [
+      "home",
+      "shop",
+      "products",
+      "product",
+      "catalog",
+      "categories",
+      "search",
+      "cart",
+      "checkout",
+      "orders",
+      "tracking",
+      "account",
+      "profile",
+    ],
+    ecommerce_bamboo: [
+      "home",
+      "shop",
+      "products",
+      "catalog",
+      "categories",
+      "search",
+      "cart",
+      "checkout",
+      "orders",
+      "tracking",
+      "account",
+      "profile",
+    ],
+    restaurant: [
+      "home",
+      "menu",
+      "order",
+      "orders",
+      "reservations",
+      "reservation",
+      "booking",
+      "offers",
+      "account",
+      "profile",
+      "contact",
+    ],
+    realestate: [
+      "search",
+      "listings",
+      "listing",
+      "properties",
+      "property",
+      "saved",
+      "agents",
+      "contact",
+      "inquiry",
+      "account",
+      "profile",
+      "more",
+    ],
+    healthcare: [
+      "home",
+      "doctors",
+      "doctor",
+      "appointments",
+      "appointment",
+      "booking",
+      "records",
+      "profile",
+      "account",
+      "contact",
+    ],
+  };
+
+  const industryPriority =
+    priorityKeysByIndustry[industry] ||
+    (industry.includes("ecommerce") ? priorityKeysByIndustry.ecommerce : undefined) ||
+    (industry.includes("restaurant") ? priorityKeysByIndustry.restaurant : undefined) ||
+    (industry.includes("realestate") ? priorityKeysByIndustry.realestate : undefined) ||
+    (industry.includes("health") ? priorityKeysByIndustry.healthcare : undefined) ||
+    [];
+
+  const rankForIndustry = (screen: SeededEditorScreen) => {
+    if (screen?.isHome) return -100;
+    const genericPrimary = [
+      "home",
+      "search",
+      "explore",
+      "browse",
+      "discover",
+      "shop",
+      "products",
+      "menu",
+      "listings",
+      "properties",
+      "doctors",
+      "appointments",
+      "cart",
+      "checkout",
+      "orders",
+      "saved",
+      "agents",
+      "offers",
+    ];
+
+    const id = normalize(screen?.id);
+    const name = normalize(screen?.name);
+
+    // 1) Strong per-industry preference order
+    if (industryPriority.length) {
+      const idx = industryPriority.findIndex((k) => id === k || name === k || id.includes(k) || name.includes(k));
+      if (idx !== -1) return idx;
+    }
+
+    // 2) Toggle-aware promotion for common modules (keeps tabs relevant if template naming differs)
+    if (domain.catalog && (matchesAny(screen, catalogKeys) || matchesAny(screen, ["categories", "category"]))) return 50;
+    if (domain.booking && matchesAny(screen, bookingKeys)) return 60;
+    if (caps.payments && (matchesAny(screen, cartKeys) || matchesAny(screen, checkoutKeys) || matchesAny(screen, ordersKeys))) return 70;
+    if (caps.auth && matchesAny(screen, accountKeys)) return 80;
+    if (domain.contactForm && matchesAny(screen, contactKeys)) return 90;
+
+    // 3) Generic fallbacks
+    const g = genericPrimary.findIndex((k) => id === k || name === k || id.includes(k) || name.includes(k));
+    if (g !== -1) return 120 + g;
+
+    return Number.MAX_SAFE_INTEGER;
+  };
+
+  const filtered = (screens as SeededEditorScreen[]).filter((screen) => {
+    // Keep non-screen objects defensively.
+    if (!screen || typeof screen !== "object") return true;
+
+    if (!domain.catalog && matchesAny(screen, catalogKeys)) return false;
+    if (!domain.booking && matchesAny(screen, bookingKeys)) return false;
+    if (!domain.contactForm && matchesAny(screen, contactKeys)) return false;
+
+    if (!caps.payments) {
+      if (matchesAny(screen, checkoutKeys)) return false;
+      if (isEcommerceLike && matchesAny(screen, cartKeys)) return false;
+      if (isEcommerceLike && matchesAny(screen, ordersKeys)) return false;
+    }
+
+    if (!caps.auth && matchesAny(screen, accountKeys)) return false;
+
+    return true;
+  });
+
+  if (filtered.length === 0) return screens;
+
+  // Make screen order "professional": most important tabs first (per vertical).
+  const ordered = filtered
+    .map((s, originalIndex) => ({ s, originalIndex }))
+    .sort((a, b) => {
+      const ra = rankForIndustry(a.s);
+      const rb = rankForIndustry(b.s);
+      if (ra !== rb) return ra - rb;
+      return a.originalIndex - b.originalIndex;
+    })
+    .map((x) => x.s);
+
+  const hasHome = ordered.some((s) => Boolean(s?.isHome));
+  if (!hasHome) {
+    return ordered.map((s, idx) => ({ ...s, isHome: idx === 0 }));
+  }
+
+  return ordered;
+}
+
 function newId(prefix: string) {
   const c: any = (globalThis as any).crypto;
   const uuid = typeof c?.randomUUID === "function" ? c.randomUUID() : null;
@@ -151,6 +408,24 @@ function defaultCapabilitiesForIndustry(industryId: string | undefined | null): 
   }
 
   return base;
+}
+
+function defaultModulesForIndustry(industryId: string | undefined | null): DomainModules {
+  const id = String(industryId || "").toLowerCase();
+  // Baseline: most apps need catalog-like content; bookings/lead capture depend on vertical.
+  if (id.includes("ecommerce") || id.includes("store") || id.includes("shop")) {
+    return { catalog: true, booking: false, contactForm: false };
+  }
+  if (id.includes("restaurant") || id.includes("food") || id.includes("cafe")) {
+    return { catalog: true, booking: true, contactForm: false };
+  }
+  if (id.includes("realestate") || id.includes("real estate") || id.includes("property")) {
+    return { catalog: true, booking: true, contactForm: true };
+  }
+  if (id.includes("healthcare") || id.includes("clinic") || id.includes("medical") || id.includes("doctor")) {
+    return { catalog: true, booking: true, contactForm: true };
+  }
+  return { catalog: true, booking: false, contactForm: true };
 }
 
 // Get industry-specific capability descriptions
@@ -256,10 +531,13 @@ function getCapabilityDescriptions(industryId: string | undefined | null): Recor
 
 function buildBusinessModules(args: {
   capabilities: BusinessCapabilities;
+  modules: DomainModules;
+  industryId: string;
   appName: string;
   prompt: string;
 }) {
-  const { capabilities, appName, prompt } = args;
+  const { capabilities, modules: domainModules, industryId, appName, prompt } = args;
+  const industry = String(industryId || "").toLowerCase();
 
   const modules: AppModule[] = [];
   const push = (m: AppModule) => modules.push(m);
@@ -291,6 +569,74 @@ function buildBusinessModules(args: {
     });
   }
 
+  if (domainModules.catalog) {
+    const catalogByIndustry: Record<string, any> = {
+      ecommerce: {
+        kind: "products",
+        categories: ["New", "Trending", "Best Sellers"],
+      },
+      ecommerce_bamboo: {
+        kind: "products",
+        categories: ["Adult", "Kids", "Charcoal", "Soft"],
+        tags: ["plastic-free", "eco-friendly", "subscription"],
+      },
+      restaurant: {
+        kind: "menu",
+        categories: ["Starters", "Main Course", "Beverages", "Desserts"],
+      },
+      restaurant_biryani: {
+        kind: "menu",
+        categories: ["Biryani", "Kebabs", "Curries", "Breads"],
+      },
+      realestate: {
+        kind: "listings",
+        categories: ["Apartments", "Villas", "Commercial", "Plots"],
+      },
+      healthcare: {
+        kind: "directory",
+        categories: ["General", "Dentist", "Dermatology", "Pediatrics"],
+      },
+    };
+
+    push({
+      id: newId("mod_catalog"),
+      type: "catalog",
+      name: industry.includes("restaurant") ? "Menu" : "Catalog",
+      enabled: true,
+      config: {
+        ...catalogByIndustry[industry],
+        prompt,
+      },
+    });
+  }
+
+  if (domainModules.booking) {
+    const bookingKind = industry.includes("health") ? "appointments" : industry.includes("real") ? "site_visits" : "reservations";
+    push({
+      id: newId("mod_booking"),
+      type: "booking",
+      name: bookingKind === "appointments" ? "Appointments" : bookingKind === "site_visits" ? "Site Visits" : "Reservations",
+      enabled: true,
+      config: {
+        kind: bookingKind,
+        reminders: true,
+      },
+    });
+  }
+
+  if (domainModules.contactForm) {
+    push({
+      id: newId("mod_contact"),
+      type: "contactForm",
+      name: "Lead Capture",
+      enabled: true,
+      config: {
+        channels: ["email", "whatsapp"],
+        prompt,
+      },
+    });
+  }
+
   if (capabilities.notifications) {
     push({
       id: newId("mod_notif"),
@@ -305,25 +651,44 @@ function buildBusinessModules(args: {
   }
 
   if (capabilities.analytics) {
+    const defaultEvents = ["signup", "login", "view_screen"];
+    const eventsByIndustry: Record<string, string[]> = {
+      ecommerce: [...defaultEvents, "view_product", "add_to_cart", "checkout", "purchase"],
+      ecommerce_bamboo: [...defaultEvents, "view_product", "add_to_cart", "start_subscription", "checkout", "purchase"],
+      restaurant: [...defaultEvents, "view_menu", "add_to_order", "place_order", "reservation_created"],
+      restaurant_biryani: [...defaultEvents, "view_menu", "add_to_order", "place_order", "reservation_created"],
+      realestate: [...defaultEvents, "view_listing", "save_listing", "inquiry_submit", "schedule_visit"],
+      healthcare: [...defaultEvents, "view_doctor", "book_appointment", "view_record", "telemedicine_started"],
+    };
+
     push({
       id: newId("mod_analytics"),
       type: "analytics",
       name: "Analytics",
       enabled: true,
       config: {
-        events: ["signup", "login", "view_screen", "add_to_cart", "checkout", "purchase"],
+        events: eventsByIndustry[industry] || defaultEvents,
       },
     });
   }
 
   if (capabilities.admin) {
+    const sectionsByIndustry: Record<string, string[]> = {
+      ecommerce: ["catalog", "orders", "users", "settings"],
+      ecommerce_bamboo: ["catalog", "subscriptions", "orders", "users", "settings"],
+      restaurant: ["menu", "orders", "reservations", "customers", "settings"],
+      restaurant_biryani: ["menu", "orders", "reservations", "customers", "settings"],
+      realestate: ["listings", "leads", "agents", "customers", "settings"],
+      healthcare: ["doctors", "appointments", "patients", "prescriptions", "settings"],
+    };
+
     push({
       id: newId("mod_admin"),
       type: "admin",
       name: "Admin Panel",
       enabled: true,
       config: {
-        sections: ["content", "catalog", "orders", "users", "settings"],
+        sections: sectionsByIndustry[industry] || ["users", "settings"],
       },
     });
   }
@@ -383,6 +748,111 @@ function hasBambooToothbrushKeywords(text: string): boolean {
   return mentionsToothbrush && mentionsBambooOrEco;
 }
 
+function resolveSpecializedIndustryId(industryId: string, promptContext: string): string {
+  const base = String(industryId || "").trim().toLowerCase();
+  if (base === "restaurant" && hasBiryaniKeywords(promptContext)) return "restaurant_biryani";
+  if (base === "ecommerce" && hasBambooToothbrushKeywords(promptContext)) return "ecommerce_bamboo";
+  return base;
+}
+
+function deriveSuggestedFeatures(args: {
+  base: string[];
+  industryId: string;
+  creationMode: CreationMode;
+  caps: BusinessCapabilities;
+  domain: DomainModules;
+}): string[] {
+  const { base, industryId, creationMode, caps, domain } = args;
+  const id = String(industryId || "").toLowerCase();
+
+  const set = new Set((base || []).filter(Boolean));
+
+  // Capability-driven gates
+  if (!caps.notifications) set.delete("pushNotifications");
+  if (!caps.payments) {
+    // Keep deep links even without payments; but ensure payment-specific features don't sneak in.
+  }
+
+  // Domain-driven additions
+  if (domain.contactForm) set.add("whatsappButton");
+  if (caps.notifications && (domain.booking || id.includes("restaurant") || id.includes("health") || id.includes("realestate"))) {
+    set.add("pushNotifications");
+  }
+
+  // Vertical defaults
+  if (creationMode === "scratch") {
+    set.add("bottomNav");
+    set.add("offlineScreen");
+  }
+
+  if (id.startsWith("ecommerce")) {
+    set.add("deepLinking");
+    set.add("offlineScreen");
+    if (caps.notifications) set.add("pushNotifications");
+  }
+
+  // If user doesn't want WhatsApp (no lead capture), keep it off.
+  if (!domain.contactForm) set.delete("whatsappButton");
+
+  return Array.from(set);
+}
+
+function deriveSuggestedScreens(args: {
+  base: string[];
+  industryId: string;
+  domain: DomainModules;
+  caps: BusinessCapabilities;
+}): string[] {
+  const { base, industryId, domain, caps } = args;
+  const id = String(industryId || "").toLowerCase();
+
+  const normalizedBase = (base || []).filter(Boolean);
+
+  const fallbackByIndustry: Record<string, string[]> = {
+    ecommerce: ["Home", "Shop", "Cart", "Orders", "Profile"],
+    ecommerce_bamboo: ["Home", "Shop", "Cart", "Orders", "Profile"],
+    restaurant: ["Menu", "Order", "Reservations", "Offers", "Account"],
+    restaurant_biryani: ["Menu", "Order", "Reservations", "Offers", "Account"],
+    realestate: ["Search", "Listings", "Saved", "Agents", "More"],
+    healthcare: ["Home", "Doctors", "Appointments", "Records", "Profile"],
+  };
+
+  let screens = normalizedBase.length > 0 ? normalizedBase : (fallbackByIndustry[id] || ["Home", "Profile"]);
+
+  // Filter screens based on chosen domain modules/capabilities
+  if (!domain.catalog) {
+    const catalogScreens = new Set(["Shop", "Products", "Menu", "Listings", "Search", "Doctors", "Directory", "Portfolio"]);
+    screens = screens.filter(s => !catalogScreens.has(s));
+  }
+  if (!domain.booking) {
+    const bookingScreens = new Set(["Reservations", "Appointments", "Book Now", "Schedule", "Visit", "Site Visits"]);
+    screens = screens.filter(s => !bookingScreens.has(s));
+  }
+  if (!domain.contactForm) {
+    const leadScreens = new Set(["Inquiry", "Enquiry", "Contact", "Connect"]);
+    screens = screens.filter(s => !leadScreens.has(s));
+  }
+  if (!caps.payments) {
+    const paymentScreens = new Set(["Cart", "Checkout", "Payments"]);
+    screens = screens.filter(s => !paymentScreens.has(s));
+  }
+
+  // Always keep at least Home/Profile-like anchors
+  const hasAnchor = screens.some(s => ["Home", "Profile", "Account"].includes(s));
+  if (!hasAnchor) screens = ["Home", ...screens];
+
+  // Deduplicate preserving order
+  const seen = new Set<string>();
+  const uniq: string[] = [];
+  for (const s of screens) {
+    const key = String(s);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    uniq.push(key);
+  }
+  return uniq;
+}
+
 export default function PromptCreate() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -397,6 +867,8 @@ export default function PromptCreate() {
     defaultCapabilitiesForIndustry(undefined),
   );
   const [capsSeedIndustry, setCapsSeedIndustry] = useState<string | null>(null);
+  const [domainModules, setDomainModules] = useState<DomainModules>(() => defaultModulesForIndustry(undefined));
+  const [modulesSeedIndustry, setModulesSeedIndustry] = useState<string | null>(null);
 
   // Auth check
   const { data: me, isLoading: authLoading } = useQuery({
@@ -535,32 +1007,42 @@ export default function PromptCreate() {
         "ecommerce";
 
       const promptContext = (customPrompt || selectedTemplate?.prompt || "").trim();
-      const resolvedIndustryId =
-        industryId === "restaurant" && hasBiryaniKeywords(promptContext)
-          ? "restaurant_biryani"
-          : industryId === "ecommerce" && hasBambooToothbrushKeywords(promptContext)
-            ? "ecommerce_bamboo"
-          : industryId;
+      const resolvedIndustryId = resolveSpecializedIndustryId(industryId, promptContext);
 
       const resolvedAppName = creationMode === "scratch" ? appName : generatedConfig.appName;
-      const initialEditorScreens = buildEditorScreensFromTemplate(
+      const seededEditorScreens = buildEditorScreensFromTemplate(
         resolvedIndustryId,
         resolvedAppName || "My App",
         { prompt: promptContext },
       );
 
+      const initialEditorScreens = pruneEditorScreensForCapabilities({
+        screens: seededEditorScreens,
+        industryId: resolvedIndustryId,
+        caps: businessCaps,
+        domain: domainModules,
+      });
+
       const rawSuggestedFeatures: string[] = Array.isArray(generatedConfig?.suggestedFeatures)
         ? generatedConfig.suggestedFeatures
         : [];
-      const featureSet = new Set(rawSuggestedFeatures);
-      if (resolvedIndustryId === "ecommerce_bamboo") {
-        featureSet.add("bottomNav");
-        featureSet.add("offlineScreen");
-        featureSet.add("deepLinking");
-        featureSet.add("pushNotifications");
-        featureSet.add("whatsappButton");
-      }
-      const finalSuggestedFeatures = Array.from(featureSet);
+      const specializationForce: string[] = [];
+      if (resolvedIndustryId === "ecommerce_bamboo") specializationForce.push("whatsappButton");
+
+      const finalSuggestedFeatures = deriveSuggestedFeatures({
+        base: [...rawSuggestedFeatures, ...specializationForce],
+        industryId: resolvedIndustryId,
+        creationMode,
+        caps: businessCaps,
+        domain: domainModules,
+      });
+
+      const finalSuggestedScreens = deriveSuggestedScreens({
+        base: Array.isArray(generatedConfig?.suggestedScreens) ? generatedConfig.suggestedScreens : [],
+        industryId: resolvedIndustryId,
+        domain: domainModules,
+        caps: businessCaps,
+      });
 
       const useTemplateBranding = resolvedIndustryId !== industryId;
       const finalIcon = useTemplateBranding ? getTemplateEmoji(resolvedIndustryId) : generatedConfig.icon;
@@ -569,6 +1051,8 @@ export default function PromptCreate() {
 
       const modules = buildBusinessModules({
         capabilities: businessCaps,
+        modules: domainModules,
+        industryId: resolvedIndustryId,
         appName: resolvedAppName || generatedConfig.appName || "My App",
         prompt: promptContext,
       });
@@ -591,7 +1075,7 @@ export default function PromptCreate() {
         modules,
         // Store generated config for later use
         generatedPrompt: promptContext,
-        generatedScreens: generatedConfig.suggestedScreens,
+        generatedScreens: finalSuggestedScreens,
         // Flag to indicate creation mode
         isNativeOnly: creationMode === "scratch",
         // Industry template ID - used to load pre-built screens in visual editor
@@ -631,6 +1115,11 @@ export default function PromptCreate() {
     setSelectedTemplate(template);
     // Don't pre-fill prompt - it's optional. Let users describe their specific needs
     setCustomPrompt("");
+    setGeneratedConfig(null);
+    setBusinessCaps(defaultCapabilitiesForIndustry(template.id));
+    setCapsSeedIndustry(template.id);
+    setDomainModules(defaultModulesForIndustry(template.id));
+    setModulesSeedIndustry(template.id);
     setStep("prompt");
   };
 
@@ -712,6 +1201,15 @@ export default function PromptCreate() {
     setBusinessCaps(defaultCapabilitiesForIndustry(next));
     setCapsSeedIndustry(next);
   }, [generatedConfig, capsSeedIndustry]);
+
+  // Also re-seed domain modules when industry changes
+  useEffect(() => {
+    if (!generatedConfig) return;
+    const next = String(generatedConfig?.industry || "");
+    if (modulesSeedIndustry === next) return;
+    setDomainModules(defaultModulesForIndustry(next));
+    setModulesSeedIndustry(next);
+  }, [generatedConfig, modulesSeedIndustry]);
 
   return (
     <div className="min-h-screen bg-background bg-mesh selection:bg-primary/30">
@@ -1273,7 +1771,22 @@ export default function PromptCreate() {
                     <div>
                       <h4 className="text-sm font-medium text-white mb-2">App Screens</h4>
                       <div className="flex flex-wrap gap-1.5">
-                        {generatedConfig.suggestedScreens.map((screen: string) => (
+                        {(() => {
+                          const promptContext = (customPrompt || selectedTemplate?.prompt || "").trim();
+                          const previewIndustryId = resolveSpecializedIndustryId(
+                            String(generatedConfig.industry || ""),
+                            promptContext,
+                          );
+                          const base = Array.isArray(generatedConfig?.suggestedScreens)
+                            ? generatedConfig.suggestedScreens
+                            : [];
+                          return deriveSuggestedScreens({
+                            base,
+                            industryId: previewIndustryId,
+                            domain: domainModules,
+                            caps: businessCaps,
+                          });
+                        })().map((screen: string) => (
                           <Badge key={screen} variant="secondary" className="bg-white/10 text-white text-xs">
                             {screen}
                           </Badge>
@@ -1285,7 +1798,27 @@ export default function PromptCreate() {
                     <div>
                       <h4 className="text-sm font-medium text-white mb-2">Features Included</h4>
                       <div className="flex flex-wrap gap-1.5">
-                        {generatedConfig.suggestedFeatures.map((feature: string) => (
+                        {(() => {
+                          const promptContext = (customPrompt || selectedTemplate?.prompt || "").trim();
+                          const previewIndustryId = resolveSpecializedIndustryId(
+                            String(generatedConfig.industry || ""),
+                            promptContext,
+                          );
+                          const base = Array.isArray(generatedConfig?.suggestedFeatures)
+                            ? generatedConfig.suggestedFeatures
+                            : [];
+                          const specializationForce: string[] = [];
+                          if (previewIndustryId === "ecommerce_bamboo") specializationForce.push("whatsappButton");
+                          const derived = deriveSuggestedFeatures({
+                            base: [...base, ...specializationForce],
+                            industryId: previewIndustryId,
+                            creationMode,
+                            caps: businessCaps,
+                            domain: domainModules,
+                          });
+
+                          return derived;
+                        })().map((feature: string) => (
                           <Badge key={feature} variant="outline" className={`text-xs ${
                             creationMode === "website" 
                               ? "border-cyan-500/50 text-cyan-400"
@@ -1302,55 +1835,215 @@ export default function PromptCreate() {
                     <div className="pt-2">
                       <h4 className="text-sm font-medium text-white mb-2">Business-Ready Capabilities</h4>
                       <p className="text-xs text-muted-foreground mb-3">
-                        Tailored for your {generatedConfig.industry} business needs.
+                        Tailored for your {resolveSpecializedIndustryId(String(generatedConfig.industry || ""), (customPrompt || selectedTemplate?.prompt || "").trim())} business needs.
                       </p>
 
                       {(() => {
-                        const capDescs = getCapabilityDescriptions(generatedConfig.industry);
+                        const previewIndustryId = resolveSpecializedIndustryId(
+                          String(generatedConfig.industry || ""),
+                          (customPrompt || selectedTemplate?.prompt || "").trim(),
+                        );
+                        const capDescs = getCapabilityDescriptions(previewIndustryId);
+
+                        const matrix = (() => {
+                          const base = [
+                            {
+                              key: "auth" as const,
+                              title: capDescs.auth.title,
+                              description: capDescs.auth.description,
+                              checked: businessCaps.auth,
+                              onChange: (checked: boolean) => setBusinessCaps((p) => ({ ...p, auth: checked })),
+                            },
+                            {
+                              key: "analytics" as const,
+                              title: capDescs.analytics.title,
+                              description: capDescs.analytics.description,
+                              checked: businessCaps.analytics,
+                              onChange: (checked: boolean) => setBusinessCaps((p) => ({ ...p, analytics: checked })),
+                            },
+                            {
+                              key: "publishingChecklist" as const,
+                              title: capDescs.publishingChecklist.title,
+                              description: capDescs.publishingChecklist.description,
+                              checked: businessCaps.publishingChecklist,
+                              onChange: (checked: boolean) => setBusinessCaps((p) => ({ ...p, publishingChecklist: checked })),
+                            },
+                          ];
+
+                          // Domain-specific items that actually provision modules.
+                          if (previewIndustryId.startsWith("ecommerce")) {
+                            return [
+                              ...base,
+                              {
+                                key: "catalog",
+                                title: "Product Catalog",
+                                description: "Categories, products, collections",
+                                checked: domainModules.catalog,
+                                onChange: (checked: boolean) => setDomainModules((p) => ({ ...p, catalog: checked })),
+                              },
+                              {
+                                key: "payments",
+                                title: capDescs.payments.title,
+                                description: capDescs.payments.description,
+                                checked: businessCaps.payments,
+                                onChange: (checked: boolean) => setBusinessCaps((p) => ({ ...p, payments: checked })),
+                              },
+                              {
+                                key: "notifications",
+                                title: capDescs.notifications.title,
+                                description: capDescs.notifications.description,
+                                checked: businessCaps.notifications,
+                                onChange: (checked: boolean) => setBusinessCaps((p) => ({ ...p, notifications: checked })),
+                              },
+                              {
+                                key: "admin",
+                                title: capDescs.admin.title,
+                                description: capDescs.admin.description,
+                                checked: businessCaps.admin,
+                                onChange: (checked: boolean) => setBusinessCaps((p) => ({ ...p, admin: checked })),
+                              },
+                            ];
+                          }
+
+                          if (previewIndustryId.startsWith("restaurant")) {
+                            return [
+                              ...base,
+                              {
+                                key: "catalog",
+                                title: "Menu & Categories",
+                                description: "Menu items, add-ons, pricing",
+                                checked: domainModules.catalog,
+                                onChange: (checked: boolean) => setDomainModules((p) => ({ ...p, catalog: checked })),
+                              },
+                              {
+                                key: "booking",
+                                title: "Reservations",
+                                description: "Table bookings and reminders",
+                                checked: domainModules.booking,
+                                onChange: (checked: boolean) => setDomainModules((p) => ({ ...p, booking: checked })),
+                              },
+                              {
+                                key: "payments",
+                                title: capDescs.payments.title,
+                                description: capDescs.payments.description,
+                                checked: businessCaps.payments,
+                                onChange: (checked: boolean) => setBusinessCaps((p) => ({ ...p, payments: checked })),
+                              },
+                              {
+                                key: "notifications",
+                                title: capDescs.notifications.title,
+                                description: capDescs.notifications.description,
+                                checked: businessCaps.notifications,
+                                onChange: (checked: boolean) => setBusinessCaps((p) => ({ ...p, notifications: checked })),
+                              },
+                              {
+                                key: "admin",
+                                title: capDescs.admin.title,
+                                description: capDescs.admin.description,
+                                checked: businessCaps.admin,
+                                onChange: (checked: boolean) => setBusinessCaps((p) => ({ ...p, admin: checked })),
+                              },
+                            ];
+                          }
+
+                          if (previewIndustryId === "realestate") {
+                            return [
+                              ...base,
+                              {
+                                key: "catalog",
+                                title: "Listings & Search",
+                                description: "Properties, filters, saved lists",
+                                checked: domainModules.catalog,
+                                onChange: (checked: boolean) => setDomainModules((p) => ({ ...p, catalog: checked })),
+                              },
+                              {
+                                key: "contactForm",
+                                title: "Lead Capture",
+                                description: "Inquiry forms and WhatsApp handoff",
+                                checked: domainModules.contactForm,
+                                onChange: (checked: boolean) => setDomainModules((p) => ({ ...p, contactForm: checked })),
+                              },
+                              {
+                                key: "booking",
+                                title: "Site Visits",
+                                description: "Schedule viewings and reminders",
+                                checked: domainModules.booking,
+                                onChange: (checked: boolean) => setDomainModules((p) => ({ ...p, booking: checked })),
+                              },
+                              {
+                                key: "notifications",
+                                title: capDescs.notifications.title,
+                                description: capDescs.notifications.description,
+                                checked: businessCaps.notifications,
+                                onChange: (checked: boolean) => setBusinessCaps((p) => ({ ...p, notifications: checked })),
+                              },
+                              {
+                                key: "admin",
+                                title: capDescs.admin.title,
+                                description: capDescs.admin.description,
+                                checked: businessCaps.admin,
+                                onChange: (checked: boolean) => setBusinessCaps((p) => ({ ...p, admin: checked })),
+                              },
+                            ];
+                          }
+
+                          // healthcare
+                          return [
+                            ...base,
+                            {
+                              key: "catalog",
+                              title: "Doctor Directory",
+                              description: "Specialties, profiles, availability",
+                              checked: domainModules.catalog,
+                              onChange: (checked: boolean) => setDomainModules((p) => ({ ...p, catalog: checked })),
+                            },
+                            {
+                              key: "booking",
+                              title: "Appointment Booking",
+                              description: "Slots, confirmations, reminders",
+                              checked: domainModules.booking,
+                              onChange: (checked: boolean) => setDomainModules((p) => ({ ...p, booking: checked })),
+                            },
+                            {
+                              key: "contactForm",
+                              title: "Patient Enquiries",
+                              description: "Contact forms and WhatsApp support",
+                              checked: domainModules.contactForm,
+                              onChange: (checked: boolean) => setDomainModules((p) => ({ ...p, contactForm: checked })),
+                            },
+                            {
+                              key: "notifications",
+                              title: capDescs.notifications.title,
+                              description: capDescs.notifications.description,
+                              checked: businessCaps.notifications,
+                              onChange: (checked: boolean) => setBusinessCaps((p) => ({ ...p, notifications: checked })),
+                            },
+                            {
+                              key: "admin",
+                              title: capDescs.admin.title,
+                              description: capDescs.admin.description,
+                              checked: businessCaps.admin,
+                              onChange: (checked: boolean) => setBusinessCaps((p) => ({ ...p, admin: checked })),
+                            },
+                          ];
+                        })();
+
                         return (
                           <div className="grid gap-2">
-                            <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
-                              <div>
-                                <div className="text-sm text-white">{capDescs.auth.title}</div>
-                                <div className="text-xs text-muted-foreground">{capDescs.auth.description}</div>
-                              </div>
-                              <input type="checkbox" className="h-4 w-4" checked={businessCaps.auth} onChange={(e) => setBusinessCaps((p) => ({ ...p, auth: e.target.checked }))} />
-                            </label>
-                            <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
-                              <div>
-                                <div className="text-sm text-white">{capDescs.payments.title}</div>
-                                <div className="text-xs text-muted-foreground">{capDescs.payments.description}</div>
-                              </div>
-                              <input type="checkbox" className="h-4 w-4" checked={businessCaps.payments} onChange={(e) => setBusinessCaps((p) => ({ ...p, payments: e.target.checked }))} />
-                            </label>
-                            <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
-                              <div>
-                                <div className="text-sm text-white">{capDescs.admin.title}</div>
-                                <div className="text-xs text-muted-foreground">{capDescs.admin.description}</div>
-                              </div>
-                              <input type="checkbox" className="h-4 w-4" checked={businessCaps.admin} onChange={(e) => setBusinessCaps((p) => ({ ...p, admin: e.target.checked }))} />
-                            </label>
-                            <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
-                              <div>
-                                <div className="text-sm text-white">{capDescs.analytics.title}</div>
-                                <div className="text-xs text-muted-foreground">{capDescs.analytics.description}</div>
-                              </div>
-                              <input type="checkbox" className="h-4 w-4" checked={businessCaps.analytics} onChange={(e) => setBusinessCaps((p) => ({ ...p, analytics: e.target.checked }))} />
-                            </label>
-                            <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
-                              <div>
-                                <div className="text-sm text-white">{capDescs.notifications.title}</div>
-                                <div className="text-xs text-muted-foreground">{capDescs.notifications.description}</div>
-                              </div>
-                              <input type="checkbox" className="h-4 w-4" checked={businessCaps.notifications} onChange={(e) => setBusinessCaps((p) => ({ ...p, notifications: e.target.checked }))} />
-                            </label>
-                            <label className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
-                              <div>
-                                <div className="text-sm text-white">{capDescs.publishingChecklist.title}</div>
-                                <div className="text-xs text-muted-foreground">{capDescs.publishingChecklist.description}</div>
-                              </div>
-                              <input type="checkbox" className="h-4 w-4" checked={businessCaps.publishingChecklist} onChange={(e) => setBusinessCaps((p) => ({ ...p, publishingChecklist: e.target.checked }))} />
-                            </label>
+                            {matrix.map((item) => (
+                              <label key={item.key} className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
+                                <div>
+                                  <div className="text-sm text-white">{item.title}</div>
+                                  <div className="text-xs text-muted-foreground">{item.description}</div>
+                                </div>
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4"
+                                  checked={item.checked}
+                                  onChange={(e) => item.onChange(e.target.checked)}
+                                />
+                              </label>
+                            ))}
                           </div>
                         );
                       })()}
