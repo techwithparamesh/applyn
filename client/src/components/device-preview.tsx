@@ -83,6 +83,9 @@ interface DevicePreviewProps {
   onPlatformChange?: (platform: DevicePlatform) => void;
   /** Whether to show the platform toggle */
   showToggle?: boolean;
+
+  /** Whether to show a small "Live / Screenshot" toggle in website previews */
+  showPreviewModeToggle?: boolean;
 }
 
 // Android device icon (Material design style)
@@ -109,6 +112,7 @@ export function DevicePreview({
   defaultPlatform = "ios",
   onPlatformChange,
   showToggle = true,
+  showPreviewModeToggle = false,
 }: DevicePreviewProps) {
   const [selectedPlatform, setSelectedPlatform] = useState<DevicePlatform>(defaultPlatform);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -313,6 +317,7 @@ export function DevicePreview({
               onRetry={handleRetry}
               isNativeApp={isNativeApp}
               preferLivePreview={preferLivePreview}
+              showPreviewModeToggle={showPreviewModeToggle}
               screens={resolvedScreens}
               industry={industry}
               activeScreenIndex={activeScreenIndex}
@@ -333,6 +338,7 @@ export function DevicePreview({
               onRetry={handleRetry}
               isNativeApp={isNativeApp}
               preferLivePreview={preferLivePreview}
+              showPreviewModeToggle={showPreviewModeToggle}
               screens={resolvedScreens}
               industry={industry}
               activeScreenIndex={activeScreenIndex}
@@ -408,6 +414,7 @@ interface DeviceFrameProps {
   // Native app props
   isNativeApp?: boolean;
   preferLivePreview?: boolean;
+  showPreviewModeToggle?: boolean;
   screens?: NativeScreen[];
   industry?: string;
   activeScreenIndex?: number;
@@ -428,6 +435,7 @@ function IOSDeviceFrame({
   onRetry,
   isNativeApp,
   preferLivePreview,
+  showPreviewModeToggle,
   screens,
   industry,
   activeScreenIndex,
@@ -504,6 +512,7 @@ function IOSDeviceFrame({
             appName={appName}
             primaryColor={primaryColor}
             preferLivePreview={preferLivePreview}
+            showPreviewModeToggle={showPreviewModeToggle}
             screens={screens}
             industry={industry}
             activeScreenIndex={activeScreenIndex}
@@ -553,6 +562,7 @@ function AndroidDeviceFrame({
   onRetry,
   isNativeApp,
   preferLivePreview,
+  showPreviewModeToggle,
   screens,
   industry,
   activeScreenIndex,
@@ -634,6 +644,7 @@ function AndroidDeviceFrame({
             appName={appName}
             primaryColor={primaryColor}
             preferLivePreview={preferLivePreview}
+            showPreviewModeToggle={showPreviewModeToggle}
             screens={screens}
             industry={industry}
             activeScreenIndex={activeScreenIndex}
@@ -1431,6 +1442,7 @@ interface PreviewContentProps {
   appName?: string;
   primaryColor?: string;
   preferLivePreview?: boolean;
+  showPreviewModeToggle?: boolean;
   screens?: NativeScreen[];
   industry?: string;
   activeScreenIndex?: number;
@@ -1451,6 +1463,7 @@ function PreviewContent({
   appName = "My App",
   primaryColor = "#2563EB",
   preferLivePreview = false,
+  showPreviewModeToggle = false,
   screens,
   industry,
   activeScreenIndex = 0,
@@ -1458,6 +1471,7 @@ function PreviewContent({
 }: PreviewContentProps) {
   const [useIframe, setUseIframe] = useState(preferLivePreview);
   const [iframeLoaded, setIframeLoaded] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   
   // For native apps, show native content
   if (isNativeApp) {
@@ -1481,6 +1495,7 @@ function PreviewContent({
 
   useEffect(() => {
     setIframeLoaded(false);
+    setNotice(null);
   }, [fullUrl]);
 
   // If we prefer live preview but the site blocks iframes, don't spin forever.
@@ -1493,6 +1508,7 @@ function PreviewContent({
     const timeout = setTimeout(() => {
       if (!iframeLoaded) {
         setUseIframe(false);
+        setNotice("Live preview blocked — showing screenshot.");
       }
     }, 8000);
 
@@ -1508,6 +1524,7 @@ function PreviewContent({
     const timeout = setTimeout(() => {
       if (!imageLoaded && !imageError) {
         setUseIframe(true);
+        setNotice("Screenshot is slow — switching to live preview.");
       }
     }, 5000);
     
@@ -1518,11 +1535,57 @@ function PreviewContent({
   useEffect(() => {
     if (imageError && isValidUrl) {
       setUseIframe(true);
+      setNotice("Screenshot failed — switching to live preview.");
     }
   }, [imageError, isValidUrl]);
 
   return (
     <>
+      {/* Preview Mode Toggle (website previews only) */}
+      {showPreviewModeToggle && isValidUrl && (
+        <div className="absolute top-3 right-3 z-20">
+          <div className="flex items-center gap-1 rounded-full border border-gray-200 bg-white/95 backdrop-blur px-1 py-1 shadow-sm">
+            <button
+              type="button"
+              onClick={() => {
+                setUseIframe(true);
+                setNotice(null);
+              }}
+              className={
+                "px-2.5 py-1 rounded-full text-[10px] font-semibold transition-colors " +
+                (useIframe ? "bg-gray-900 text-white" : "text-gray-600 hover:text-gray-900")
+              }
+              aria-pressed={useIframe}
+            >
+              Live
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setUseIframe(false);
+                setNotice(null);
+              }}
+              className={
+                "px-2.5 py-1 rounded-full text-[10px] font-semibold transition-colors " +
+                (!useIframe ? "bg-gray-900 text-white" : "text-gray-600 hover:text-gray-900")
+              }
+              aria-pressed={!useIframe}
+            >
+              Screenshot
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Small notice for auto fallbacks */}
+      {notice && isValidUrl && (
+        <div className="absolute left-3 right-3 top-14 z-20">
+          <div className="rounded-lg border border-gray-200 bg-white/95 backdrop-blur px-3 py-2 text-[11px] text-gray-700 shadow-sm">
+            {notice}
+          </div>
+        </div>
+      )}
+
       {/* Invalid URL State - show placeholder */}
       {!isValidUrl && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 z-10 p-4">

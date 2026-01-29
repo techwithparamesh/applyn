@@ -5,7 +5,7 @@
  * with components like Text, Image, Button, Gallery, Forms, etc.
  */
 
-import { useMemo, useState, useCallback, useEffect, useRef } from "react";
+import { useMemo, useState, useCallback, useEffect, useRef, type ReactNode } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -24,6 +24,16 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Reorder } from "framer-motion";
 import {
   ArrowLeft,
@@ -1333,9 +1343,55 @@ export default function VisualEditor() {
   const { toast } = useToast();
   
   // Editor state
-  const [screens, setScreens] = useState<EditorScreen[]>([
+  const [screens, setScreensRaw] = useState<EditorScreen[]>([
     { id: "home", name: "Home", icon: "🏠", components: [], isHome: true }
   ]);
+
+  // Undo/Redo history for screens
+  const historyRef = useRef<{ past: EditorScreen[][]; future: EditorScreen[][] }>({ past: [], future: [] });
+  const isTimeTravelRef = useRef(false);
+  const [, setHistoryTick] = useState(0);
+
+  // Saved snapshot hash used to derive hasChanges
+  const savedHashRef = useRef<string>("");
+  const hashScreens = useCallback((value: EditorScreen[]) => {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(Date.now());
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!savedHashRef.current) {
+      savedHashRef.current = hashScreens(screens);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const setScreens = useCallback(
+    (
+      updater: EditorScreen[] | ((prev: EditorScreen[]) => EditorScreen[]),
+      opts?: { recordHistory?: boolean },
+    ) => {
+      const shouldRecord = opts?.recordHistory !== false && !isTimeTravelRef.current;
+      if (shouldRecord) setHistoryTick((t) => t + 1);
+
+      setScreensRaw((prev) => {
+        const next = typeof updater === "function" ? (updater as any)(prev) : updater;
+        if (shouldRecord) {
+          historyRef.current.past.push(prev);
+          if (historyRef.current.past.length > 100) historyRef.current.past.shift();
+          historyRef.current.future = [];
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
+  const canUndo = historyRef.current.past.length > 0;
+  const canRedo = historyRef.current.future.length > 0;
   const [activeScreenId, setActiveScreenId] = useState("home");
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [deviceView, setDeviceView] = useState<"mobile" | "desktop">("mobile");
@@ -1449,9 +1505,173 @@ export default function VisualEditor() {
   const [hasChanges, setHasChanges] = useState(false);
   const [blueprintOpen, setBlueprintOpen] = useState(false);
   const [blueprintJson, setBlueprintJson] = useState<string>("");
+  const [blueprintConfirmOpen, setBlueprintConfirmOpen] = useState(false);
+  const [blueprintSummary, setBlueprintSummary] = useState<{ screenNames: string[]; screenCount: number } | null>(null);
   const [showComponentTree, setShowComponentTree] = useState(true);
   const [templatesLoaded, setTemplatesLoaded] = useState(false);
   const [activeCategoryByScreen, setActiveCategoryByScreen] = useState<Record<string, string>>({});
+
+  const [layerExpanded, setLayerExpanded] = useState<Record<string, boolean>>({});
+
+  const getLayerLabel = useCallback((comp: EditorComponent) => {
+    const t = String(comp.type || "");
+    const p: any = comp.props || {};
+    const pickText = (v: any) => (typeof v === "string" ? v.trim() : "");
+    const text =
+      pickText(p.text) ||
+      pickText(p.title) ||
+      pickText(p.heading) ||
+      pickText(p.label) ||
+      pickText(p.name);
+    if (text) return `${t}: ${text.length > 28 ? text.slice(0, 28) + "…" : text}`;
+    return t;
+  }, []);
+
+  const toggleLayerExpanded = useCallback((id: string) => {
+    setLayerExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+  }, []);
+
+  const getAncestorIdsForComponent = useCallback((components: EditorComponent[], targetId: string) => {
+    const walk = (nodes: EditorComponent[], path: string[]): string[] | null => {
+      for (const node of nodes) {
+        const nextPath = [...path, node.id];
+        if (node.id === targetId) return path;
+        if (node.children?.length) {
+          const found = walk(node.children, nextPath);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    return walk(components, []) ?? [];
+  }, []);
+
+  useEffect(() => {
+    if (!selectedComponentId || !activeScreen?.components?.length) return;
+    const ancestors = getAncestorIdsForComponent(activeScreen.components, selectedComponentId);
+    if (!ancestors.length) return;
+    setLayerExpanded((prev) => {
+      const next = { ...prev };
+      for (const id of ancestors) next[id] = true;
+      return next;
+    });
+  }, [activeScreen?.components, getAncestorIdsForComponent, selectedComponentId]);
+
+  const [unsavedConfirmOpen, setUnsavedConfirmOpen] = useState(false);
+  const pendingActionRef = useRef<null | (() => void)>(null);
+
+  const confirmIfUnsaved = useCallback(
+    (action: () => void) => {
+      if (!hasChanges) {
+        action();
+        return;
+      }
+      pendingActionRef.current = action;
+      setUnsavedConfirmOpen(true);
+    },
+    [hasChanges],
+  );
+
+  const doUndo = useCallback(() => {
+    if (!historyRef.current.past.length) return;
+    isTimeTravelRef.current = true;
+    setSelectedComponentId(null);
+    setScreensRaw((current) => {
+      const past = historyRef.current.past;
+      const previous = past[past.length - 1];
+      historyRef.current.past = past.slice(0, -1);
+      historyRef.current.future.unshift(current);
+      return previous;
+    });
+    setHistoryTick((t) => t + 1);
+    queueMicrotask(() => {
+      isTimeTravelRef.current = false;
+    });
+  }, []);
+
+  const doRedo = useCallback(() => {
+    if (!historyRef.current.future.length) return;
+    isTimeTravelRef.current = true;
+    setSelectedComponentId(null);
+    setScreensRaw((current) => {
+      const future = historyRef.current.future;
+      const next = future[0];
+      historyRef.current.future = future.slice(1);
+      historyRef.current.past.push(current);
+      if (historyRef.current.past.length > 100) historyRef.current.past.shift();
+      return next;
+    });
+    setHistoryTick((t) => t + 1);
+    queueMicrotask(() => {
+      isTimeTravelRef.current = false;
+    });
+  }, []);
+
+  useEffect(() => {
+    setHasChanges(hashScreens(screens) !== savedHashRef.current);
+  }, [screens, hashScreens]);
+
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (!hasChanges) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasChanges]);
+
+  useEffect(() => {
+    if (!screens.length) return;
+    if (!screens.some((s) => s.id === activeScreenId)) {
+      setActiveScreenId(screens[0].id);
+      setSelectedComponentId(null);
+    }
+  }, [activeScreenId, screens]);
+
+  useEffect(() => {
+    const isEditableTarget = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+      if (target.isContentEditable) return true;
+      return false;
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (isEditableTarget(e.target)) return;
+      const isMod = e.ctrlKey || e.metaKey;
+      if (!isMod) return;
+
+      const key = e.key.toLowerCase();
+      if (key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        doUndo();
+        return;
+      }
+      if (key === "y" || (key === "z" && e.shiftKey)) {
+        e.preventDefault();
+        doRedo();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [doRedo, doUndo]);
+
+  const reviewBlueprint = useCallback(() => {
+    let parsed: AppBlueprint;
+    try {
+      parsed = JSON.parse(blueprintJson || "");
+    } catch {
+      toast({ title: "Invalid JSON", description: "Please fix the blueprint JSON and try again.", variant: "destructive" });
+      return;
+    }
+    const screenNames = Array.isArray(parsed.screens) ? parsed.screens.map((s) => s.title).filter(Boolean) : [];
+    setBlueprintSummary({ screenNames, screenCount: screenNames.length });
+    setBlueprintConfirmOpen(true);
+  }, [blueprintJson, toast]);
 
   // Fetch app data
   const { data: app, isLoading } = useQuery<any>({
@@ -1673,7 +1893,11 @@ export default function VisualEditor() {
       // If saved screens are just placeholders and we have an industry template, prefer the template.
       if (hasContent && !(isPlaceholderScreens(app.editorScreens) && normalizedIndustry && getTemplateById(normalizedIndustry))) {
         console.log('[Visual Editor] Loading saved screens:', app.editorScreens.length);
-        setScreens(app.editorScreens);
+        historyRef.current.past = [];
+        historyRef.current.future = [];
+        setScreens(app.editorScreens, { recordHistory: false });
+        savedHashRef.current = hashScreens(app.editorScreens as any);
+        setHasChanges(false);
         const homeScreen = app.editorScreens.find((s: EditorScreen) => s.isHome);
         setActiveScreenId(homeScreen?.id || app.editorScreens[0].id);
         setTemplatesLoaded(true);
@@ -2427,6 +2651,61 @@ export default function VisualEditor() {
     setHasChanges(true);
   }, [activeScreenId]);
 
+  const renderLayersTree = useCallback(
+    (components: EditorComponent[], depth = 0): ReactNode => {
+      const render = (nodes: EditorComponent[], d: number): ReactNode => {
+        return nodes
+          .filter((c) => {
+            if (!search) return true;
+            const q = search.toLowerCase();
+            return String(c.type).toLowerCase().includes(q) || getLayerLabel(c).toLowerCase().includes(q);
+          })
+          .map((comp, index) => {
+            const hasChildren = !!(comp.children && comp.children.length);
+            const expanded = !!layerExpanded[comp.id];
+            const selected = selectedComponentId === comp.id;
+
+            return (
+              <div key={comp.id}>
+                <button
+                  onClick={() => setSelectedComponentId(comp.id)}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all border ${
+                    selected
+                      ? "bg-cyan-500/20 text-cyan-300 font-medium border-cyan-500/30"
+                      : "text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
+                  }`}
+                  style={{ paddingLeft: 12 + d * 12 }}
+                >
+                  {hasChildren ? (
+                    <span
+                      className="inline-flex h-4 w-4 items-center justify-center text-slate-500 hover:text-slate-200"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleLayerExpanded(comp.id);
+                      }}
+                      aria-label={expanded ? "Collapse" : "Expand"}
+                    >
+                      {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                    </span>
+                  ) : (
+                    <span className="inline-flex h-4 w-4" />
+                  )}
+                  <span className="text-slate-500 w-4 shrink-0">{index + 1}</span>
+                  <span className="truncate">{getLayerLabel(comp)}</span>
+                </button>
+
+                {hasChildren && expanded ? <div className="mt-1">{render(comp.children as any, d + 1)}</div> : null}
+              </div>
+            );
+          });
+      };
+
+      return render(components, depth);
+    },
+    [getLayerLabel, layerExpanded, search, selectedComponentId, toggleLayerExpanded],
+  );
+
   // Add screen
   const addScreen = useCallback(() => {
     const newScreen: EditorScreen = {
@@ -2448,6 +2727,7 @@ export default function VisualEditor() {
       return res.json();
     },
     onSuccess: () => {
+      savedHashRef.current = hashScreens(screens);
       setHasChanges(false);
       queryClient.invalidateQueries({ queryKey: [`/api/apps/${id}`] });
       toast({ title: "Saved!", description: "Your changes have been saved." });
@@ -2472,10 +2752,13 @@ export default function VisualEditor() {
       return { built, app: await res.json() };
     },
     onSuccess: ({ built }) => {
-      setScreens(built.screens as any);
+      historyRef.current.past = [];
+      historyRef.current.future = [];
+      setScreens(built.screens as any, { recordHistory: false });
       const home = built.screens.find((s) => (s as any).isHome) || built.screens[0];
       if (home?.id) setActiveScreenId(home.id);
       setSelectedComponentId(null);
+      savedHashRef.current = hashScreens(built.screens as any);
       setHasChanges(false);
       setBlueprintOpen(false);
       queryClient.invalidateQueries({ queryKey: [`/api/apps/${id}`] });
@@ -2500,6 +2783,12 @@ export default function VisualEditor() {
 
   // Check if this is a native-only app
   const isNativeApp = app?.isNativeOnly || app?.url === "native://app" || !app?.url;
+  const websiteUrlForPreview =
+    websitePreviewUrl && websitePreviewUrl !== "native://app"
+      ? websitePreviewUrl
+      : app?.url && app.url !== "native://app" && app.url.startsWith("http")
+        ? app.url
+        : "";
 
   return (
     <div className="h-screen bg-slate-950 text-slate-100 flex flex-col overflow-hidden">
@@ -2509,7 +2798,7 @@ export default function VisualEditor() {
           <Button 
             variant="ghost" 
             size="icon" 
-            onClick={() => setLocation(`/apps/${id}/preview`)}
+            onClick={() => confirmIfUnsaved(() => setLocation(`/apps/${id}/preview`))}
             className="text-slate-300 hover:text-white hover:bg-slate-800/60"
           >
             <ArrowLeft className="h-5 w-5" />
@@ -2632,10 +2921,24 @@ export default function VisualEditor() {
 
           <div className="h-6 w-px bg-slate-800" />
 
-          <Button variant="ghost" size="icon" title="Undo" className="text-slate-400 hover:text-white">
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Undo"
+            className="text-slate-400 hover:text-white disabled:opacity-50"
+            disabled={!canUndo}
+            onClick={doUndo}
+          >
             <Undo2 className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" title="Redo" className="text-slate-400 hover:text-white">
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Redo"
+            className="text-slate-400 hover:text-white disabled:opacity-50"
+            disabled={!canRedo}
+            onClick={doRedo}
+          >
             <Redo2 className="h-4 w-4" />
           </Button>
           
@@ -2644,7 +2947,7 @@ export default function VisualEditor() {
           <Button 
             variant="outline"
             size="sm"
-            onClick={() => setLocation(`/apps/${id}/structure`)}
+            onClick={() => confirmIfUnsaved(() => setLocation(`/apps/${id}/structure`))}
             className="border-slate-800 bg-slate-950/40 text-slate-200 hover:bg-slate-800/50 hover:text-white"
           >
             <ListTree className="h-4 w-4 mr-2" /> Structure
@@ -2654,7 +2957,7 @@ export default function VisualEditor() {
             <Button 
               variant="outline"
               size="sm"
-              onClick={() => setLocation(`/apps/${id}/import`)}
+              onClick={() => confirmIfUnsaved(() => setLocation(`/apps/${id}/import`))}
               className="border-slate-800 bg-slate-950/40 text-slate-200 hover:bg-slate-800/50 hover:text-white"
             >
               <Link2 className="h-4 w-4 mr-2" /> Import
@@ -2672,11 +2975,24 @@ export default function VisualEditor() {
           <Button 
             variant="outline"
             size="sm"
-            onClick={() => window.open(`/live-preview/${id}`, "_blank")}
+            onClick={() => confirmIfUnsaved(() => window.open(`/live-preview/${id}`, "_blank"))}
             className="border-slate-800 bg-slate-950/40 text-slate-200 hover:bg-slate-800/50 hover:text-white"
           >
             <Eye className="h-4 w-4 mr-2" /> Preview
           </Button>
+
+          <Badge
+            className={`hidden md:inline-flex h-7 px-2.5 border ${
+              saveMutation.isPending
+                ? "bg-slate-800/60 text-slate-200 border-slate-700"
+                : hasChanges
+                  ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                  : "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+            }`}
+          >
+            {saveMutation.isPending ? "Saving…" : hasChanges ? "Unsaved" : "Saved"}
+          </Badge>
+
           <Button 
             onClick={() => saveMutation.mutate()}
             disabled={!hasChanges || saveMutation.isPending}
@@ -2712,7 +3028,7 @@ export default function VisualEditor() {
                 Cancel
               </Button>
               <Button
-                onClick={() => applyBlueprintMutation.mutate()}
+                onClick={reviewBlueprint}
                 disabled={applyBlueprintMutation.isPending || !blueprintJson.trim()}
                 className="bg-cyan-600 hover:bg-cyan-500 text-white"
               >
@@ -2721,13 +3037,75 @@ export default function VisualEditor() {
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Applying...
                   </>
                 ) : (
-                  "Apply Blueprint"
+                  "Review & Apply"
                 )}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={unsavedConfirmOpen} onOpenChange={setUnsavedConfirmOpen}>
+        <AlertDialogContent className="bg-slate-950 text-slate-100 border border-slate-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-400">
+              You have unsaved edits. Save before leaving, or discard changes and continue.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-slate-800 bg-transparent text-slate-200 hover:bg-slate-800/50">
+              Stay
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-cyan-600 hover:bg-cyan-500 text-white"
+              onClick={() => {
+                const action = pendingActionRef.current;
+                pendingActionRef.current = null;
+                setUnsavedConfirmOpen(false);
+                action?.();
+              }}
+            >
+              Discard & Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={blueprintConfirmOpen} onOpenChange={setBlueprintConfirmOpen}>
+        <AlertDialogContent className="bg-slate-950 text-slate-100 border border-slate-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apply blueprint to this app?</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-400">
+              This will generate and save native screens and bottom-tab navigation.
+              {blueprintSummary ? (
+                <span className="block mt-2">
+                  {blueprintSummary.screenCount} screens: {blueprintSummary.screenNames.slice(0, 5).join(", ")}
+                  {blueprintSummary.screenNames.length > 5 ? "…" : ""}
+                </span>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className="border-slate-800 bg-transparent text-slate-200 hover:bg-slate-800/50"
+              disabled={applyBlueprintMutation.isPending}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-cyan-600 hover:bg-cyan-500 text-white"
+              disabled={applyBlueprintMutation.isPending}
+              onClick={() => {
+                setBlueprintConfirmOpen(false);
+                applyBlueprintMutation.mutate();
+              }}
+            >
+              Apply & Save
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar - Components Panel */}
@@ -2773,7 +3151,7 @@ export default function VisualEditor() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => setLocation(`/apps/${id}/import`)}
+                              onClick={() => confirmIfUnsaved(() => setLocation(`/apps/${id}/import`))}
                               className="border-slate-700 text-slate-200 hover:bg-slate-800/60"
                             >
                               <Link2 className="h-4 w-4 mr-2" /> Import
@@ -2781,7 +3159,7 @@ export default function VisualEditor() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => setLocation(`/apps/${id}/structure`)}
+                              onClick={() => confirmIfUnsaved(() => setLocation(`/apps/${id}/structure`))}
                               className="border-slate-700 text-slate-200 hover:bg-slate-800/60"
                             >
                               <ListTree className="h-4 w-4 mr-2" /> Structure
@@ -2795,7 +3173,7 @@ export default function VisualEditor() {
                           <div className="pt-2">
                             <Button
                               size="sm"
-                              onClick={() => setLocation(`/apps/${id}/import`)}
+                              onClick={() => confirmIfUnsaved(() => setLocation(`/apps/${id}/import`))}
                               className="bg-gradient-to-r from-cyan-500 to-blue-500 text-white"
                             >
                               <Link2 className="h-4 w-4 mr-2" /> Import Website
@@ -2913,22 +3291,7 @@ export default function VisualEditor() {
                       <p className="text-xs text-slate-500">Layers are available when editing native screens.</p>
                     ) : activeScreen && activeScreen.components.length > 0 ? (
                       <div className="space-y-1">
-                        {activeScreen.components
-                          .filter((c) => !search || String(c.type).toLowerCase().includes(search))
-                          .map((comp, index) => (
-                            <button
-                              key={comp.id}
-                              onClick={() => setSelectedComponentId(comp.id)}
-                              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all ${
-                                selectedComponentId === comp.id
-                                  ? "bg-cyan-500/20 text-cyan-400 font-medium border border-cyan-500/30"
-                                  : "text-slate-400 hover:bg-slate-800/50 hover:text-white border border-transparent"
-                              }`}
-                            >
-                              <span className="text-slate-500 w-4">{index + 1}</span>
-                              <span className="capitalize">{comp.type}</span>
-                            </button>
-                          ))}
+                        {renderLayersTree(activeScreen.components)}
                       </div>
                     ) : (
                       <p className="text-xs text-slate-500">No components on this screen yet.</p>
@@ -2943,109 +3306,66 @@ export default function VisualEditor() {
         {/* Canvas Area - Premium Dark Design */}
         <main className="flex-1 overflow-auto p-8 flex items-start justify-center bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800">
           {editorMode === "website" ? (
-            /* Website Preview Mode - Shows actual website in mobile frame */
             <div className="flex flex-col items-center gap-6">
-              {/* Mobile Device Frame - Premium Design */}
               <div className="relative">
-                {/* Glow effect */}
                 <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 blur-3xl rounded-full scale-150 opacity-30" />
-                
-                <div className="relative mx-auto border-gray-900 bg-gray-900 border-[12px] rounded-[3rem] h-[640px] w-[310px] shadow-2xl shadow-black/50">
-                  {/* Dynamic Island */}
-                  <div className="w-[120px] h-[28px] bg-black top-3 rounded-full left-1/2 -translate-x-1/2 absolute z-20 flex items-center justify-center gap-2">
-                    <div className="w-2 h-2 bg-slate-700 rounded-full" />
-                  </div>
-                  {/* Side buttons */}
-                  <div className="h-[32px] w-[3px] bg-gray-700 absolute -left-[15px] top-[100px] rounded-l-lg"></div>
-                  <div className="h-[46px] w-[3px] bg-gray-700 absolute -left-[15px] top-[150px] rounded-l-lg"></div>
-                  <div className="h-[46px] w-[3px] bg-gray-700 absolute -left-[15px] top-[210px] rounded-l-lg"></div>
-                  <div className="h-[64px] w-[3px] bg-gray-700 absolute -right-[15px] top-[170px] rounded-r-lg"></div>
-                  
-                  <div className="rounded-[2.5rem] overflow-hidden w-full h-full bg-white relative flex flex-col">
-                    {/* Status Bar */}
-                    <div className="h-12 bg-black/90 flex items-end justify-between px-6 pb-1 text-[11px] font-medium text-white select-none z-20 shrink-0">
-                      <span className="font-semibold">9:41</span>
-                      <div className="flex gap-1.5 items-center">
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 20.5a8.5 8.5 0 100-17 8.5 8.5 0 000 17z" /></svg>
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M2 17h20v2H2zm2-4h16v2H4zm2-4h12v2H6zm2-4h8v2H8z" /></svg>
-                        <span className="ml-0.5 font-semibold">100%</span>
+                <div className="relative">
+                  {websiteUrlForPreview ? (
+                    <DevicePreview
+                      url={websiteUrlForPreview}
+                      appName={app?.name || "My App"}
+                      primaryColor={app?.primaryColor || ""}
+                      icon={String((app as any)?.iconUrl || app?.icon || "📱")}
+                      preferLivePreview={true}
+                      isNativeOnly={false}
+                      showPreviewModeToggle={true}
+                      showToggle={deviceView === "desktop"}
+                      availablePlatforms={deviceView === "desktop" ? ["android", "ios"] : ["android"]}
+                      defaultPlatform={deviceView === "desktop" ? "ios" : "android"}
+                    />
+                  ) : (
+                    <div className="w-[340px] rounded-2xl border border-slate-700/50 bg-slate-900/40 p-5 text-center">
+                      <div className="mx-auto mb-3 h-10 w-10 rounded-xl bg-slate-800/70 flex items-center justify-center">
+                        <Globe className="h-5 w-5 text-cyan-400" />
+                      </div>
+                      <p className="text-sm text-slate-200 font-medium">No website URL configured</p>
+                      <p className="text-xs text-slate-400 mt-1">Import pages or set a website URL to preview.</p>
+                      <div className="mt-4 flex items-center justify-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => confirmIfUnsaved(() => setLocation(`/apps/${id}/import`))}
+                          className="border-slate-700 text-slate-200 hover:bg-slate-800/60"
+                        >
+                          <Link2 className="h-4 w-4 mr-2" /> Import
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => confirmIfUnsaved(() => setLocation(`/apps/${id}/structure`))}
+                          className="border-slate-700 text-slate-200 hover:bg-slate-800/60"
+                        >
+                          <ListTree className="h-4 w-4 mr-2" /> Structure
+                        </Button>
                       </div>
                     </div>
-
-                    {/* App Header Bar */}
-                    <div 
-                      className="h-12 flex items-center justify-between px-4 shadow-lg z-10 shrink-0"
-                      style={{ backgroundColor: app?.primaryColor || "#2563EB" }}
-                    >
-                      <div className="text-white font-bold flex items-center gap-2 text-sm">
-                        <span className="text-lg">{app?.icon || "📱"}</span>
-                        <span className="truncate max-w-[180px]">{app?.name || "My App"}</span>
-                      </div>
-                      <Menu className="w-5 h-5 text-white/80" />
-                    </div>
-
-                    {/* Website Content - Live iframe */}
-                    <div className="flex-1 bg-white relative overflow-hidden">
-                      {websitePreviewUrl && websitePreviewUrl !== "native://app" ? (
-                        <iframe
-                          src={websitePreviewUrl}
-                          className="w-full h-full border-0"
-                          title="Website Preview"
-                          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                        />
-                      ) : (
-                        <div className="flex flex-col items-center justify-center h-full text-slate-400 p-6 bg-gradient-to-b from-slate-50 to-white">
-                          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-cyan-100 to-purple-100 flex items-center justify-center mb-4">
-                            <Globe className="h-10 w-10 text-cyan-500" />
-                          </div>
-                          <p className="text-sm text-center font-medium text-slate-600">No website URL configured</p>
-                          <p className="text-xs mt-2 text-slate-400 text-center">Add your website URL in Settings<br/>or switch to <strong>Screens</strong> mode</p>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Bottom Navigation */}
-                    <div className="h-16 bg-white border-t border-gray-100 flex items-center justify-around px-6 shrink-0 pb-2">
-                      <div className="flex flex-col items-center gap-1">
-                        <svg className="w-6 h-6" style={{ color: app?.primaryColor || "#2563EB" }} fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
-                        </svg>
-                        <span className="text-[10px] font-medium" style={{ color: app?.primaryColor || "#2563EB" }}>Home</span>
-                      </div>
-                      <div className="flex flex-col items-center gap-1">
-                        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                        <span className="text-[10px] text-gray-400">Search</span>
-                      </div>
-                      <div className="flex flex-col items-center gap-1">
-                        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        <span className="text-[10px] text-gray-400">Profile</span>
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
-              
-              {/* App name label */}
-              <p className="text-sm text-slate-400 text-center font-medium">
-                {app?.name || "My App"}
-              </p>
-              
-              {/* Quick Info */}
-              {websitePreviewUrl && websitePreviewUrl !== "native://app" && (
-                <a 
-                  href={websitePreviewUrl} 
-                  target="_blank" 
+
+              {websiteUrlForPreview ? (
+                <a
+                  href={websiteUrlForPreview}
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1.5 bg-slate-800/50 px-3 py-1.5 rounded-full border border-slate-700/50"
                 >
                   <Globe className="h-3 w-3" />
-                  {websitePreviewUrl.replace(/^https?:\/\//, "").replace(/\/$/, "").substring(0, 30)}
+                  {websiteUrlForPreview.replace(/^https?:\/\//, "").replace(/\/$/, "").substring(0, 30)}
                   <ExternalLink className="h-3 w-3" />
                 </a>
+              ) : (
+                <p className="text-sm text-slate-400 text-center font-medium">No website URL configured</p>
               )}
             </div>
           ) : (

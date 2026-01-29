@@ -19,19 +19,9 @@ import {
   Sparkles,
   Loader2,
   ShoppingCart,
-  Scissors,
   UtensilsCrossed,
-  Church,
-  Radio,
-  Dumbbell,
-  GraduationCap,
   Building2,
   Heart,
-  Camera,
-  Music,
-  Briefcase,
-  Newspaper,
-  Globe,
   Check,
   ChevronRight,
   Rocket,
@@ -53,16 +43,6 @@ const INDUSTRY_TEMPLATES = [
     screens: ["Home", "Products", "Cart", "Orders", "Account"],
   },
   {
-    id: "salon",
-    name: "Salon & Spa",
-    icon: Scissors,
-    color: "from-pink-500 to-rose-500",
-    description: "Booking, services, gallery for beauty business",
-    prompt: "Create a salon booking app with service catalog, online appointment booking, stylist profiles, price list, gallery, customer reviews, push notification reminders, and loyalty rewards.",
-    suggestedFeatures: ["bottomNav", "pushNotifications", "whatsappButton"],
-    screens: ["Home", "Services", "Book Now", "Gallery", "Profile"],
-  },
-  {
     id: "restaurant",
     name: "Restaurant",
     icon: UtensilsCrossed,
@@ -71,46 +51,6 @@ const INDUSTRY_TEMPLATES = [
     prompt: "Build a restaurant app with digital menu, online ordering, table reservation, delivery tracking, special offers, push notifications for deals, and customer loyalty program.",
     suggestedFeatures: ["bottomNav", "pushNotifications", "whatsappButton", "deepLinking"],
     screens: ["Menu", "Order", "Reservations", "Offers", "Account"],
-  },
-  {
-    id: "church",
-    name: "Church & Ministry",
-    icon: Church,
-    color: "from-purple-500 to-indigo-500",
-    description: "Sermons, events, donations for religious orgs",
-    prompt: "Create a church app with sermon library, event calendar, online giving/donations, prayer requests, volunteer sign-up, push notifications for services, and community directory.",
-    suggestedFeatures: ["pushNotifications", "offlineScreen"],
-    screens: ["Home", "Sermons", "Events", "Give", "Connect"],
-  },
-  {
-    id: "radio",
-    name: "Online Radio",
-    icon: Radio,
-    color: "from-cyan-500 to-blue-500",
-    description: "Live streaming, podcasts, music station",
-    prompt: "Build a radio streaming app with live audio player, podcast episodes, show schedule, DJ profiles, song request feature, push notifications for shows, and social sharing.",
-    suggestedFeatures: ["pushNotifications", "offlineScreen"],
-    screens: ["Live", "Shows", "Podcasts", "Schedule", "About"],
-  },
-  {
-    id: "fitness",
-    name: "Fitness & Gym",
-    icon: Dumbbell,
-    color: "from-green-500 to-emerald-500",
-    description: "Workouts, classes, membership for gyms",
-    prompt: "Create a fitness app with workout plans, class booking, trainer profiles, progress tracking, membership management, push notifications for classes, and nutrition tips.",
-    suggestedFeatures: ["bottomNav", "pushNotifications", "deepLinking"],
-    screens: ["Home", "Workouts", "Classes", "Progress", "Profile"],
-  },
-  {
-    id: "education",
-    name: "Education",
-    icon: GraduationCap,
-    color: "from-blue-500 to-cyan-500",
-    description: "Courses, learning materials for schools",
-    prompt: "Build an education app with course catalog, video lessons, quiz assessments, progress tracking, certificates, discussion forum, push notifications for assignments, and resource library.",
-    suggestedFeatures: ["bottomNav", "pushNotifications", "offlineScreen", "deepLinking"],
-    screens: ["Courses", "My Learning", "Quizzes", "Resources", "Profile"],
   },
   {
     id: "realestate",
@@ -131,56 +71,6 @@ const INDUSTRY_TEMPLATES = [
     prompt: "Build a healthcare app with doctor profiles, appointment booking, medical records, prescription history, health tips, emergency contacts, push notification reminders, and telemedicine.",
     suggestedFeatures: ["bottomNav", "pushNotifications", "deepLinking"],
     screens: ["Home", "Doctors", "Appointments", "Records", "Profile"],
-  },
-  {
-    id: "photography",
-    name: "Photography",
-    icon: Camera,
-    color: "from-violet-500 to-purple-500",
-    description: "Portfolio, booking for photographers",
-    prompt: "Create a photography portfolio app with image gallery, service packages, booking system, client testimonials, pricing information, contact form, and social media integration.",
-    suggestedFeatures: ["bottomNav", "whatsappButton"],
-    screens: ["Portfolio", "Services", "Book", "About", "Contact"],
-  },
-  {
-    id: "music",
-    name: "Music & Band",
-    icon: Music,
-    color: "from-fuchsia-500 to-pink-500",
-    description: "Albums, events, merchandise for artists",
-    prompt: "Build a music app with album releases, tour dates, music player, merchandise store, fan club membership, push notifications for releases, and social media feed.",
-    suggestedFeatures: ["bottomNav", "pushNotifications", "deepLinking"],
-    screens: ["Home", "Music", "Tour", "Merch", "Fan Club"],
-  },
-  {
-    id: "business",
-    name: "Business Services",
-    icon: Briefcase,
-    color: "from-gray-600 to-slate-600",
-    description: "Company info, services, contact",
-    prompt: "Create a professional business app with company overview, service catalog, team profiles, case studies, contact form, appointment booking, and WhatsApp integration.",
-    suggestedFeatures: ["whatsappButton", "deepLinking"],
-    screens: ["Home", "Services", "About", "Portfolio", "Contact"],
-  },
-  {
-    id: "news",
-    name: "News & Blog",
-    icon: Newspaper,
-    color: "from-amber-500 to-yellow-500",
-    description: "Articles, categories, notifications",
-    prompt: "Build a news app with article feed, category filters, bookmarks, reading history, push notifications for breaking news, offline reading, and social sharing.",
-    suggestedFeatures: ["bottomNav", "pushNotifications", "offlineScreen", "deepLinking"],
-    screens: ["Feed", "Categories", "Saved", "Notifications", "Settings"],
-  },
-  {
-    id: "custom",
-    name: "Custom App",
-    icon: Globe,
-    color: "from-cyan-400 to-purple-500",
-    description: "Describe your unique app idea",
-    prompt: "",
-    suggestedFeatures: [],
-    screens: [],
   },
 ];
 
@@ -479,6 +369,20 @@ function hasBiryaniKeywords(text: string): boolean {
   return t.includes("biryani") || t.includes("biriyani") || t.includes("biryani") || t.includes("dum biryani") || t.includes("biriyani") || t.includes("biriyani") || t.includes("biriyan") || t.includes("briyani") || t.includes("hyderabadi biryani") || t.includes("hyderabadi biriyani");
 }
 
+function hasBambooToothbrushKeywords(text: string): boolean {
+  const t = (text || "").toLowerCase();
+  const mentionsToothbrush = t.includes("toothbrush") || t.includes("tooth brush") || t.includes("oral care") || t.includes("dental");
+  const mentionsBambooOrEco =
+    t.includes("bamboo") ||
+    t.includes("eco") ||
+    t.includes("eco-friendly") ||
+    t.includes("sustainable") ||
+    t.includes("plastic-free") ||
+    t.includes("zero waste") ||
+    t.includes("biodegradable");
+  return mentionsToothbrush && mentionsBambooOrEco;
+}
+
 export default function PromptCreate() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -503,8 +407,8 @@ export default function PromptCreate() {
   // AI generation mutation - uses real AI when available, falls back to templates
   const generateMutation = useMutation({
     mutationFn: async (prompt: string) => {
-      const template = selectedTemplate || INDUSTRY_TEMPLATES[INDUSTRY_TEMPLATES.length - 1];
-      const lockedIndustry = selectedTemplate?.id && selectedTemplate.id !== "custom" ? selectedTemplate.id : null;
+      const template = selectedTemplate || INDUSTRY_TEMPLATES[0];
+      const lockedIndustry = selectedTemplate?.id || null;
       
       // Try to use real AI parsing
       try {
@@ -538,9 +442,7 @@ export default function PromptCreate() {
       }
       
       // Template-based generation (no AI needed)
-      const appName = template.id === "custom" 
-        ? extractAppName(prompt) 
-        : generateSmartAppName(prompt, template);
+      const appName = generateSmartAppName(prompt, template);
       
       return {
         appName,
@@ -559,7 +461,7 @@ export default function PromptCreate() {
       };
     },
     onSuccess: (data) => {
-      const lockedIndustry = selectedTemplate?.id && selectedTemplate.id !== "custom" ? selectedTemplate.id : null;
+      const lockedIndustry = selectedTemplate?.id || null;
       const industry = String(lockedIndustry || data?.industry || "");
 
       setGeneratedConfig({
@@ -602,13 +504,12 @@ export default function PromptCreate() {
           .replace(/[^a-z0-9 ]/g, "")
           .trim();
 
-        // Direct template ids
+        // Direct template ids (only the focused set + custom)
         const known = new Set(INDUSTRY_TEMPLATES.map(t => t.id));
         if (known.has(normalized)) return normalized;
 
-        // Common synonyms/variants from AI
-        if (normalized.includes("salon") || normalized.includes("spa") || normalized.includes("beauty")) return "salon";
-        // Ecommerce / grocery / marketplace
+        // Common synonyms/variants from AI (restricted to supported domains)
+        // Ecommerce / marketplace
         if (
           normalized.includes("ecommerce") ||
           normalized.includes("e commerce") ||
@@ -616,48 +517,55 @@ export default function PromptCreate() {
           normalized.includes("shop") ||
           normalized.includes("market") ||
           normalized.includes("marketplace") ||
-          normalized.includes("grocery") ||
-          normalized.includes("supermarket") ||
-          normalized.includes("farm") ||
-          normalized.includes("produce") ||
-          normalized.includes("vegetable") ||
-          normalized.includes("fruit") ||
-          normalized.includes("dairy") ||
           normalized.includes("delivery")
         ) return "ecommerce";
 
         // Restaurant / food service
         if (normalized.includes("restaurant") || normalized.includes("cafe") || normalized.includes("menu") || normalized.includes("reservation")) return "restaurant";
-        if (normalized.includes("church") || normalized.includes("ministry")) return "church";
-        if (normalized.includes("fitness") || normalized.includes("gym")) return "fitness";
-        if (normalized.includes("education") || normalized.includes("school") || normalized.includes("college")) return "education";
-        if (normalized.includes("radio") || normalized.includes("station") || normalized.includes("podcast")) return "radio";
         if (normalized.includes("health") || normalized.includes("clinic") || normalized.includes("medical") || normalized.includes("hospital")) return "healthcare";
         if (normalized.includes("real estate") || normalized.includes("realestate") || normalized.includes("property")) return "realestate";
-        if (normalized.includes("photo") || normalized.includes("photography") || normalized.includes("studio")) return "photography";
-        if (normalized.includes("music") || normalized.includes("band") || normalized.includes("artist")) return "music";
-        if (normalized.includes("news") || normalized.includes("magazine") || normalized.includes("blog")) return "news";
-        if (normalized.includes("business") || normalized.includes("company") || normalized.includes("corporate")) return "business";
 
         return undefined;
       };
 
       const industryId =
-        // If a template is selected (non-custom), it always wins.
-        (selectedTemplate?.id !== "custom" ? selectedTemplate?.id : undefined) ||
+        // If a template is selected, it always wins.
+        selectedTemplate?.id ||
         normalizeIndustryId(generatedConfig.industry) ||
-        "custom";
+        "ecommerce";
 
       const promptContext = (customPrompt || selectedTemplate?.prompt || "").trim();
       const resolvedIndustryId =
         industryId === "restaurant" && hasBiryaniKeywords(promptContext)
           ? "restaurant_biryani"
+          : industryId === "ecommerce" && hasBambooToothbrushKeywords(promptContext)
+            ? "ecommerce_bamboo"
           : industryId;
 
       const resolvedAppName = creationMode === "scratch" ? appName : generatedConfig.appName;
-      const initialEditorScreens = resolvedIndustryId !== "custom"
-        ? buildEditorScreensFromTemplate(resolvedIndustryId, resolvedAppName || "My App", { prompt: promptContext })
-        : null;
+      const initialEditorScreens = buildEditorScreensFromTemplate(
+        resolvedIndustryId,
+        resolvedAppName || "My App",
+        { prompt: promptContext },
+      );
+
+      const rawSuggestedFeatures: string[] = Array.isArray(generatedConfig?.suggestedFeatures)
+        ? generatedConfig.suggestedFeatures
+        : [];
+      const featureSet = new Set(rawSuggestedFeatures);
+      if (resolvedIndustryId === "ecommerce_bamboo") {
+        featureSet.add("bottomNav");
+        featureSet.add("offlineScreen");
+        featureSet.add("deepLinking");
+        featureSet.add("pushNotifications");
+        featureSet.add("whatsappButton");
+      }
+      const finalSuggestedFeatures = Array.from(featureSet);
+
+      const useTemplateBranding = resolvedIndustryId !== industryId;
+      const finalIcon = useTemplateBranding ? getTemplateEmoji(resolvedIndustryId) : generatedConfig.icon;
+      const finalPrimaryColor = useTemplateBranding ? getTemplateColor(resolvedIndustryId) : generatedConfig.primaryColor;
+      const finalSecondaryColor = useTemplateBranding ? getTemplateSecondaryColor(resolvedIndustryId) : generatedConfig.secondaryColor;
 
       const modules = buildBusinessModules({
         capabilities: businessCaps,
@@ -668,27 +576,28 @@ export default function PromptCreate() {
       const appData = {
         name: resolvedAppName,
         url: appUrl,
-        icon: generatedConfig.icon,
-        primaryColor: generatedConfig.primaryColor,
+        icon: finalIcon,
+        primaryColor: finalPrimaryColor,
+        secondaryColor: finalSecondaryColor,
         platform: "android",
         plan: "preview",
         features: {
-          bottomNav: generatedConfig.suggestedFeatures.includes("bottomNav"),
-          pullToRefresh: generatedConfig.suggestedFeatures.includes("pullToRefresh"),
-          offlineScreen: generatedConfig.suggestedFeatures.includes("offlineScreen"),
-          whatsappButton: generatedConfig.suggestedFeatures.includes("whatsappButton"),
+          bottomNav: finalSuggestedFeatures.includes("bottomNav"),
+          pullToRefresh: finalSuggestedFeatures.includes("pullToRefresh"),
+          offlineScreen: finalSuggestedFeatures.includes("offlineScreen"),
+          whatsappButton: finalSuggestedFeatures.includes("whatsappButton"),
           whatsappNumber: "",
         },
         modules,
         // Store generated config for later use
-        generatedPrompt: customPrompt || selectedTemplate?.prompt,
+        generatedPrompt: promptContext,
         generatedScreens: generatedConfig.suggestedScreens,
         // Flag to indicate creation mode
         isNativeOnly: creationMode === "scratch",
         // Industry template ID - used to load pre-built screens in visual editor
         industry: resolvedIndustryId,
         // Seed the visual editor with real template screens when possible
-        editorScreens: initialEditorScreens || undefined,
+        editorScreens: initialEditorScreens,
       };
 
       const res = await apiRequest("POST", "/api/apps", appData);
@@ -1516,6 +1425,7 @@ function extractAppName(prompt: string): string {
 function getTemplateColor(id: string): string {
   const colors: Record<string, string> = {
     ecommerce: "#F97316",
+    ecommerce_bamboo: "#2F6B4F",
     salon: "#EC4899",
     restaurant: "#EF4444",
     restaurant_biryani: "#7A1020",
@@ -1537,6 +1447,7 @@ function getTemplateColor(id: string): string {
 function getTemplateEmoji(id: string): string {
   const emojis: Record<string, string> = {
     ecommerce: "🛒",
+    ecommerce_bamboo: "🎋",
     salon: "💇",
     restaurant: "🍽️",
     restaurant_biryani: "👑",
@@ -1572,6 +1483,7 @@ function formatFeatureName(feature: string): string {
 function getTemplateSecondaryColor(id: string): string {
   const colors: Record<string, string> = {
     ecommerce: "#FCD34D",
+    ecommerce_bamboo: "#E7DCC8",
     salon: "#F472B6",
     restaurant: "#FBBF24",
     restaurant_biryani: "#D4AF37",

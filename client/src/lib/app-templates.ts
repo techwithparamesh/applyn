@@ -319,6 +319,341 @@ export const ecommerceTemplate: IndustryTemplate = {
 };
 
 // ============================================
+// E-COMMERCE (ECO BAMBOO TOOTHBRUSH) TEMPLATE
+// ============================================
+export const ecommerceBambooTemplate: IndustryTemplate = {
+  id: "ecommerce_bamboo",
+  name: "Eco Toothbrush Store",
+  description: "Plastic-free bamboo toothbrushes with subscriptions",
+  primaryColor: "#2F6B4F",
+  secondaryColor: "#E7DCC8",
+  icon: "🎋",
+  features: ["bottomNav", "pushNotifications", "offlineScreen", "deepLinking", "whatsappButton"],
+  screens: [
+    {
+      id: "home",
+      name: "Home",
+      icon: "🏠",
+      isHome: true,
+      components: [
+        {
+          id: uid(),
+          type: "hero",
+          props: {
+            title: "Plastic‑Free Smiles",
+            subtitle: "Eco-friendly bamboo toothbrushes",
+            buttonText: "Shop Toothbrushes",
+            buttonAction: "navigate:products",
+            backgroundImage: "https://images.unsplash.com/photo-1501004318641-b39e6451bec6?w=800",
+            overlayColor: "rgba(47,107,79,0.55)",
+            height: 280,
+          },
+        },
+        {
+          id: uid(),
+          type: "section",
+          props: { title: "Categories", padding: 16 },
+          children: [
+            {
+              id: uid(),
+              type: "grid",
+              props: { columns: 2, gap: 12 },
+              children: [
+                { id: uid(), type: "card", props: { title: "Adult", icon: "🧑", backgroundColor: "#E9F3ED", compact: true } },
+                { id: uid(), type: "card", props: { title: "Kids", icon: "🧒", backgroundColor: "#F4EFE6", compact: true } },
+                { id: uid(), type: "card", props: { title: "Charcoal", icon: "⚫", backgroundColor: "#EEF2F0", compact: true } },
+                { id: uid(), type: "card", props: { title: "Soft Bristle", icon: "☁️", backgroundColor: "#F6F3EE", compact: true } },
+              ],
+            },
+          ],
+        },
+        {
+          id: uid(),
+          type: "section",
+          props: { title: "Best Sellers", padding: 16, showMore: true, showMoreAction: "navigate:products" },
+          children: [
+            {
+              id: uid(),
+              type: "productGrid",
+              props: {
+                columns: 2,
+                products: [
+                  {
+                    id: "bb_adult_medium",
+                    name: "Bamboo Toothbrush (Adult) – Medium",
+                    price: "$6.99",
+                    image: "https://images.unsplash.com/photo-1615486364107-30d0c0b9b8b3?w=400",
+                    rating: 4.8,
+                    category: "Adult",
+                  },
+                  {
+                    id: "bb_kids_soft",
+                    name: "Bamboo Toothbrush (Kids) – Soft",
+                    price: "$5.99",
+                    image: "https://images.unsplash.com/photo-1588776814546-0a55c8d0f5d8?w=400",
+                    rating: 4.7,
+                    category: "Kids",
+                  },
+                  {
+                    id: "bb_charcoal",
+                    name: "Charcoal Bamboo Toothbrush",
+                    price: "$7.49",
+                    image: "https://images.unsplash.com/photo-1615486364351-bad7a81a1e6b?w=400",
+                    rating: 4.6,
+                    category: "Charcoal",
+                  },
+                  {
+                    id: "bb_soft",
+                    name: "Soft Bristle Bamboo Toothbrush",
+                    price: "$6.49",
+                    image: "https://images.unsplash.com/photo-1615486364080-6d2e0a6b5e7b?w=400",
+                    rating: 4.9,
+                    category: "Soft Bristle",
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          id: uid(),
+          type: "section",
+          props: { title: "Why Bamboo?", padding: 16, backgroundColor: "#F4EFE6" },
+          children: [
+            {
+              id: uid(),
+              type: "stats",
+              props: {
+                columns: 2,
+                items: [
+                  { value: "0%", label: "Plastic handle" },
+                  { value: "100%", label: "Bamboo handle" },
+                  { value: "BPA‑Free", label: "Bristles" },
+                  { value: "3‑mo", label: "Replace cycle" },
+                ],
+              },
+            },
+            { id: uid(), type: "spacer", props: { height: 10 } },
+            {
+              id: uid(),
+              type: "text",
+              props: {
+                text: "Switch to a plastic‑free routine with responsibly sourced bamboo and minimal packaging.",
+                fontSize: 13,
+                color: "#334155",
+              },
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: "products",
+      name: "Shop",
+      icon: "🛍️",
+      components: [
+        {
+          id: uid(),
+          type: "container",
+          props: { padding: 16, backgroundColor: "#F6F3EE" },
+          children: [
+            { id: uid(), type: "input", props: { placeholder: "Search bamboo toothbrushes...", type: "search", icon: "search" } },
+          ],
+        },
+        {
+          id: uid(),
+          type: "container",
+          props: { padding: 16 },
+          children: [
+            {
+              id: uid(),
+              type: "grid",
+              props: { columns: 4, gap: 8, scrollable: true },
+              children: [
+                { id: uid(), type: "button", props: { text: "All", variant: "primary", size: "sm" } },
+                { id: uid(), type: "button", props: { text: "Adult", variant: "outline", size: "sm" } },
+                { id: uid(), type: "button", props: { text: "Kids", variant: "outline", size: "sm" } },
+                { id: uid(), type: "button", props: { text: "Charcoal", variant: "outline", size: "sm" } },
+              ],
+            },
+          ],
+        },
+        {
+          id: uid(),
+          type: "productGrid",
+          props: {
+            columns: 2,
+            products: [
+              { id: "bb_adult_soft", name: "Bamboo Toothbrush (Adult) – Soft", price: "$6.99", image: "https://images.unsplash.com/photo-1615486364080-6d2e0a6b5e7b?w=400", rating: 4.9, badge: "Best Seller", category: "Adult" },
+              { id: "bb_adult_medium", name: "Bamboo Toothbrush (Adult) – Medium", price: "$6.99", image: "https://images.unsplash.com/photo-1615486364107-30d0c0b9b8b3?w=400", rating: 4.8, category: "Adult" },
+              { id: "bb_kids_soft", name: "Bamboo Toothbrush (Kids) – Soft", price: "$5.99", image: "https://images.unsplash.com/photo-1588776814546-0a55c8d0f5d8?w=400", rating: 4.7, category: "Kids" },
+              { id: "bb_charcoal", name: "Charcoal Bamboo Toothbrush", price: "$7.49", image: "https://images.unsplash.com/photo-1615486364351-bad7a81a1e6b?w=400", rating: 4.6, badge: "Charcoal", category: "Charcoal" },
+              { id: "bb_soft", name: "Soft Bristle Bamboo Toothbrush", price: "$6.49", image: "https://images.unsplash.com/photo-1615486364080-6d2e0a6b5e7b?w=400", rating: 4.9, category: "Soft Bristle" },
+              { id: "bb_family_pack", name: "Family Pack (4 pcs)", price: "$22.99", image: "https://images.unsplash.com/photo-1615486364107-30d0c0b9b8b3?w=400", rating: 4.7, badge: "Value", category: "Adult" },
+            ],
+          },
+        },
+        {
+          id: uid(),
+          type: "section",
+          props: { title: "Materials & Care", padding: 16, backgroundColor: "#E9F3ED" },
+          children: [
+            { id: uid(), type: "text", props: { text: "Handle: FSC‑friendly bamboo • Bristles: BPA‑free nylon • Packaging: plastic‑free", fontSize: 13, color: "#0f172a" } },
+            { id: uid(), type: "spacer", props: { height: 10 } },
+            { id: uid(), type: "text", props: { text: "Care: Rinse and dry after use. Replace every 3 months.", fontSize: 13, color: "#334155" } },
+          ],
+        },
+        {
+          id: uid(),
+          type: "section",
+          props: { title: "Reviews", padding: 16 },
+          children: [
+            {
+              id: uid(),
+              type: "testimonial",
+              props: {
+                items: [
+                  { name: "Aanya", quote: "Love the earthy feel and soft bristles. Great switch from plastic.", rating: 5 },
+                  { name: "Daniel", quote: "Charcoal version feels super clean. Subscription is convenient.", rating: 5 },
+                  { name: "Meera", quote: "Kids brush is gentle and the packaging is truly plastic‑free.", rating: 4 },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          id: uid(),
+          type: "section",
+          props: { title: "Subscribe & Save", padding: 16, backgroundColor: "#F4EFE6" },
+          children: [
+            {
+              id: uid(),
+              type: "grid",
+              props: { columns: 2, gap: 12 },
+              children: [
+                { id: uid(), type: "card", props: { title: "One‑time", icon: "🛒", backgroundColor: "#FFFFFF", compact: false, subtitle: "Buy once, replace later" } },
+                { id: uid(), type: "card", props: { title: "Subscription", icon: "🔁", backgroundColor: "#FFFFFF", compact: false, subtitle: "Every 3 months • Save 10%" } },
+              ],
+            },
+            { id: uid(), type: "spacer", props: { height: 12 } },
+            { id: uid(), type: "button", props: { text: "Start Subscription", variant: "primary", fullWidth: true, size: "lg" } },
+          ],
+        },
+      ],
+    },
+    {
+      id: "cart",
+      name: "Cart",
+      icon: "🛒",
+      components: [
+        {
+          id: uid(),
+          type: "section",
+          props: { title: "Your Cart", subtitle: "2 items", padding: 16 },
+          children: [
+            {
+              id: uid(),
+              type: "list",
+              props: {
+                variant: "cart",
+                items: [
+                  { id: "1", name: "Bamboo Toothbrush (Adult) – Soft", price: "$6.99", quantity: 2, image: "https://images.unsplash.com/photo-1615486364080-6d2e0a6b5e7b?w=200" },
+                  { id: "2", name: "Charcoal Bamboo Toothbrush", price: "$7.49", quantity: 1, image: "https://images.unsplash.com/photo-1615486364351-bad7a81a1e6b?w=200" },
+                ],
+              },
+            },
+          ],
+        },
+        { id: uid(), type: "divider", props: { color: "#e5e7eb", thickness: 1 } },
+        {
+          id: uid(),
+          type: "container",
+          props: { padding: 16 },
+          children: [
+            { id: uid(), type: "text", props: { text: "Subtotal", fontSize: 14, color: "#666", align: "left" } },
+            { id: uid(), type: "heading", props: { text: "$21.47", level: 3, color: "#000", align: "right" } },
+            { id: uid(), type: "text", props: { text: "Shipping: $3.99", fontSize: 14, color: "#666" } },
+            { id: uid(), type: "text", props: { text: "Payment options: Secure checkout or Cash on Delivery (COD)", fontSize: 12, color: "#475569" } },
+            { id: uid(), type: "spacer", props: { height: 12 } },
+            { id: uid(), type: "grid", props: { columns: 2, gap: 10 }, children: [
+              { id: uid(), type: "button", props: { text: "Pay Securely", variant: "primary", fullWidth: true, size: "sm" } },
+              { id: uid(), type: "button", props: { text: "Cash on Delivery", variant: "outline", fullWidth: true, size: "sm" } },
+            ] },
+            { id: uid(), type: "spacer", props: { height: 12 } },
+            { id: uid(), type: "button", props: { text: "Place Order", variant: "primary", fullWidth: true, size: "lg" } },
+          ],
+        },
+      ],
+    },
+    {
+      id: "orders",
+      name: "Orders",
+      icon: "📦",
+      components: [
+        {
+          id: uid(),
+          type: "section",
+          props: { title: "Order Tracking", padding: 16 },
+          children: [
+            {
+              id: uid(),
+              type: "list",
+              props: {
+                variant: "orders",
+                items: [
+                  { id: "ORD1024", date: "Jan 29, 2026", status: "Shipped", total: "$21.47", itemCount: 3 },
+                  { id: "ORD1019", date: "Jan 21, 2026", status: "Delivered", total: "$18.98", itemCount: 2 },
+                  { id: "ORD1003", date: "Jan 10, 2026", status: "Processing", total: "$29.99", itemCount: 4 },
+                ],
+              },
+            },
+            { id: uid(), type: "spacer", props: { height: 10 } },
+            { id: uid(), type: "text", props: { text: "Tip: Track updates and delivery ETA from your Orders. Need help? Chat on WhatsApp.", fontSize: 12, color: "#475569" } },
+            { id: uid(), type: "spacer", props: { height: 10 } },
+            { id: uid(), type: "button", props: { text: "WhatsApp Support", variant: "outline", fullWidth: true, size: "lg" } },
+          ],
+        },
+      ],
+    },
+    {
+      id: "account",
+      name: "Account",
+      icon: "👤",
+      components: [
+        {
+          id: uid(),
+          type: "container",
+          props: { padding: 24, backgroundColor: "#2F6B4F", align: "center" },
+          children: [
+            { id: uid(), type: "image", props: { src: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200", width: 80, height: 80, borderRadius: 40 } },
+            { id: uid(), type: "spacer", props: { height: 12 } },
+            { id: uid(), type: "heading", props: { text: "Eco Customer", level: 3, color: "#fff" } },
+            { id: uid(), type: "text", props: { text: "you@example.com", fontSize: 14, color: "#fff", opacity: 0.85 } },
+          ],
+        },
+        {
+          id: uid(),
+          type: "list",
+          props: {
+            variant: "menu",
+            items: [
+              { icon: "📦", label: "My Orders", action: "navigate:orders" },
+              { icon: "🔁", label: "Subscriptions", action: "navigate:subscriptions" },
+              { icon: "🌿", label: "Sustainability", action: "navigate:sustainability" },
+              { icon: "💳", label: "Payment Methods", action: "navigate:payments" },
+              { icon: "📍", label: "Delivery Addresses", action: "navigate:addresses" },
+              { icon: "💬", label: "WhatsApp Support", action: "whatsapp" },
+              { icon: "⚙️", label: "Settings", action: "navigate:settings" },
+              { icon: "🚪", label: "Logout", action: "logout", color: "#EF4444" },
+            ],
+          },
+        },
+      ],
+    },
+  ],
+};
+
+// ============================================
 // SALON & SPA TEMPLATE
 // ============================================
 export const salonTemplate: IndustryTemplate = {
@@ -3239,6 +3574,7 @@ export const newsTemplate: IndustryTemplate = {
 // ============================================
 export const ALL_TEMPLATES: Record<string, IndustryTemplate> = {
   ecommerce: ecommerceTemplate,
+  ecommerce_bamboo: ecommerceBambooTemplate,
   salon: salonTemplate,
   restaurant: restaurantTemplate,
   restaurant_biryani: biryaniRestaurantTemplate,
@@ -3273,6 +3609,7 @@ export function buildEditorScreensFromTemplate(
 
   const subtitles: Record<string, string> = {
     ecommerce: "Shop the best products online",
+    ecommerce_bamboo: "Plastic-free bamboo toothbrushes",
     salon: "Book your perfect appointment",
     restaurant: "Delicious food, delivered fresh",
     church: "Join our community of faith",
