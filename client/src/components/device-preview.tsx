@@ -1182,7 +1182,7 @@ function NativeScreensPreview({
 
       {/* Native-style bottom navigation */}
       <div className="h-16 bg-white/90 backdrop-blur border-t border-gray-200 flex items-center justify-around px-1 shrink-0">
-        {screens.slice(0, 4).map((screen, i) => {
+        {screens.slice(0, 5).map((screen, i) => {
           const isActive = i === activeScreenIndex;
           return (
             <button

@@ -16,6 +16,7 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { DevicePreview } from "@/components/device-preview";
 import { isHttpUrl } from "@/lib/utils";
+import { PageLoading, PageState } from "@/components/page-state";
 
 type AppData = {
   id: string;
@@ -62,11 +63,8 @@ export default function LivePreview() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-center">
-          <div className="h-8 w-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-400 text-sm">Loading preview...</p>
-        </div>
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
+        <PageLoading label="Loading preview…" />
       </div>
     );
   }
@@ -75,18 +73,28 @@ export default function LivePreview() {
   if (error || !app) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
-        <div className="text-center">
-          <div className="h-16 w-16 rounded-2xl bg-red-500/20 flex items-center justify-center mx-auto mb-4">
-            <ExternalLink className="h-8 w-8 text-red-400" />
-          </div>
-          <h1 className="text-xl font-bold text-white mb-2">Preview Not Available</h1>
-          <p className="text-slate-400 text-sm mb-6">This app preview may have expired or doesn't exist.</p>
-          <Button 
-            onClick={() => window.location.href = "https://applyn.in"}
-            className="bg-gradient-to-r from-cyan-500 to-purple-500"
+        <div className="w-full max-w-md">
+          <PageState
+            icon={<ExternalLink className="h-5 w-5 text-red-300" />}
+            title="Preview not available"
+            description="This preview may have expired, or the app doesn’t exist."
           >
-            Go to Applyn
-          </Button>
+            <Button
+              variant="outline"
+              className="border-white/[0.10] bg-white/[0.03] hover:bg-white/[0.06]"
+              onClick={() => window.location.reload()}
+            >
+              Retry
+            </Button>
+            <Button
+              className="bg-cyan-600 hover:bg-cyan-500 text-white"
+              onClick={() => {
+                window.location.href = "https://applyn.in";
+              }}
+            >
+              Go to Applyn
+            </Button>
+          </PageState>
         </div>
       </div>
     );

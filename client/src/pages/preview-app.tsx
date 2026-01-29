@@ -1,6 +1,6 @@
 import { Navbar } from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Edit, Download, RefreshCw, ExternalLink, QrCode, Smartphone, Share2, Copy, CheckCircle2, Sparkles, Crown, Wand2 } from "lucide-react";
+import { ArrowLeft, Edit, Download, RefreshCw, ExternalLink, QrCode, Smartphone, Share2, Copy, CheckCircle2, Sparkles, Crown, Wand2, AlertTriangle } from "lucide-react";
 import { useLocation, useParams, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { getAppUrlDisplay, isHttpUrl } from "@/lib/utils";
 import { AppBuilderStepper } from "@/components/app-builder-stepper";
+import { PageLoading, PageState } from "@/components/page-state";
 
 type AppItem = {
   id: string;
@@ -63,7 +64,12 @@ export default function PreviewApp() {
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
-  const { data: app, isLoading: appLoading } = useQuery<AppItem | null>({
+  const {
+    data: app,
+    isLoading: appLoading,
+    error: appError,
+    refetch: refetchApp,
+  } = useQuery<AppItem | null>({
     queryKey: [`/api/apps/${appId}`],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!me && !!appId,
@@ -81,10 +87,29 @@ export default function PreviewApp() {
       <div className="min-h-screen bg-background bg-mesh-subtle">
         <Navbar />
         <main className="container mx-auto px-4 py-8">
-          <div className="flex items-center gap-3 text-muted-foreground">
-            <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            Loading...
-          </div>
+          <PageLoading label="Loading preview…" />
+        </main>
+      </div>
+    );
+  }
+
+  if (appError) {
+    return (
+      <div className="min-h-screen bg-background bg-mesh-subtle">
+        <Navbar />
+        <main className="container mx-auto px-4 py-8 max-w-3xl">
+          <PageState
+            icon={<AlertTriangle className="h-5 w-5 text-red-300" />}
+            title="Couldn’t load this app"
+            description={(appError as any)?.message || "Please try again."}
+          >
+            <Button variant="outline" className="border-white/[0.10]" onClick={() => void refetchApp()}>
+              <RefreshCw className="mr-2 h-4 w-4" /> Retry
+            </Button>
+            <Button variant="outline" className="border-white/[0.10]" onClick={() => setLocation("/dashboard")}>
+              <ArrowLeft className="mr-2 h-4 w-4" /> Dashboard
+            </Button>
+          </PageState>
         </main>
       </div>
     );
@@ -95,12 +120,16 @@ export default function PreviewApp() {
     return (
       <div className="min-h-screen bg-background bg-mesh-subtle">
         <Navbar />
-        <main className="container mx-auto px-4 py-8 text-center">
-          <h1 className="text-2xl font-bold text-white mb-4">App not found</h1>
-          <p className="text-muted-foreground mb-6">The app you're looking for doesn't exist or you don't have access to it.</p>
-          <Button onClick={() => setLocation("/dashboard")}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
-          </Button>
+        <main className="container mx-auto px-4 py-8 max-w-3xl">
+          <PageState
+            icon={<AlertTriangle className="h-5 w-5 text-amber-300" />}
+            title="App not found"
+            description="The app you’re looking for doesn’t exist, or you don’t have access."
+          >
+            <Button variant="outline" className="border-white/[0.10]" onClick={() => setLocation("/dashboard")}>
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to dashboard
+            </Button>
+          </PageState>
         </main>
       </div>
     );

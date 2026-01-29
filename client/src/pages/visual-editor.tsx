@@ -72,6 +72,8 @@ import {
 
 import { QRCodeSVG } from "qrcode.react";
 import { AppBuilderStepper } from "@/components/app-builder-stepper";
+import { buildAppFromBlueprint } from "@/lib/blueprint/builder";
+import type { AppBlueprint } from "@/lib/blueprint/types";
 
 // Component types for the editor (extended to support industry templates)
 type ComponentType =
@@ -1445,6 +1447,8 @@ export default function VisualEditor() {
   const [paletteSearch, setPaletteSearch] = useState<string>("");
   const [websitePreviewUrl, setWebsitePreviewUrl] = useState<string>("");
   const [hasChanges, setHasChanges] = useState(false);
+  const [blueprintOpen, setBlueprintOpen] = useState(false);
+  const [blueprintJson, setBlueprintJson] = useState<string>("");
   const [showComponentTree, setShowComponentTree] = useState(true);
   const [templatesLoaded, setTemplatesLoaded] = useState(false);
   const [activeCategoryByScreen, setActiveCategoryByScreen] = useState<Record<string, string>>({});
@@ -2453,6 +2457,39 @@ export default function VisualEditor() {
     },
   });
 
+  const applyBlueprintMutation = useMutation({
+    mutationFn: async () => {
+      let parsed: AppBlueprint;
+      try {
+        parsed = JSON.parse(blueprintJson || "");
+      } catch {
+        throw new Error("Invalid JSON");
+      }
+
+      const built = await buildAppFromBlueprint(parsed);
+      const res = await apiRequest("PATCH", `/api/apps/${id}`, built.patch);
+      if (!res.ok) throw new Error("Failed to apply blueprint");
+      return { built, app: await res.json() };
+    },
+    onSuccess: ({ built }) => {
+      setScreens(built.screens as any);
+      const home = built.screens.find((s) => (s as any).isHome) || built.screens[0];
+      if (home?.id) setActiveScreenId(home.id);
+      setSelectedComponentId(null);
+      setHasChanges(false);
+      setBlueprintOpen(false);
+      queryClient.invalidateQueries({ queryKey: [`/api/apps/${id}`] });
+      toast({ title: "Blueprint applied", description: "Generated screens + navigation saved." });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Blueprint failed",
+        description: err?.message ?? "Please check your JSON and try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center">
@@ -2623,6 +2660,14 @@ export default function VisualEditor() {
               <Link2 className="h-4 w-4 mr-2" /> Import
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setBlueprintOpen(true)}
+            className="border-slate-800 bg-slate-950/40 text-slate-200 hover:bg-slate-800/50 hover:text-white"
+          >
+            <Sparkles className="h-4 w-4 mr-2" /> Blueprint
+          </Button>
 
           <Button 
             variant="outline"
@@ -2642,6 +2687,47 @@ export default function VisualEditor() {
           </Button>
         </div>
       </header>
+      <Dialog open={blueprintOpen} onOpenChange={setBlueprintOpen}>
+        <DialogContent className="sm:max-w-[720px] bg-slate-950 text-slate-100 border border-slate-800">
+          <DialogHeader>
+            <DialogTitle>Import Blueprint JSON</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-slate-400">
+              Paste a strict blueprint JSON. This will generate native screens, set bottom-tabs navigation, and save to your app.
+            </p>
+            <Textarea
+              value={blueprintJson}
+              onChange={(e) => setBlueprintJson(e.target.value)}
+              placeholder={`{\n  "schema_version": "1.0", ...\n}`}
+              className="min-h-[260px] font-mono text-xs bg-slate-900/40 border-slate-800 text-slate-100 placeholder:text-slate-500"
+            />
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setBlueprintOpen(false)}
+                className="border-slate-800 bg-transparent text-slate-200 hover:bg-slate-800/50"
+                disabled={applyBlueprintMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => applyBlueprintMutation.mutate()}
+                disabled={applyBlueprintMutation.isPending || !blueprintJson.trim()}
+                className="bg-cyan-600 hover:bg-cyan-500 text-white"
+              >
+                {applyBlueprintMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Applying...
+                  </>
+                ) : (
+                  "Apply Blueprint"
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar - Components Panel */}
@@ -3220,7 +3306,7 @@ export default function VisualEditor() {
                   {/* Bottom Navigation - Mobile Only */}
                   {deviceView === "mobile" && (
                     <div className="h-16 bg-white/90 backdrop-blur border-t border-gray-200 flex items-center justify-around px-1 shrink-0">
-                      {screens.slice(0, 4).map((screen) => {
+                      {screens.slice(0, 5).map((screen) => {
                         const isActive = screen.id === activeScreenId;
                         return (
                           <button

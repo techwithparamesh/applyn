@@ -466,6 +466,13 @@ export async function registerRoutes(
     legacyHeaders: false,
   });
 
+  const unsplashLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
   const contactLimiter = rateLimit({
     windowMs: 60 * 1000,
     limit: 5,
@@ -475,6 +482,70 @@ export async function registerRoutes(
 
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, time: new Date().toISOString() });
+  });
+
+  // Secure Unsplash proxy (keeps UNSPLASH_ACCESS_KEY server-side)
+  app.get("/api/unsplash/image", requireAuth, unsplashLimiter, async (req, res) => {
+    const key = String(process.env.UNSPLASH_ACCESS_KEY || "").trim();
+    if (!key) return res.status(503).json({ message: "Unsplash is not configured" });
+
+    const parsed = z
+      .object({
+        query: z.string().min(1).max(80),
+        w: z.coerce.number().int().min(200).max(2000).optional(),
+      })
+      .safeParse(req.query);
+
+    if (!parsed.success) return res.status(400).json({ message: "Invalid query" });
+    const q = parsed.data.query.trim();
+    const w = parsed.data.w ?? 1200;
+
+    try {
+      const upstream = await fetch(
+        `https://api.unsplash.com/search/photos?query=${encodeURIComponent(q)}&per_page=1&orientation=portrait`,
+        {
+          headers: {
+            Authorization: `Client-ID ${key}`,
+            "Accept-Version": "v1",
+          },
+        },
+      );
+
+      if (!upstream.ok) {
+        return res.status(502).json({ message: `Unsplash error (${upstream.status})` });
+      }
+
+      const json: any = await upstream.json();
+      const photo = Array.isArray(json?.results) ? json.results[0] : null;
+      if (!photo) return res.status(404).json({ message: "No image found" });
+
+      const rawUrl = String(photo?.urls?.raw || photo?.urls?.regular || "");
+      const sep = rawUrl.includes("?") ? "&" : "?";
+      const url = rawUrl ? `${rawUrl}${sep}w=${w}&auto=format&fit=crop` : "";
+
+      // Best-effort download tracking (Unsplash API guideline)
+      const downloadLocation = String(photo?.links?.download_location || "");
+      if (downloadLocation) {
+        fetch(downloadLocation, {
+          headers: {
+            Authorization: `Client-ID ${key}`,
+            "Accept-Version": "v1",
+          },
+        }).catch(() => null);
+      }
+
+      res.setHeader("Cache-Control", "private, max-age=86400");
+      return res.json({
+        url,
+        alt: photo?.alt_description ?? photo?.description ?? q,
+        credit: {
+          name: photo?.user?.name ?? "Unsplash",
+          url: photo?.user?.links?.html ?? "https://unsplash.com",
+        },
+      });
+    } catch {
+      return res.status(502).json({ message: "Unsplash request failed" });
+    }
   });
 
   app.get("/api/me", (req, res) => {
