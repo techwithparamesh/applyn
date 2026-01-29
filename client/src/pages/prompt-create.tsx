@@ -918,7 +918,7 @@ export default function PromptCreate() {
                     <>
                       <div className="space-y-3">
                         <label className="text-base font-semibold text-white flex items-center gap-2">
-                          <Globe className="h-5 w-5 text-cyan-400" />
+                          <Smartphone className="h-5 w-5 text-cyan-400" />
                           Your Website URL
                           <Badge variant="secondary" className="bg-cyan-500/20 text-cyan-400 text-xs ml-2">Required</Badge>
                         </label>
@@ -1070,7 +1070,7 @@ export default function PromptCreate() {
                       {/* Optional website for scratch mode */}
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-white flex items-center gap-2">
-                          <Globe className="h-4 w-4 text-muted-foreground" />
+                          <Smartphone className="h-4 w-4 text-muted-foreground" />
                           Website URL (optional)
                         </label>
                         <Input
@@ -1242,7 +1242,7 @@ export default function PromptCreate() {
                     {websiteUrl && (
                       <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-3">
                         <div className="flex items-center gap-2 mb-1">
-                          <Globe className="h-4 w-4 text-cyan-400" />
+                          <Smartphone className="h-4 w-4 text-cyan-400" />
                           <span className="text-sm font-medium text-white">Website</span>
                         </div>
                         <a 
