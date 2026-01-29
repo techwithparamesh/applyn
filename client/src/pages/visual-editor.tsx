@@ -78,6 +78,7 @@ import {
   Link2,
   Send,
   RotateCcw,
+  Download,
 } from "lucide-react";
 
 import { QRCodeSVG } from "qrcode.react";
@@ -1351,6 +1352,7 @@ export default function VisualEditor() {
   const historyRef = useRef<{ past: EditorScreen[][]; future: EditorScreen[][] }>({ past: [], future: [] });
   const isTimeTravelRef = useRef(false);
   const [, setHistoryTick] = useState(0);
+  const qrContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Saved snapshot hash used to derive hasChanges
   const savedHashRef = useRef<string>("");
@@ -2743,6 +2745,78 @@ export default function VisualEditor() {
     }
   }, [toast]);
 
+  const getQrSvgEl = (): SVGSVGElement | null => {
+    const el = qrContainerRef.current?.querySelector("svg");
+    return (el as SVGSVGElement) || null;
+  };
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadQrSvg = () => {
+    const svgEl = getQrSvgEl();
+    if (!svgEl) {
+      toast({ title: "QR not ready", description: "Please try again in a moment." });
+      return;
+    }
+    const cloned = svgEl.cloneNode(true) as SVGSVGElement;
+    cloned.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    const svgText = new XMLSerializer().serializeToString(cloned);
+    const blob = new Blob([svgText], { type: "image/svg+xml;charset=utf-8" });
+    downloadBlob(blob, `live-preview-${id}-qr.svg`);
+  };
+
+  const downloadQrPng = async () => {
+    const svgEl = getQrSvgEl();
+    if (!svgEl) {
+      toast({ title: "QR not ready", description: "Please try again in a moment." });
+      return;
+    }
+    try {
+      const cloned = svgEl.cloneNode(true) as SVGSVGElement;
+      cloned.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      const svgText = new XMLSerializer().serializeToString(cloned);
+      const svgBlob = new Blob([svgText], { type: "image/svg+xml;charset=utf-8" });
+      const svgUrl = URL.createObjectURL(svgBlob);
+
+      const img = new Image();
+      img.decoding = "async";
+      img.src = svgUrl;
+
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("Failed to load QR image"));
+      });
+
+      const size = 1024;
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas not supported");
+
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, size, size);
+      ctx.drawImage(img, 0, 0, size, size);
+
+      URL.revokeObjectURL(svgUrl);
+
+      const pngBlob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (!pngBlob) throw new Error("Failed to export PNG");
+      downloadBlob(pngBlob, `live-preview-${id}-qr.png`);
+    } catch (err: any) {
+      toast({ title: "Download failed", description: err?.message || "Please try again." });
+    }
+  };
+
   // Add template section
   const addTemplate = useCallback((template: typeof SECTION_TEMPLATES[0]) => {
     if (!activeScreen) return;
@@ -4035,16 +4109,37 @@ export default function VisualEditor() {
               <ScrollArea className="h-full bg-slate-900/20">
                 <div className="p-4 space-y-4">
                   <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 flex flex-col items-center gap-3">
-                    <QRCodeSVG
-                      value={`${window.location.origin}/live-preview/${id}`}
-                      size={180}
-                      bgColor="#ffffff"
-                      fgColor="#111827"
-                      level="M"
-                    />
+                    <div ref={qrContainerRef} className="p-5 bg-white rounded-3xl shadow-xl ring-1 ring-black/10">
+                      <QRCodeSVG
+                        value={`${window.location.origin}/live-preview/${id}`}
+                        size={190}
+                        bgColor="#ffffff"
+                        fgColor="#0a0a0a"
+                        level="M"
+                        includeMargin={true}
+                      />
+                    </div>
                     <p className="text-xs text-slate-400 text-center">
                       Scan to open live preview
                     </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-slate-600 text-slate-200 hover:bg-slate-700/50"
+                        onClick={() => void downloadQrPng()}
+                      >
+                        <Download className="h-4 w-4 mr-2" /> PNG
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-slate-600 text-slate-200 hover:bg-slate-700/50"
+                        onClick={() => downloadQrSvg()}
+                      >
+                        <Download className="h-4 w-4 mr-2" /> SVG
+                      </Button>
+                    </div>
                     <div className="flex gap-2">
                       <Button
                         variant="outline"

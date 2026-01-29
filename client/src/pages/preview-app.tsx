@@ -1,6 +1,6 @@
 import { Navbar } from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Edit, Download, RefreshCw, ExternalLink, QrCode, Smartphone, Share2, Copy, CheckCircle2, Sparkles, Crown, Wand2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Download, RefreshCw, ExternalLink, QrCode, Share2, Copy, CheckCircle2, Wand2, AlertTriangle, MoreHorizontal } from "lucide-react";
 import { useLocation, useParams, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
@@ -8,10 +8,11 @@ import { DevicePreview } from "@/components/device-preview";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getAppUrlDisplay, isHttpUrl } from "@/lib/utils";
 import { AppBuilderStepper } from "@/components/app-builder-stepper";
 import { PageLoading, PageState } from "@/components/page-state";
@@ -53,6 +54,7 @@ export default function PreviewApp() {
   // QR Code modal state
   const [showQRModal, setShowQRModal] = useState(false);
   const [copied, setCopied] = useState(false);
+  const qrContainerRef = useRef<HTMLDivElement | null>(null);
   
   // Check if coming from appId query param (create flow)
   const params = new URLSearchParams(search);
@@ -186,6 +188,93 @@ export default function PreviewApp() {
     await copyPreviewUrl();
   };
 
+  const getSafeFilename = (raw: string) => {
+    const base = (raw || "app")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9\-]/g, "")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
+    return base || "app";
+  };
+
+  const getQrSvgEl = (): SVGSVGElement | null => {
+    const el = qrContainerRef.current?.querySelector("svg");
+    return (el as SVGSVGElement) || null;
+  };
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadQrSvg = () => {
+    const svgEl = getQrSvgEl();
+    if (!svgEl) {
+      toast({ title: "QR not ready", description: "Please try again in a moment.", variant: "destructive" });
+      return;
+    }
+    const cloned = svgEl.cloneNode(true) as SVGSVGElement;
+    cloned.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    const svgText = new XMLSerializer().serializeToString(cloned);
+    const blob = new Blob([svgText], { type: "image/svg+xml;charset=utf-8" });
+    downloadBlob(blob, `${getSafeFilename(app.name)}-qr.svg`);
+  };
+
+  const downloadQrPng = async () => {
+    const svgEl = getQrSvgEl();
+    if (!svgEl) {
+      toast({ title: "QR not ready", description: "Please try again in a moment.", variant: "destructive" });
+      return;
+    }
+    try {
+      const cloned = svgEl.cloneNode(true) as SVGSVGElement;
+      cloned.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      const svgText = new XMLSerializer().serializeToString(cloned);
+      const svgBlob = new Blob([svgText], { type: "image/svg+xml;charset=utf-8" });
+      const svgUrl = URL.createObjectURL(svgBlob);
+
+      const img = new Image();
+      img.decoding = "async";
+      img.src = svgUrl;
+
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("Failed to load QR image"));
+      });
+
+      const size = 1024;
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas not supported");
+
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, size, size);
+      ctx.drawImage(img, 0, 0, size, size);
+
+      URL.revokeObjectURL(svgUrl);
+
+      const pngBlob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (!pngBlob) throw new Error("Failed to export PNG");
+      downloadBlob(pngBlob, `${getSafeFilename(app.name)}-qr.png`);
+    } catch (err: any) {
+      toast({
+        title: "Download failed",
+        description: err?.message || "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Status badge helper
   const getStatusBadge = () => {
     if (isPreviewOnly) {
@@ -257,54 +346,57 @@ export default function PreviewApp() {
 
           <div className="flex items-center gap-2">
             <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void shareOrCopyPreviewUrl()}
-              className="border-white/[0.10] bg-white/[0.03] hover:bg-white/[0.06] rounded-xl"
-            >
-              <Share2 className="mr-2 h-4 w-4 text-slate-200" /> Share Preview
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowQRModal(true)}
-              className="border-white/[0.10] bg-white/[0.03] hover:bg-white/[0.06] rounded-xl"
-            >
-              <QrCode className="mr-2 h-4 w-4 text-cyan-300" /> QR Code
-            </Button>
-
-            <Button
               size="sm"
               onClick={() => setLocation(`/apps/${app.id}/visual-editor`)}
               className="bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl"
             >
               <Wand2 className="mr-2 h-4 w-4" /> Open Builder
             </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-white/[0.10] bg-white/[0.03] hover:bg-white/[0.06] rounded-xl h-9 w-9 p-0"
+                  aria-label="Preview actions"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={() => void shareOrCopyPreviewUrl()}>
+                  <Share2 className="mr-2 h-4 w-4" /> Share / Copy link
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowQRModal(true)}>
+                  <QrCode className="mr-2 h-4 w-4" /> QR Code
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => window.open(getPreviewUrl(), "_blank", "noopener,noreferrer")}>
+                  <ExternalLink className="mr-2 h-4 w-4" /> Open preview
+                </DropdownMenuItem>
+                {isHttpUrl(app.url) && (
+                  <DropdownMenuItem onClick={() => window.open(app.url, "_blank", "noopener,noreferrer")}>
+                    <ExternalLink className="mr-2 h-4 w-4" /> Visit website
+                  </DropdownMenuItem>
+                )}
+                {!isPreviewOnly && app.status === "live" && (
+                  <>
+                    <DropdownMenuSeparator />
+                    {(app.platform === "android" || app.platform === "both") && (
+                      <DropdownMenuItem onClick={() => handleDownload("android")}>
+                        <Download className="mr-2 h-4 w-4" /> Download APK
+                      </DropdownMenuItem>
+                    )}
+                    {(app.platform === "ios" || app.platform === "both") && (
+                      <DropdownMenuItem onClick={() => handleDownload("ios")}>
+                        <Download className="mr-2 h-4 w-4" /> Download iOS
+                      </DropdownMenuItem>
+                    )}
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
             
-            {/* Download buttons - Only for paid plans with live status */}
-            {!isPreviewOnly && app.status === "live" && (
-              <>
-                {(app.platform === "android" || app.platform === "both") && (
-                  <Button 
-                    size="sm"
-                    onClick={() => handleDownload("android")}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl"
-                  >
-                    <Download className="mr-2 h-4 w-4" /> APK
-                  </Button>
-                )}
-                {(app.platform === "ios" || app.platform === "both") && (
-                  <Button 
-                    size="sm"
-                    onClick={() => handleDownload("ios")}
-                    className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl"
-                  >
-                    <Download className="mr-2 h-4 w-4" /> iOS
-                  </Button>
-                )}
-              </>
-            )}
           </div>
 
           {/* Step navigation */}
@@ -566,29 +658,57 @@ export default function PreviewApp() {
             </DialogHeader>
           </div>
 
-          <div className="px-6 py-5 overflow-auto">
-            <div className="grid gap-6 md:grid-cols-[220px_1fr] items-start">
+          <div className="px-6 py-5 overflow-y-auto overflow-x-hidden">
+            <div className="grid gap-6 md:grid-cols-[240px_minmax(0,1fr)] items-start">
               {/* QR */}
               <div className="flex flex-col items-center gap-3">
-                <div className="p-4 bg-white rounded-2xl shadow-xl">
+                <div ref={qrContainerRef} className="p-5 bg-white rounded-3xl shadow-xl ring-1 ring-black/10">
                   <QRCodeSVG
                     value={getPreviewUrl()}
-                    size={168}
-                    level="H"
-                    includeMargin={false}
+                    size={190}
+                    level="M"
+                    includeMargin={true}
                     bgColor="#FFFFFF"
                     fgColor="#0a0a0a"
+                    imageSettings={
+                      app.iconUrl
+                        ? {
+                            src: app.iconUrl,
+                            height: 28,
+                            width: 28,
+                            excavate: true,
+                          }
+                        : undefined
+                    }
                   />
                 </div>
                 <div className="text-xs text-muted-foreground text-center">Open your camera and scan.</div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-white/10 bg-white/5 hover:bg-white/10 rounded-xl"
+                    onClick={() => void downloadQrPng()}
+                  >
+                    <Download className="mr-2 h-4 w-4" /> PNG
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-white/10 bg-white/5 hover:bg-white/10 rounded-xl"
+                    onClick={() => downloadQrSvg()}
+                  >
+                    <Download className="mr-2 h-4 w-4" /> SVG
+                  </Button>
+                </div>
               </div>
 
               {/* Link + Instructions */}
-              <div className="space-y-5">
+              <div className="space-y-5 min-w-0">
                 <div>
                   <label className="text-xs text-muted-foreground mb-2 block font-medium">Preview link</label>
                   <div className="flex items-center gap-2">
-                    <div className="flex-1 px-3 py-2.5 rounded-xl bg-white/5 border border-white/[0.06] text-sm text-muted-foreground truncate font-mono">
+                    <div className="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-white/5 border border-white/[0.06] text-sm text-muted-foreground truncate font-mono">
                       {getPreviewUrl()}
                     </div>
                     <Button

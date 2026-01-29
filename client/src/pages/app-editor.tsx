@@ -977,6 +977,17 @@ export default function AppEditor() {
                     primaryColor={branding.primaryColor}
                     appName={branding.name}
                     icon={branding.customLogo || branding.icon}
+                    screens={
+                      app.isNativeOnly || String(app.url || "").startsWith("native://")
+                        ? (app.editorScreens as any) || undefined
+                        : undefined
+                    }
+                    industry={
+                      app.isNativeOnly || String(app.url || "").startsWith("native://")
+                        ? (app.industry as any) || undefined
+                        : undefined
+                    }
+                    isNativeOnly={app.isNativeOnly || String(app.url || "").startsWith("native://")}
                   />
                 </CardContent>
               </Card>

@@ -395,6 +395,17 @@ export default function EditApp() {
                 appName={formData.name}
                 primaryColor={formData.primaryColor}
                 icon={formData.customLogo || formData.icon}
+                screens={
+                  app.isNativeOnly || String(formData.url || "").startsWith("native://")
+                    ? (app.editorScreens as any) || undefined
+                    : undefined
+                }
+                industry={
+                  app.isNativeOnly || String(formData.url || "").startsWith("native://")
+                    ? (app.industry as any) || undefined
+                    : undefined
+                }
+                isNativeOnly={app.isNativeOnly || String(formData.url || "").startsWith("native://")}
               />
               <p className="text-center text-sm text-muted-foreground mt-4">Live Preview</p>
             </div>
