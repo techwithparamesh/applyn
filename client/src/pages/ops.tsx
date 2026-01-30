@@ -89,6 +89,10 @@ type SupportTicket = {
   updatedAt: string | Date;
 };
 
+type ProductionRequestsMeta = {
+  totalCount: number;
+};
+
 function isStaffRole(role: Role) {
   return role === "admin" || role === "support";
 }
@@ -103,6 +107,31 @@ export default function Ops() {
   });
 
   const isStaff = useMemo(() => isStaffRole(me?.role || "user"), [me]);
+
+  const { data: productionRequestsMeta } = useQuery<ProductionRequestsMeta | null>({
+    queryKey: ["/api/admin/play/production-requests", "meta"],
+    enabled: !!me && isStaff,
+    staleTime: 15_000,
+    refetchInterval: 15_000,
+    retry: false,
+    queryFn: async () => {
+      const res = await fetch("/api/admin/play/production-requests?limit=1&offset=0", {
+        credentials: "include",
+      });
+
+      if (res.status === 401 || res.status === 403) return null;
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(text || `Request failed (${res.status})`);
+      }
+
+      const json = (await res.json()) as any;
+      return { totalCount: Number(json?.totalCount ?? 0) };
+    },
+  });
+
+  const approvalsCount = productionRequestsMeta?.totalCount ?? 0;
+  const approvalsCountLabel = approvalsCount > 99 ? "99+" : String(approvalsCount);
 
   useEffect(() => {
     if (meLoading) return;
@@ -387,6 +416,33 @@ export default function Ops() {
               </div>
             </CardContent>
           </Card>
+
+          {approvalsCount > 0 && (
+            <Card className="glass border-white/10">
+              <CardContent className="pt-4 pb-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                      <Smartphone className="h-5 w-5 text-amber-300" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-amber-200">{approvalsCountLabel}</div>
+                      <div className="text-xs text-muted-foreground">Play Approvals</div>
+                    </div>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-white/10 text-white hover:bg-white/5"
+                    onClick={() => setLocation("/admin/play-approvals")}
+                  >
+                    Review
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card className="glass border-white/10">
             <CardContent className="pt-4 pb-3">

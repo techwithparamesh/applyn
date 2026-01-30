@@ -149,6 +149,18 @@ export class MysqlStorage {
     return await this.getUser(userId);
   }
 
+  async setUserPlayRefreshTokenEnc(userId: string, tokenEnc: string | null): Promise<User | undefined> {
+    await getMysqlDb()
+      .update(users)
+      .set({
+        playRefreshTokenEnc: tokenEnc,
+        playConnectedAt: tokenEnc ? new Date() : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+    return await this.getUser(userId);
+  }
+
   // ============================================
   // SUBSCRIPTION MANAGEMENT
   // ============================================
@@ -427,6 +439,7 @@ export class MysqlStorage {
       navigation: (app as any).navigation ? JSON.stringify((app as any).navigation) : null,
       editorScreensHistory: (app as any).editorScreensHistory ? JSON.stringify((app as any).editorScreensHistory) : null,
       features: app.features ? JSON.stringify(app.features) : null,
+      playPublishingMode: (app as any).playPublishingMode ?? "central",
       createdAt: now,
       updatedAt: now,
     });

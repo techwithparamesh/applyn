@@ -7,6 +7,7 @@ import rateLimit from "express-rate-limit";
 import sharp from "sharp";
 import PDFDocument from "pdfkit";
 import { z } from "zod";
+import { google } from "googleapis";
 import {
   insertAppSchema,
   insertContactSubmissionSchema,
@@ -27,8 +28,9 @@ import { hashPassword, sanitizeUser, verifyPassword } from "./auth";
 import { sendPasswordResetEmail, isEmailConfigured, sendTeamMemberWelcomeEmail, sendEmailVerificationEmail, sendBuildCompleteEmail, sendAccountLockedEmail } from "./email";
 import crypto from "crypto";
 import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
-import { getMysqlDb } from "./db-mysql";
+import { getMysqlDb, getMysqlPool } from "./db-mysql";
 import {
+  apps,
   appCustomers,
   appEvents,
   appOrderItems,
@@ -55,6 +57,7 @@ import {
   appMusicTracks,
   appLeads,
   appWebhooks,
+  users as usersTable,
 } from "@shared/db.mysql";
 import {
   isLLMConfigured,
@@ -75,6 +78,10 @@ import {
   canDownloadIpa,
   canSubmitToAppStore,
 } from "./build-validation";
+import { decryptToken, encryptToken } from "./security/token-encryption";
+import { PlayPublisher, type PlayCredentials, type PlayTrack } from "./publishing/playPublisher";
+import { validateForPublish } from "./publishing/publishValidator";
+import { scanPolicy } from "./publishing/policyScanner";
 
 function isGoogleConfigured() {
   return !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
@@ -479,6 +486,94 @@ export async function registerRoutes(
     standardHeaders: true,
     legacyHeaders: false,
   });
+
+  const playOauthLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req: any) => getAuthedUser(req)?.id || req.ip || "unknown",
+  });
+
+  const publishLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: 6,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req: any) => getAuthedUser(req)?.id || req.ip || "unknown",
+  });
+
+  // Prevent concurrent Google Play publish/promote operations per app.
+  // Uses MySQL advisory locks when available; otherwise falls back to an in-process lock.
+  const inProcessPublishLocks = new Map<string, number>();
+
+  const withPlayPublishLock = async <T,>(appId: string, fn: () => Promise<T>): Promise<T> => {
+    const lockName = `play_publish:${appId}`;
+    const timeoutSec = Number(process.env.PUBLISH_LOCK_TIMEOUT_SEC || 10);
+
+    // Prefer MySQL advisory lock in production.
+    try {
+      if (String(process.env.STORAGE || "").toLowerCase() === "mysql") {
+        const pool = getMysqlPool();
+        const [rows] = await pool.query("SELECT GET_LOCK(?, ?) AS got", [lockName, timeoutSec]);
+        const got = Array.isArray(rows) ? (rows as any)[0]?.got : (rows as any)?.got;
+        if (Number(got) !== 1) {
+          throw Object.assign(new Error("Publish already in progress for this app."), { status: 409 });
+        }
+        try {
+          return await fn();
+        } finally {
+          try {
+            await pool.query("SELECT RELEASE_LOCK(?)", [lockName]);
+          } catch {
+            // ignore
+          }
+        }
+      }
+    } catch (err: any) {
+      // If MySQL lock fails unexpectedly, fall back to in-process locking.
+      if (err?.status === 409) throw err;
+    }
+
+    const now = Date.now();
+    const ttlMs = Number(process.env.PUBLISH_LOCK_TTL_MS || 2 * 60 * 1000);
+    const existingUntil = inProcessPublishLocks.get(lockName);
+    if (existingUntil && existingUntil > now) {
+      throw Object.assign(new Error("Publish already in progress for this app."), { status: 409 });
+    }
+
+    inProcessPublishLocks.set(lockName, now + ttlMs);
+    try {
+      return await fn();
+    } finally {
+      inProcessPublishLocks.delete(lockName);
+    }
+  };
+
+  const playPublisher = new PlayPublisher({
+    storage,
+    artifactsRoot: safeArtifactsRoot(),
+  });
+
+  const resolvePlayCredentialsForApp = async (appItem: any, user: User): Promise<PlayCredentials> => {
+    const mode = (appItem as any)?.playPublishingMode === "user" ? "user" : "central";
+    if (mode === "central") return { type: "central" };
+
+    const freshUser = await storage.getUser(user.id);
+    const enc = typeof (freshUser as any)?.playRefreshTokenEnc === "string" ? String((freshUser as any).playRefreshTokenEnc).trim() : "";
+    if (!enc) {
+      throw new Error("No Google Play account connected. Connect your Play account via OAuth first.");
+    }
+
+    let refreshToken: string;
+    try {
+      refreshToken = decryptToken(enc);
+    } catch (err: any) {
+      throw new Error(err?.message || "Failed to decrypt Play refresh token");
+    }
+
+    return { type: "user", oauthRefreshToken: refreshToken };
+  };
 
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, time: new Date().toISOString() });
@@ -1199,6 +1294,193 @@ export async function registerRoutes(
       return res.redirect(returnTo);
     },
   );
+
+  // ============================================
+  // Google Play OAuth (Phase 2)
+  // ============================================
+
+  const getPlayOauthRedirectUrl = (req: any) => {
+    const env = typeof process.env.GOOGLE_PLAY_OAUTH_REDIRECT_URL === "string" ? process.env.GOOGLE_PLAY_OAUTH_REDIRECT_URL.trim() : "";
+    if (env) return env;
+
+    const proto = (req.headers["x-forwarded-proto"] as string | undefined) || req.protocol;
+    const host = (req.headers["x-forwarded-host"] as string | undefined) || req.get("host");
+    return `${proto}://${host}/auth/google/play/callback`;
+  };
+
+  const buildPlayOauthClient = (redirectUrl: string) => {
+    const clientId = String(process.env.GOOGLE_CLIENT_ID || "").trim();
+    const clientSecret = String(process.env.GOOGLE_CLIENT_SECRET || "").trim();
+    if (!clientId || !clientSecret) {
+      throw new Error("Google OAuth is not configured (missing GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET)");
+    }
+    return new google.auth.OAuth2(clientId, clientSecret, redirectUrl);
+  };
+
+  const playScope = "https://www.googleapis.com/auth/androidpublisher";
+
+  const clearPlayOauthSession = (req: any) => {
+    try {
+      const sess = (req as any).session;
+      if (sess?.playOauth) sess.playOauth = null;
+    } catch {
+      // ignore
+    }
+  };
+
+  const startPlayOauth = (req: any, res: any) => {
+    const user = getAuthedUser(req);
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+    if (!isGoogleConfigured()) {
+      return res.status(503).json({ message: "Google OAuth is not configured" });
+    }
+
+    const returnTo = safeReturnTo(req.query.returnTo);
+    const redirectUrl = getPlayOauthRedirectUrl(req);
+    const oauth2 = buildPlayOauthClient(redirectUrl);
+
+    const nonce = crypto.randomBytes(16).toString("hex");
+    (req as any).session.playOauth = {
+      nonce,
+      returnTo,
+      createdAt: Date.now(),
+    };
+
+    const authUrl = oauth2.generateAuthUrl({
+      access_type: "offline",
+      prompt: "consent",
+      scope: [playScope],
+      state: nonce,
+      include_granted_scopes: true,
+    });
+
+    return res.redirect(authUrl);
+  };
+
+  app.get("/auth/google/play", requireAuth, playOauthLimiter, startPlayOauth);
+  // Alias (some deployments route all auth under /api)
+  app.get("/api/auth/google/play", requireAuth, playOauthLimiter, startPlayOauth);
+
+  const playOauthCallback = async (req: any, res: any, next: any) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const sess = (req as any).session;
+      const state = typeof req.query.state === "string" ? req.query.state : "";
+      const code = typeof req.query.code === "string" ? req.query.code : "";
+      const stored = sess?.playOauth;
+
+      const returnTo = safeReturnTo(stored?.returnTo);
+      const maxAgeMs = 15 * 60 * 1000;
+      const createdAtMs = typeof stored?.createdAt === "number" ? stored.createdAt : 0;
+      const expired = !createdAtMs || Date.now() - createdAtMs > maxAgeMs;
+
+      if (!stored?.nonce || state !== stored.nonce || expired) {
+        clearPlayOauthSession(req);
+        return res.redirect(`/dashboard?error=play_oauth_state`);
+      }
+      if (!code) {
+        clearPlayOauthSession(req);
+        return res.redirect(`${returnTo}?error=play_oauth_code`);
+      }
+
+      const redirectUrl = getPlayOauthRedirectUrl(req);
+      const oauth2 = buildPlayOauthClient(redirectUrl);
+
+      const tokenResp = await oauth2.getToken(code);
+      const refresh = String(tokenResp.tokens.refresh_token || "").trim();
+
+      if (refresh) {
+        const tokenEnc = encryptToken(refresh);
+        await storage.setUserPlayRefreshTokenEnc(user.id, tokenEnc);
+      } else {
+        // Google often only returns refresh_token the *first* time the user consents.
+        // If we already have a stored refresh token, treat this as success.
+        const freshUser = await storage.getUser(user.id);
+        const existingEnc = typeof (freshUser as any)?.playRefreshTokenEnc === "string" ? String((freshUser as any).playRefreshTokenEnc).trim() : "";
+        if (!existingEnc) {
+          clearPlayOauthSession(req);
+          return res.redirect(`${returnTo}?error=play_oauth_no_refresh`);
+        }
+      }
+
+      storage.createAuditLog({
+        userId: user.id,
+        action: "user.play.connected",
+        targetType: "user",
+        targetId: user.id,
+        metadata: { scopes: [playScope] },
+        ipAddress: req.ip || null,
+        userAgent: req.headers["user-agent"] || null,
+      }).catch(() => {});
+
+      // Clear state
+      clearPlayOauthSession(req);
+
+      return res.redirect(`${returnTo}?play=connected`);
+    } catch (err) {
+      clearPlayOauthSession(req);
+      return next(err);
+    }
+  };
+
+  app.get("/auth/google/play/callback", requireAuth, playOauthLimiter, playOauthCallback);
+  app.get("/api/auth/google/play/callback", requireAuth, playOauthLimiter, playOauthCallback);
+
+  app.get("/api/auth/google/play/status", requireAuth, async (req, res) => {
+    const user = getAuthedUser(req);
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+    const fresh = await storage.getUser(user.id);
+    const enc = typeof (fresh as any)?.playRefreshTokenEnc === "string" ? String((fresh as any).playRefreshTokenEnc).trim() : "";
+    const connectedAt = (fresh as any)?.playConnectedAt ?? null;
+    return res.json({ connected: !!enc, connectedAt });
+  });
+
+  app.post("/api/auth/google/play/disconnect", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      await storage.setUserPlayRefreshTokenEnc(user.id, null);
+
+      storage.createAuditLog({
+        userId: user.id,
+        action: "user.play.disconnected",
+        targetType: "user",
+        targetId: user.id,
+        metadata: {},
+        ipAddress: req.ip || null,
+        userAgent: req.headers["user-agent"] || null,
+      }).catch(() => {});
+
+      return res.json({ ok: true });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.get("/api/auth/google/play/validate", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const fresh = await storage.getUser(user.id);
+      const enc = typeof (fresh as any)?.playRefreshTokenEnc === "string" ? String((fresh as any).playRefreshTokenEnc).trim() : "";
+      if (!enc) return res.status(409).json({ ok: false, message: "No Play account connected" });
+
+      let refreshToken: string;
+      try {
+        refreshToken = decryptToken(enc);
+      } catch (err: any) {
+        return res.status(503).json({ ok: false, message: "Play token encryption is not configured", details: err?.message || String(err) });
+      }
+
+      const result = await playPublisher.validatePlayConnection({ type: "user", oauthRefreshToken: refreshToken });
+      return res.json(result);
+    } catch (err) {
+      return next(err);
+    }
+  });
 
   app.post("/api/auth/logout", requireAuth, (req, res, next) => {
     const logout = (req as any).logout as
@@ -4488,6 +4770,64 @@ export async function registerRoutes(
     },
   );
 
+  // --- Admin: Google Play production approval queue ---
+  app.get("/api/admin/play/production-requests", requireAuth, requireRole(["admin", "support"]), async (req, res, next) => {
+    try {
+      const parsed = z
+        .object({
+          limit: z.coerce.number().int().min(1).max(200).optional(),
+          offset: z.coerce.number().int().min(0).max(5000).optional(),
+        })
+        .safeParse(req.query);
+
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid query" });
+      }
+
+      const limit = parsed.data.limit ?? 50;
+      const offset = parsed.data.offset ?? 0;
+
+      const whereClause = and(
+        eq(apps.playPublishingMode, "central" as any),
+        eq(apps.playProductionStatus, "requested" as any),
+      );
+
+      const totalRow = await getMysqlDb()
+        .select({ totalCount: sql<number>`count(*)` })
+        .from(apps)
+        .where(whereClause);
+
+      const totalCount = Number(totalRow?.[0]?.totalCount ?? 0);
+
+      const rows = await getMysqlDb()
+        .select({
+          id: apps.id,
+          ownerId: apps.ownerId,
+          ownerUsername: usersTable.username,
+          name: apps.name,
+          url: apps.url,
+          status: apps.status,
+          packageName: apps.packageName,
+          playPublishingMode: apps.playPublishingMode,
+          playProductionStatus: apps.playProductionStatus,
+          playProductionRequestedAt: apps.playProductionRequestedAt,
+          lastPlayPublishedAt: apps.lastPlayPublishedAt,
+          lastPlayTrack: apps.lastPlayTrack,
+          lastPlayVersionCode: apps.lastPlayVersionCode,
+        })
+        .from(apps)
+        .leftJoin(usersTable, eq(usersTable.id, apps.ownerId))
+        .where(whereClause)
+        .orderBy(desc(apps.playProductionRequestedAt))
+        .limit(limit)
+        .offset(offset);
+
+      return res.json({ items: rows, limit, offset, totalCount });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
   // Get single user details with their apps and tickets (for admin support)
   app.get(
     "/api/admin/users/:id",
@@ -5678,6 +6018,409 @@ export async function registerRoutes(
       const validation = canDownloadAab(appItem, plan, buildInfo);
 
       return res.json(validation);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Publish the latest AAB to Google Play Internal Testing (Standard/Pro)
+  app.post("/api/apps/:id/publish/play/internal", requireAuth, publishLimiter, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const appId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      if (!appId) return res.status(400).json({ message: "Missing app id" });
+
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "App not found" });
+      }
+
+      const { plan, limits } = await getAppPlanInfo(appItem.id);
+      if (!limits.playStoreReady || !limits.aabEnabled) {
+        return res.status(403).json({
+          message: "Google Play publishing requires Standard plan or above.",
+          requiresUpgrade: true,
+          minimumPlan: "standard",
+        });
+      }
+
+      if (appItem.status !== "live") {
+        return res.status(409).json({ message: "Build not ready. Please build the app first." });
+      }
+
+      const pkg = String(appItem.packageName || "").trim();
+      if (!pkg) {
+        return res.status(400).json({ message: "Missing package name. Set a valid package name first." });
+      }
+
+      let credentials: PlayCredentials;
+      try {
+        credentials = await resolvePlayCredentialsForApp(appItem, user);
+      } catch (err: any) {
+        const msg = err?.message ? String(err.message) : "Missing Google Play credentials";
+        return res.status(409).json({ message: msg });
+      }
+
+      let result: any;
+      try {
+        result = await withPlayPublishLock(appItem.id, () => playPublisher.publishToInternalTrack(appItem.id, credentials));
+      } catch (err: any) {
+        if (err?.status === 409) return res.status(409).json({ message: err.message || "Publish already in progress" });
+        const msg = err?.message ? String(err.message) : "Google Play publish failed";
+        if (msg.toLowerCase().includes("missing google play credentials")) {
+          return res.status(503).json({
+            message: "Google Play publishing is not configured on the server.",
+            details: "Set GOOGLE_PLAY_SERVICE_ACCOUNT_JSON (or GOOGLE_PLAY_SERVICE_ACCOUNT_B64) and grant the service account access in Play Console.",
+          });
+        }
+        return res.status(500).json({ message: "Google Play publish failed", details: msg });
+      }
+
+      // Persist last publish info (best-effort)
+      storage.updateApp(appItem.id, {
+        lastPlayTrack: result.track,
+        lastPlayVersionCode: result.versionCode,
+        lastPlayPublishedAt: new Date(),
+        lastPlayReleaseStatus: "completed",
+      } as any).catch(() => {});
+
+      // Audit log (best-effort)
+      storage.createAuditLog({
+        userId: user.id,
+        action: "app.play.publish.internal",
+        targetType: "app",
+        targetId: appItem.id,
+        metadata: { packageName: pkg, versionCode: result.versionCode, track: result.track },
+        ipAddress: req.ip || null,
+        userAgent: req.headers["user-agent"] || null,
+      }).catch(() => {});
+
+      return res.json({
+        message: "Published to Google Play Internal Testing",
+        ...result,
+        plan,
+      });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Preflight publish checks (Phase 3)
+  app.get("/api/apps/:id/publish/preflight", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const appItem = await storage.getApp(req.params.id);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "App not found" });
+      }
+
+      const validation = validateForPublish(appItem);
+      const policy = scanPolicy(appItem);
+
+      const riskThreshold = Number(process.env.PUBLISH_POLICY_RISK_THRESHOLD || 0.7);
+      const policyBlocked = policy.riskScore >= riskThreshold;
+
+      return res.json({
+        validation,
+        policy,
+        policyBlocked,
+        policyRiskThreshold: riskThreshold,
+      });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Phase 1: Owner requests production publishing (central mode only)
+  app.post("/api/apps/:id/request-production", requireAuth, publishLimiter, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const appId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      if (!appId) return res.status(400).json({ message: "Missing app id" });
+
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "App not found" });
+      }
+
+      const mode = (appItem as any)?.playPublishingMode === "user" ? "user" : "central";
+      if (mode !== "central") {
+        return res.status(409).json({ message: "Production approval is only required for Platform-managed publishing." });
+      }
+
+      const updated = await storage.updateApp(appItem.id, {
+        playProductionStatus: "requested",
+        playProductionRequestedAt: new Date(),
+        playProductionDecisionAt: null,
+        playProductionDecisionBy: null,
+        playProductionDecisionReason: null,
+      } as any);
+
+      storage.createAuditLog({
+        userId: user.id,
+        action: "app.play.request_production",
+        targetType: "app",
+        targetId: appItem.id,
+        metadata: { mode },
+        ipAddress: req.ip || null,
+        userAgent: req.headers["user-agent"] || null,
+      }).catch(() => {});
+
+      return res.json({ ok: true, app: updated });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Phase 1: Admin approves/rejects production publish
+  app.post("/api/apps/:id/admin/production-decision", requireAuth, publishLimiter, requireRole(["admin", "support"]), async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const body = z
+        .object({
+          approved: z.boolean(),
+          reason: z.string().max(2000).optional(),
+        })
+        .strict()
+        .parse(req.body);
+
+      const appId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      if (!appId) return res.status(400).json({ message: "Missing app id" });
+
+      const appItem = await storage.getApp(appId);
+      if (!appItem) return res.status(404).json({ message: "App not found" });
+
+      const nextStatus = body.approved ? "approved" : "rejected";
+      const updated = await storage.updateApp(appItem.id, {
+        playProductionStatus: nextStatus,
+        playProductionDecisionAt: new Date(),
+        playProductionDecisionBy: user.id,
+        playProductionDecisionReason: body.reason || null,
+      } as any);
+
+      storage.createAuditLog({
+        userId: user.id,
+        action: body.approved ? "app.play.approve_production" : "app.play.reject_production",
+        targetType: "app",
+        targetId: appItem.id,
+        metadata: { reason: body.reason || null },
+        ipAddress: req.ip || null,
+        userAgent: req.headers["user-agent"] || null,
+      }).catch(() => {});
+
+      return res.json({ ok: true, app: updated });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Phase 1+2+3: Publish to Google Play Production
+  app.post("/api/apps/:id/publish/play/production", requireAuth, publishLimiter, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const appId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      if (!appId) return res.status(400).json({ message: "Missing app id" });
+
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "App not found" });
+      }
+
+      const { plan, limits } = await getAppPlanInfo(appItem.id);
+      if (!limits.playStoreReady || !limits.aabEnabled) {
+        return res.status(403).json({
+          message: "Google Play publishing requires Standard plan or above.",
+          requiresUpgrade: true,
+          minimumPlan: "standard",
+        });
+      }
+
+      if (appItem.status !== "live") {
+        return res.status(409).json({ message: "Build not ready. Please build the app first." });
+      }
+
+      const pkg = String(appItem.packageName || "").trim();
+      if (!pkg) return res.status(400).json({ message: "Missing package name." });
+
+      // Phase 3: validation + policy scan
+      const validation = validateForPublish(appItem);
+      if (!validation.isValid) {
+        return res.status(422).json({
+          message: "Publish blocked: validation failed",
+          validation,
+        });
+      }
+
+      const policy = scanPolicy(appItem);
+      const riskThreshold = Number(process.env.PUBLISH_POLICY_RISK_THRESHOLD || 0.7);
+      const policyBlocked = policy.riskScore >= riskThreshold;
+      if (policyBlocked && !isStaff(user)) {
+        return res.status(422).json({
+          message: "Publish blocked: policy risk too high",
+          policy,
+          policyRiskThreshold: riskThreshold,
+        });
+      }
+
+      const mode = (appItem as any)?.playPublishingMode === "user" ? "user" : "central";
+      if (mode === "central") {
+        const status = String((appItem as any)?.playProductionStatus || "none");
+        if (status !== "approved") {
+          return res.status(409).json({
+            message: "Production publishing requires admin approval. Request production approval first.",
+            playProductionStatus: status,
+          });
+        }
+      }
+
+      let credentials: PlayCredentials;
+      try {
+        credentials = await resolvePlayCredentialsForApp(appItem, user);
+      } catch (err: any) {
+        return res.status(409).json({ message: err?.message || "Missing Google Play credentials" });
+      }
+
+      let result: any;
+      try {
+        result = await withPlayPublishLock(appItem.id, () => playPublisher.publishToProduction(appItem.id, credentials));
+      } catch (err: any) {
+        if (err?.status === 409) return res.status(409).json({ message: err.message || "Publish already in progress" });
+        const msg = err?.message ? String(err.message) : "Google Play publish failed";
+        return res.status(500).json({ message: "Google Play publish failed", details: msg });
+      }
+
+      await storage.updateApp(appItem.id, {
+        lastPlayTrack: result.track,
+        lastPlayVersionCode: result.versionCode,
+        lastPlayPublishedAt: new Date(),
+        lastPlayReleaseStatus: "completed",
+      } as any);
+
+      storage.createAuditLog({
+        userId: user.id,
+        action: "app.play.publish.production",
+        targetType: "app",
+        targetId: appItem.id,
+        metadata: { packageName: pkg, versionCode: result.versionCode, track: result.track, mode },
+        ipAddress: req.ip || null,
+        userAgent: req.headers["user-agent"] || null,
+      }).catch(() => {});
+
+      return res.json({
+        message: "Published to Google Play Production",
+        ...result,
+        plan,
+      });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.post("/api/apps/:id/publish/play/promote", requireAuth, publishLimiter, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const appId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      if (!appId) return res.status(400).json({ message: "Missing app id" });
+
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "App not found" });
+      }
+
+      const body = z
+        .object({
+          fromTrack: z.enum(["internal", "alpha", "beta", "production"]),
+          toTrack: z.enum(["internal", "alpha", "beta", "production"]),
+        })
+        .strict()
+        .parse(req.body);
+
+      let credentials: PlayCredentials;
+      try {
+        credentials = await resolvePlayCredentialsForApp(appItem, user);
+      } catch (err: any) {
+        return res.status(409).json({ message: err?.message || "Missing Google Play credentials" });
+      }
+
+      const result = await withPlayPublishLock(appItem.id, () => playPublisher.promoteTrack(appItem.id, body.fromTrack as PlayTrack, body.toTrack as PlayTrack, credentials));
+
+      storage.createAuditLog({
+        userId: user.id,
+        action: "app.play.promote",
+        targetType: "app",
+        targetId: appItem.id,
+        metadata: result,
+        ipAddress: req.ip || null,
+        userAgent: req.headers["user-agent"] || null,
+      }).catch(() => {});
+
+      return res.json(result);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Health endpoint (Phase 3)
+  app.get("/api/apps/:id/health", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const appItem = await storage.getApp(req.params.id);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "App not found" });
+      }
+
+      const pkg = String(appItem.packageName || "").trim();
+      let release: any = null;
+      let releaseError: string | null = null;
+
+      if (pkg) {
+        try {
+          const credentials = await resolvePlayCredentialsForApp(appItem, user);
+          release = await playPublisher.checkReleaseStatus(pkg, credentials);
+        } catch (err: any) {
+          releaseError = err?.message ? String(err.message) : "Failed to fetch release status";
+        }
+      }
+
+      storage.createAuditLog({
+        userId: user.id,
+        action: "app.health.check",
+        targetType: "app",
+        targetId: appItem.id,
+        metadata: { hasPackageName: !!pkg },
+        ipAddress: req.ip || null,
+        userAgent: req.headers["user-agent"] || null,
+      }).catch(() => {});
+
+      return res.json({
+        appId: appItem.id,
+        crashRate7d: (appItem as any).crashRate7d ?? null,
+        lastCrashAt: (appItem as any).lastCrashAt ?? null,
+        publishing: {
+          mode: (appItem as any)?.playPublishingMode || "central",
+          productionStatus: (appItem as any)?.playProductionStatus || "none",
+          lastTrack: (appItem as any)?.lastPlayTrack || null,
+          lastVersionCode: (appItem as any)?.lastPlayVersionCode || null,
+          lastPublishedAt: (appItem as any)?.lastPlayPublishedAt || null,
+          lastReleaseStatus: (appItem as any)?.lastPlayReleaseStatus || null,
+        },
+        release,
+        releaseError,
+      });
     } catch (err) {
       return next(err);
     }

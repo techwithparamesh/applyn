@@ -5,6 +5,8 @@ export const users = mysqlTable("users", {
   name: text("name"),
   username: varchar("username", { length: 200 }).notNull().unique(),
   googleId: varchar("google_id", { length: 255 }).unique(),
+  playRefreshTokenEnc: text("play_refresh_token_enc"),
+  playConnectedAt: timestamp("play_connected_at", { mode: "date" }),
   role: varchar("role", { length: 16 }).notNull().default("user"),
   password: text("password").notNull(),
   mustChangePassword: boolean("must_change_password").notNull().default(false), // Force password change on first login
@@ -30,6 +32,22 @@ export const users = mysqlTable("users", {
   planStatusIdx: index("users_plan_status_idx").on(table.planStatus),
   planExpiryIdx: index("users_plan_expiry_idx").on(table.planExpiryDate),
 }));
+
+const doubleNumber = customType<{ data: number | null; driverData: number | null }>(
+  {
+    dataType() {
+      return "double";
+    },
+    toDriver(value) {
+      return value;
+    },
+    fromDriver(value) {
+      if (value === null || value === undefined) return null;
+      const n = typeof value === "number" ? value : Number(value);
+      return Number.isFinite(n) ? n : null;
+    },
+  }
+);
 
 export const apps = mysqlTable("apps", {
   id: varchar("id", { length: 36 }).primaryKey(),
@@ -87,11 +105,31 @@ export const apps = mysqlTable("apps", {
   buildError: text("build_error"),
   lastBuildAt: timestamp("last_build_at", { mode: "date" }),
   apiSecret: varchar("api_secret", { length: 64 }), // For push notification token registration auth
+
+  // Google Play publishing state
+  playPublishingMode: varchar("play_publishing_mode", { length: 16 }).notNull().default("central"),
+  playProductionStatus: varchar("play_production_status", { length: 16 }).notNull().default("none"),
+  playProductionRequestedAt: timestamp("play_production_requested_at", { mode: "date" }),
+  playProductionDecisionAt: timestamp("play_production_decision_at", { mode: "date" }),
+  playProductionDecisionBy: varchar("play_production_decision_by", { length: 36 }),
+  playProductionDecisionReason: text("play_production_decision_reason"),
+  lastPlayTrack: varchar("last_play_track", { length: 16 }),
+  lastPlayVersionCode: int("last_play_version_code"),
+  lastPlayPublishedAt: timestamp("last_play_published_at", { mode: "date" }),
+  lastPlayReleaseStatus: varchar("last_play_release_status", { length: 32 }),
+
+  // Health monitoring (aggregated)
+  crashRate7d: doubleNumber("crash_rate_7d"),
+  lastCrashAt: timestamp("last_crash_at", { mode: "date" }),
+  lastHealthSyncAt: timestamp("last_health_sync_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 }, (table) => ({
   ownerIdIdx: index("apps_owner_id_idx").on(table.ownerId),
   statusIdx: index("apps_status_idx").on(table.status),
+  playProdStatusIdx: index("apps_play_production_status_idx").on(table.playProductionStatus),
+  playProdRequestedIdx: index("apps_play_production_requested_at_idx").on(table.playProductionRequestedAt),
+  lastPlayPublishedIdx: index("apps_last_play_published_at_idx").on(table.lastPlayPublishedAt),
 }));
 
 // --- App Runtime (end-user) tables ---

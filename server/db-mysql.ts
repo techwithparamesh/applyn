@@ -46,3 +46,22 @@ export function getMysqlDb() {
 
   return db;
 }
+
+export function getMysqlPool(): mysql.Pool {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is required when STORAGE=mysql");
+  }
+
+  if (!pool) {
+    const opts = parseMysqlUrl(process.env.DATABASE_URL);
+    pool = mysql.createPool({
+      ...opts,
+      waitForConnections: true,
+      connectionLimit: Number(process.env.DB_POOL_SIZE || 10),
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 0,
+    });
+  }
+
+  return pool;
+}

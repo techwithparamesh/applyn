@@ -1,9 +1,9 @@
 import { Navbar } from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Download, RefreshCw, ExternalLink, QrCode, Share2, Copy, CheckCircle2, Wand2, AlertTriangle, MoreHorizontal } from "lucide-react";
+import { ArrowLeft, Download, RefreshCw, ExternalLink, QrCode, Share2, Copy, CheckCircle2, Wand2, AlertTriangle, MoreHorizontal, UploadCloud, Edit, Crown, Sparkles, Smartphone } from "lucide-react";
 import { useLocation, useParams, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { getQueryFn } from "@/lib/queryClient";
+import { apiRequest, getQueryFn } from "@/lib/queryClient";
 import { DevicePreview } from "@/components/device-preview";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
@@ -55,6 +55,8 @@ export default function PreviewApp() {
   const [showQRModal, setShowQRModal] = useState(false);
   const [copied, setCopied] = useState(false);
   const qrContainerRef = useRef<HTMLDivElement | null>(null);
+  const [qrMode, setQrMode] = useState<"preview" | "play">("preview");
+  const [publishingPlay, setPublishingPlay] = useState(false);
   
   // Check if coming from appId query param (create flow)
   const params = new URLSearchParams(search);
@@ -153,14 +155,27 @@ export default function PreviewApp() {
     return `${baseUrl}/live-preview/${app.id}`;
   };
 
-  // Copy preview URL to clipboard
-  const copyPreviewUrl = async () => {
+  const getPlayTestingUrl = () => {
+    if (!app.packageName) return null;
+    return `https://play.google.com/apps/testing/${app.packageName}`;
+  };
+
+  const canUsePlayQr = Boolean(app.packageName);
+
+  const getActiveQrUrl = () => {
+    if (qrMode === "play") {
+      return getPlayTestingUrl() || getPreviewUrl();
+    }
+    return getPreviewUrl();
+  };
+
+  const copyUrlToClipboard = async (url: string) => {
     try {
-      await navigator.clipboard.writeText(getPreviewUrl());
+      await navigator.clipboard.writeText(url);
       setCopied(true);
       toast({
         title: "Link copied",
-        description: "Anyone with this link can preview the app.",
+        description: "Copied to clipboard.",
       });
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -172,8 +187,7 @@ export default function PreviewApp() {
     }
   };
 
-  const shareOrCopyPreviewUrl = async () => {
-    const url = getPreviewUrl();
+  const shareOrCopyUrl = async (url: string) => {
     try {
       if (navigator.share) {
         await navigator.share({
@@ -185,7 +199,30 @@ export default function PreviewApp() {
     } catch {
       // fall back to copy
     }
-    await copyPreviewUrl();
+    await copyUrlToClipboard(url);
+  };
+
+  const publishToPlayInternal = async () => {
+    if (!app) return;
+    try {
+      setPublishingPlay(true);
+      const res = await apiRequest("POST", `/api/apps/${app.id}/publish/play/internal`);
+      const payload = await res.json().catch(() => null);
+      toast({
+        title: "Published to Play (Internal testing)",
+        description: payload?.testingUrl ? "Tester install link is ready." : "Done.",
+      });
+      setQrMode("play");
+      setShowQRModal(true);
+    } catch (err: any) {
+      toast({
+        title: "Publish failed",
+        description: err?.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setPublishingPlay(false);
+    }
   };
 
   const getSafeFilename = (raw: string) => {
@@ -365,7 +402,7 @@ export default function PreviewApp() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={() => void shareOrCopyPreviewUrl()}>
+                <DropdownMenuItem onClick={() => void shareOrCopyUrl(getPreviewUrl())}>
                   <Share2 className="mr-2 h-4 w-4" /> Share / Copy link
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setShowQRModal(true)}>
@@ -374,6 +411,15 @@ export default function PreviewApp() {
                 <DropdownMenuItem onClick={() => window.open(getPreviewUrl(), "_blank", "noopener,noreferrer")}>
                   <ExternalLink className="mr-2 h-4 w-4" /> Open preview
                 </DropdownMenuItem>
+                {app.packageName && app.status === "live" && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => void publishToPlayInternal()} disabled={publishingPlay}>
+                      <UploadCloud className="mr-2 h-4 w-4" />
+                      {publishingPlay ? "Publishing to Play…" : "Publish to Play (Internal)"}
+                    </DropdownMenuItem>
+                  </>
+                )}
                 {isHttpUrl(app.url) && (
                   <DropdownMenuItem onClick={() => window.open(app.url, "_blank", "noopener,noreferrer")}>
                     <ExternalLink className="mr-2 h-4 w-4" /> Visit website
@@ -449,7 +495,7 @@ export default function PreviewApp() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => void copyPreviewUrl()}
+                      onClick={() => void copyUrlToClipboard(getPreviewUrl())}
                       className="border-white/[0.10] bg-white/[0.03] hover:bg-white/[0.06] rounded-xl h-10 w-10 p-0"
                       aria-label="Copy preview link"
                     >
@@ -659,12 +705,36 @@ export default function PreviewApp() {
           </div>
 
           <div className="px-6 py-5 overflow-y-auto overflow-x-hidden">
+            {canUsePlayQr && (
+              <div className="mb-5">
+                <div className="inline-flex p-1 rounded-xl bg-white/5 border border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setQrMode("preview")}
+                    className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
+                      qrMode === "preview" ? "bg-white/10 text-white" : "text-muted-foreground hover:text-white"
+                    }`}
+                  >
+                    Live preview
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQrMode("play")}
+                    className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
+                      qrMode === "play" ? "bg-white/10 text-white" : "text-muted-foreground hover:text-white"
+                    }`}
+                  >
+                    Install (Play testing)
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="grid gap-6 md:grid-cols-[240px_minmax(0,1fr)] items-start">
               {/* QR */}
               <div className="flex flex-col items-center gap-3">
                 <div ref={qrContainerRef} className="p-5 bg-white rounded-3xl shadow-xl ring-1 ring-black/10">
                   <QRCodeSVG
-                    value={getPreviewUrl()}
+                    value={getActiveQrUrl()}
                     size={190}
                     level="M"
                     includeMargin={true}
@@ -706,15 +776,17 @@ export default function PreviewApp() {
               {/* Link + Instructions */}
               <div className="space-y-5 min-w-0">
                 <div>
-                  <label className="text-xs text-muted-foreground mb-2 block font-medium">Preview link</label>
+                  <label className="text-xs text-muted-foreground mb-2 block font-medium">
+                    {qrMode === "play" ? "Google Play testing link" : "Preview link"}
+                  </label>
                   <div className="flex items-center gap-2">
                     <div className="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-white/5 border border-white/[0.06] text-sm text-muted-foreground truncate font-mono">
-                      {getPreviewUrl()}
+                      {getActiveQrUrl()}
                     </div>
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => void copyPreviewUrl()}
+                      onClick={() => void copyUrlToClipboard(getActiveQrUrl())}
                       className="border-white/10 bg-white/5 hover:bg-white/10 rounded-xl h-10 w-10 p-0"
                       aria-label="Copy preview link"
                     >
@@ -729,11 +801,23 @@ export default function PreviewApp() {
                       <Smartphone className="h-4 w-4 text-cyan-400" />
                     </div>
                     <div className="text-sm">
-                      <p className="font-medium text-cyan-400 mb-2">Best experience</p>
+                      <p className="font-medium text-cyan-400 mb-2">
+                        {qrMode === "play" ? "Install via Google Play (testing)" : "Best experience"}
+                      </p>
                       <ul className="space-y-1.5 text-muted-foreground text-sm">
-                        <li>Scan the QR code or open the link</li>
-                        <li>On iOS/Android, add to Home Screen (optional)</li>
-                        <li>Share the link with teammates to review</li>
+                        {qrMode === "play" ? (
+                          <>
+                            <li>Opens Google Play’s testing enrollment page</li>
+                            <li>User must be added as a tester in Play Console</li>
+                            <li>After joining, install/update through Google Play</li>
+                          </>
+                        ) : (
+                          <>
+                            <li>Scan the QR code or open the link</li>
+                            <li>On iOS/Android, add to Home Screen (optional)</li>
+                            <li>Share the link with teammates to review</li>
+                          </>
+                        )}
                       </ul>
                     </div>
                   </div>
@@ -747,7 +831,7 @@ export default function PreviewApp() {
               <Button
                 variant="outline"
                 className="flex-1 border-white/10 bg-white/5 hover:bg-white/10 rounded-xl h-11"
-                onClick={() => void shareOrCopyPreviewUrl()}
+                onClick={() => void shareOrCopyUrl(getActiveQrUrl())}
               >
                 <Share2 className="mr-2 h-4 w-4" /> Share
               </Button>
@@ -755,10 +839,10 @@ export default function PreviewApp() {
                 className="flex-1 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-xl h-11"
                 onClick={() => {
                   setShowQRModal(false);
-                  window.open(getPreviewUrl(), "_blank", "noopener,noreferrer");
+                  window.open(getActiveQrUrl(), "_blank", "noopener,noreferrer");
                 }}
               >
-                <ExternalLink className="mr-2 h-4 w-4" /> Open Preview
+                <ExternalLink className="mr-2 h-4 w-4" /> {qrMode === "play" ? "Open Play" : "Open Preview"}
               </Button>
             </div>
           </div>

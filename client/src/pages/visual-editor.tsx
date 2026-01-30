@@ -1553,15 +1553,17 @@ export default function VisualEditor() {
   }, []);
 
   useEffect(() => {
-    if (!selectedComponentId || !activeScreen?.components?.length) return;
-    const ancestors = getAncestorIdsForComponent(activeScreen.components, selectedComponentId);
+    if (!selectedComponentId) return;
+    const screen = screens.find((s) => s.id === activeScreenId) || screens[0];
+    if (!screen?.components?.length) return;
+    const ancestors = getAncestorIdsForComponent(screen.components, selectedComponentId);
     if (!ancestors.length) return;
     setLayerExpanded((prev) => {
       const next = { ...prev };
       for (const id of ancestors) next[id] = true;
       return next;
     });
-  }, [activeScreen?.components, getAncestorIdsForComponent, selectedComponentId]);
+  }, [screens, activeScreenId, getAncestorIdsForComponent, selectedComponentId]);
 
   const [unsavedConfirmOpen, setUnsavedConfirmOpen] = useState(false);
   const pendingActionRef = useRef<null | (() => void)>(null);

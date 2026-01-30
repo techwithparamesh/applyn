@@ -27,6 +27,9 @@ export type User = {
   username: string;
   role: UserRole;
   googleId?: string | null;
+  // Phase 2: Google Play user-connected publishing (encrypted refresh token)
+  playRefreshTokenEnc?: string | null;
+  playConnectedAt?: Date | null;
   password: string;
   mustChangePassword?: boolean | null; // Force password change on first login (for team members)
   // Subscription fields for yearly renewal model
@@ -134,6 +137,9 @@ export const insertAppSchema = z.object({
   // AI generation metadata (stored for reference)
   generatedPrompt: z.string().optional(),
   generatedScreens: z.array(z.string()).optional(),
+
+  // Google Play publishing configuration
+  playPublishingMode: z.enum(["central", "user"]).optional(),
 });
 
 export type InsertApp = z.infer<typeof insertAppSchema>;
@@ -167,6 +173,23 @@ export type App = {
   modules?: AppModule[] | null;
   navigation?: AppNavigation | null;
   editorScreensHistory?: any[] | null;
+
+  // Google Play publishing state
+  playPublishingMode?: "central" | "user" | null;
+  playProductionStatus?: "none" | "requested" | "approved" | "rejected" | null;
+  playProductionRequestedAt?: Date | null;
+  playProductionDecisionAt?: Date | null;
+  playProductionDecisionBy?: string | null;
+  playProductionDecisionReason?: string | null;
+  lastPlayTrack?: string | null;
+  lastPlayVersionCode?: number | null;
+  lastPlayPublishedAt?: Date | null;
+  lastPlayReleaseStatus?: string | null;
+
+  // Health monitoring (aggregated)
+  crashRate7d?: number | null;
+  lastCrashAt?: Date | null;
+  lastHealthSyncAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -379,6 +402,17 @@ export const auditActionSchema = z.enum([
   "admin.user_deleted",
   "support.ticket_created",
   "support.ticket_closed",
+
+  // Publishing / Google Play
+  "user.play.connected",
+  "user.play.disconnected",
+  "app.play.request_production",
+  "app.play.approve_production",
+  "app.play.reject_production",
+  "app.play.publish.internal",
+  "app.play.publish.production",
+  "app.play.promote",
+  "app.health.check",
 ]);
 
 export type AuditAction = z.infer<typeof auditActionSchema>;

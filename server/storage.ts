@@ -77,6 +77,9 @@ export interface IStorage {
   clearResetToken(userId: string): Promise<User | undefined>;
   setEmailVerified(userId: string, verified: boolean): Promise<User | undefined>;
 
+  // Google Play OAuth (Phase 2)
+  setUserPlayRefreshTokenEnc(userId: string, tokenEnc: string | null): Promise<User | undefined>;
+
   // Subscription management (yearly renewal model)
   activateSubscription(userId: string, data: {
     plan: string;
@@ -323,6 +326,19 @@ export class MemStorage implements IStorage {
     const updated: any = {
       ...existing,
       emailVerified: verified,
+      updatedAt: new Date(),
+    };
+    this.users.set(userId, updated);
+    return updated;
+  }
+
+  async setUserPlayRefreshTokenEnc(userId: string, tokenEnc: string | null): Promise<User | undefined> {
+    const existing = this.users.get(userId);
+    if (!existing) return undefined;
+    const updated: any = {
+      ...existing,
+      playRefreshTokenEnc: tokenEnc,
+      playConnectedAt: tokenEnc ? new Date() : null,
       updatedAt: new Date(),
     };
     this.users.set(userId, updated);

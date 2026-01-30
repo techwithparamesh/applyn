@@ -12,6 +12,9 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
+type ProductionRequestsMeta = {
+  totalCount: number;
+};
 
 function NavItem({
   href,
@@ -52,6 +55,31 @@ export function Navbar() {
   const isStaff = role === "admin" || role === "support";
   const isSupport = role === "support";
   const isAdmin = role === "admin";
+
+  const { data: productionRequestsMeta } = useQuery<ProductionRequestsMeta | null>({
+    queryKey: ["/api/admin/play/production-requests", "meta"],
+    enabled: isAuthed && isStaff,
+    staleTime: 15_000,
+    refetchInterval: 15_000,
+    retry: false,
+    queryFn: async () => {
+      const res = await fetch("/api/admin/play/production-requests?limit=1&offset=0", {
+        credentials: "include",
+      });
+
+      if (res.status === 401 || res.status === 403) return null;
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(text || `Request failed (${res.status})`);
+      }
+
+      const json = (await res.json()) as any;
+      return { totalCount: Number(json?.totalCount ?? 0) };
+    },
+  });
+
+  const approvalsCount = productionRequestsMeta?.totalCount ?? 0;
+  const approvalsCountLabel = approvalsCount > 99 ? "99+" : String(approvalsCount);
 
   const initials = (() => {
     const name = (me as any)?.name as string | null | undefined;
@@ -167,6 +195,21 @@ export function Navbar() {
                       Ops
                     </DropdownMenuItem>
                   )}
+                  {isStaff && (
+                    <DropdownMenuItem 
+                      onClick={() => setLocation("/admin/play-approvals")}
+                      className="text-muted-foreground hover:text-white focus:text-white"
+                    >
+                      <span className="flex w-full items-center justify-between">
+                        <span>Play Approvals</span>
+                        {approvalsCount > 0 ? (
+                          <span className="inline-flex items-center justify-center min-w-6 h-5 px-2 rounded-full bg-amber-500/20 text-amber-200 text-xs font-semibold">
+                            {approvalsCountLabel}
+                          </span>
+                        ) : null}
+                      </span>
+                    </DropdownMenuItem>
+                  )}
                   {isAdmin && (
                     <DropdownMenuItem 
                       onClick={() => setLocation("/admin/team")}
@@ -259,6 +302,12 @@ export function Navbar() {
                     {/* Ops for staff only */}
                     {isStaff && (
                       <MobileLink label="Ops" onClick={() => setLocation("/ops")} />
+                    )}
+                    {isStaff && (
+                      <MobileLink
+                        label={approvalsCount > 0 ? `Play Approvals (${approvalsCountLabel})` : "Play Approvals"}
+                        onClick={() => setLocation("/admin/play-approvals")}
+                      />
                     )}
                     {/* Team for admin only */}
                     {isAdmin && (

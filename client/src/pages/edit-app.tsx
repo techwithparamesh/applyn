@@ -18,6 +18,9 @@ type AppItem = {
   icon: string;
   iconUrl?: string | null;
   iconColor?: string | null;
+  isNativeOnly?: boolean | null;
+  industry?: string | null;
+  editorScreens?: any[] | null;
   primaryColor: string;
   platform: string;
   status: string;
