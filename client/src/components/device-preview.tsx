@@ -777,13 +777,21 @@ function NativeComponentPreview({
         );
       case "button": {
         const text: string = component.props?.text || "Button";
-        const isCategory = ["All", "Vegetables", "Fruits", "Dairy"].includes(text);
+        const explicitAction = component.props?.action || component.props?.buttonAction;
+
+        // Treat small outline/primary chips (no explicit action) as category filters.
+        const isChip =
+          (component.props?.size === "sm" || component.props?.variant === "outline" || component.props?.variant === "primary") &&
+          !(typeof explicitAction === "string" && explicitAction.trim());
+
+        const isCategory =
+          isChip ||
+          ["All", "Vegetables", "Fruits", "Dairy", "New Drops", "Hoodies", "Tees", "Sneakers", "Accessories"].includes(text);
         const isActive = isCategory && text === activeCategory;
         return (
           <button
             onClick={() => {
               if (isCategory) setActiveCategory(text);
-              const explicitAction = component.props?.action || component.props?.buttonAction;
               if (!isCategory && typeof explicitAction === "string" && explicitAction.trim()) {
                 onAction(explicitAction.trim());
               }
@@ -1203,7 +1211,7 @@ function NativeComponentPreview({
 
         return (
           <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
-            {visible.slice(0, 6).map((product, idx) => (
+            {visible.slice(0, 12).map((product, idx) => (
               <button
                 key={idx}
                 type="button"
@@ -1213,11 +1221,16 @@ function NativeComponentPreview({
                   onAction(`product:${productId}`, product);
                 }}
               >
-                {product.image && <img src={product.image} alt={product.name} className="w-full h-24 object-cover" />}
+                <SafeImage
+                  src={product?.image || product?.imageUrl || product?.src}
+                  alt={product?.name || product?.title || "Product"}
+                  className="w-full h-24 object-cover"
+                  placeholderClassName="w-full h-24 bg-gray-100"
+                />
                 <div className="p-2">
-                  <div className="text-xs font-medium truncate">{product.name}</div>
+                  <div className="text-xs font-medium truncate">{product?.name || product?.title || "Product"}</div>
                   <div className="flex items-center justify-between mt-1">
-                    <div className="text-sm font-bold" style={{ color: themeColor }}>{product.price}</div>
+                    <div className="text-sm font-bold" style={{ color: themeColor }}>{product?.price || product?.amount || ""}</div>
                     {product.rating && <div className="text-[10px] text-amber-600">★ {product.rating}</div>}
                   </div>
                 </div>

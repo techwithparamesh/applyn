@@ -643,6 +643,96 @@ export async function registerRoutes(
     }
   });
 
+  // Unsplash -> image bytes proxy (same-origin), for templates that need relevant images.
+  // Returns an actual image response instead of JSON.
+  app.get("/api/unsplash/proxy", requireAuth, unsplashLimiter, async (req, res) => {
+    const key = String(process.env.UNSPLASH_ACCESS_KEY || "").trim();
+    if (!key) return res.status(503).json({ message: "Unsplash is not configured" });
+
+    const parsed = z
+      .object({
+        query: z.string().min(1).max(80),
+        w: z.coerce.number().int().min(200).max(2000).optional(),
+        orientation: z.enum(["landscape", "portrait", "squarish"]).optional(),
+      })
+      .safeParse(req.query);
+
+    if (!parsed.success) return res.status(400).json({ message: "Invalid query" });
+    const q = parsed.data.query.trim();
+    const w = parsed.data.w ?? 900;
+    const orientation = parsed.data.orientation ?? "squarish";
+
+    try {
+      const searchRes = await fetch(
+        `https://api.unsplash.com/search/photos?query=${encodeURIComponent(q)}&per_page=1&orientation=${encodeURIComponent(orientation)}`,
+        {
+          headers: {
+            Authorization: `Client-ID ${key}`,
+            "Accept-Version": "v1",
+          },
+        },
+      );
+
+      if (!searchRes.ok) {
+        return res.status(502).json({ message: `Unsplash error (${searchRes.status})` });
+      }
+
+      const json: any = await searchRes.json();
+      const photo = Array.isArray(json?.results) ? json.results[0] : null;
+      if (!photo) return res.status(404).json({ message: "No image found" });
+
+      const rawUrl = String(photo?.urls?.raw || photo?.urls?.regular || "");
+      if (!rawUrl) return res.status(404).json({ message: "No image found" });
+
+      const sep = rawUrl.includes("?") ? "&" : "?";
+      const imgUrl = `${rawUrl}${sep}w=${w}&auto=format&fit=crop`;
+
+      // Best-effort download tracking (Unsplash API guideline)
+      const downloadLocation = String(photo?.links?.download_location || "");
+      if (downloadLocation) {
+        fetch(downloadLocation, {
+          headers: {
+            Authorization: `Client-ID ${key}`,
+            "Accept-Version": "v1",
+          },
+        }).catch(() => null);
+      }
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+      const upstream = await fetch(imgUrl, {
+        signal: controller.signal,
+        redirect: "follow",
+        headers: {
+          "User-Agent": "SaaS-Architect/1.0 (+unsplash-proxy)",
+          Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        },
+      }).finally(() => clearTimeout(timeout));
+
+      if (!upstream.ok) {
+        return res.status(502).json({ message: `Upstream image error (${upstream.status})` });
+      }
+
+      const contentType = String(upstream.headers.get("content-type") || "");
+      if (!contentType.toLowerCase().startsWith("image/")) {
+        return res.status(415).json({ message: "Upstream is not an image" });
+      }
+
+      const arrayBuffer = await upstream.arrayBuffer();
+      const buf = Buffer.from(arrayBuffer);
+      if (buf.length > 6 * 1024 * 1024) {
+        return res.status(413).json({ message: "Image too large" });
+      }
+
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "private, max-age=604800");
+      return res.status(200).send(buf);
+    } catch (err: any) {
+      const msg = String(err?.name || "").includes("Abort") ? "Upstream timeout" : "Unsplash request failed";
+      return res.status(502).json({ message: msg });
+    }
+  });
+
   // Server-side image proxy (avoid client-side blocking / hotlink rules).
   // NOTE: allowlist only, to prevent SSRF.
   app.get("/api/image-proxy", requireAuth, async (req, res) => {

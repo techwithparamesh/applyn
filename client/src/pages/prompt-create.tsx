@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { Button } from "@/components/ui/button";
@@ -1134,6 +1134,74 @@ export default function PromptCreate() {
     },
   });
 
+  // Build a deterministic native preview for the Preview step.
+  // This avoids showing a generic website wrapper when users expect a real app UI.
+  const previewNative = useMemo(() => {
+    if (!generatedConfig) return null;
+
+    const normalizeIndustryId = (raw: string | undefined | null) => {
+      if (!raw) return undefined;
+      const v = String(raw).trim().toLowerCase();
+      const normalized = v
+        .replace(/&/g, "and")
+        .replace(/\s+/g, " ")
+        .replace(/[^a-z0-9 ]/g, "")
+        .trim();
+
+      const known = new Set(INDUSTRY_TEMPLATES.map((t) => t.id));
+      if (known.has(normalized)) return normalized;
+
+      if (
+        normalized.includes("ecommerce") ||
+        normalized.includes("e commerce") ||
+        normalized.includes("store") ||
+        normalized.includes("shop") ||
+        normalized.includes("market") ||
+        normalized.includes("marketplace") ||
+        normalized.includes("delivery")
+      ) return "ecommerce";
+
+      if (normalized.includes("restaurant") || normalized.includes("cafe") || normalized.includes("menu") || normalized.includes("reservation")) return "restaurant";
+      if (normalized.includes("health") || normalized.includes("clinic") || normalized.includes("medical") || normalized.includes("hospital")) return "healthcare";
+      if (normalized.includes("real estate") || normalized.includes("realestate") || normalized.includes("property")) return "realestate";
+
+      return undefined;
+    };
+
+    const baseIndustryId = selectedTemplate?.id || normalizeIndustryId(generatedConfig.industry) || "ecommerce";
+    const promptContext = (customPrompt || selectedTemplate?.prompt || "").trim();
+    const resolvedIndustryId = resolveSpecializedIndustryId(baseIndustryId, promptContext);
+    const resolvedAppName = creationMode === "scratch" ? appName : generatedConfig.appName;
+
+    const seededEditorScreens = buildEditorScreensFromTemplate(
+      resolvedIndustryId,
+      resolvedAppName || "My App",
+      { prompt: promptContext },
+    );
+
+    const initialEditorScreens = pruneEditorScreensForCapabilities({
+      screens: seededEditorScreens,
+      industryId: resolvedIndustryId,
+      caps: businessCaps,
+      domain: domainModules,
+    });
+
+    return {
+      industryId: resolvedIndustryId,
+      screens: initialEditorScreens || seededEditorScreens || undefined,
+      appName: resolvedAppName || generatedConfig.appName,
+    };
+  }, [
+    generatedConfig,
+    selectedTemplate?.id,
+    selectedTemplate?.prompt,
+    customPrompt,
+    creationMode,
+    appName,
+    businessCaps,
+    domainModules,
+  ]);
+
   const handleTemplateSelect = (template: typeof INDUSTRY_TEMPLATES[0]) => {
     setSelectedTemplate(template);
     // Don't pre-fill prompt - it's optional. Let users describe their specific needs
@@ -1722,17 +1790,28 @@ export default function PromptCreate() {
 
               {/* Live Preview and Config Grid */}
               <div className={`grid gap-8 mb-6 ${creationMode === "website" ? "lg:grid-cols-2" : ""}`}>
-                {/* Mobile Preview - Only for website mode */}
-                {creationMode === "website" && websiteUrl && (
-                  <div className="flex justify-center">
-                    <MobilePreview
-                      url={websiteUrl}
-                      appName={generatedConfig.appName}
-                      primaryColor={generatedConfig.primaryColor}
-                      icon={generatedConfig.icon}
-                    />
-                  </div>
-                )}
+                {/* Mobile Preview - Always show a native app UI preview when possible */}
+                <div className="flex flex-col items-center">
+                  <MobilePreview
+                    url={"native://app"}
+                    appName={(previewNative?.appName || generatedConfig.appName) as any}
+                    primaryColor={generatedConfig.primaryColor}
+                    icon={generatedConfig.icon}
+                    screens={(previewNative?.screens as any) || undefined}
+                    industry={previewNative?.industryId || generatedConfig.industry}
+                    isNativeOnly={true}
+                  />
+                  {creationMode === "website" && websiteUrl && (
+                    <a
+                      href={websiteUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 text-xs text-cyan-300 hover:text-cyan-200 underline"
+                    >
+                      Open website preview
+                    </a>
+                  )}
+                </div>
 
                 {/* App Configuration Card */}
                 <Card className="glass border-white/10">
