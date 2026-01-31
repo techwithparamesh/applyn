@@ -39,6 +39,51 @@ import {
 } from "@/components/ui/tooltip";
 import { getTemplateById } from "@/lib/app-templates";
 
+function SafeImage({
+  src,
+  alt,
+  className,
+  placeholderClassName,
+}: {
+  src?: string | null;
+  alt?: string;
+  className?: string;
+  placeholderClassName?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const normalizedSrc = typeof src === "string" ? src.trim() : "";
+  const effectiveSrc = (() => {
+    if (!normalizedSrc) return "";
+    // Always proxy allowlisted external image hosts so client-side blocks don't break UI.
+    try {
+      const u = new URL(normalizedSrc);
+      const allow = new Set(["images.unsplash.com", "plus.unsplash.com", "source.unsplash.com", "picsum.photos"]);
+      if (u.protocol === "https:" && allow.has(u.hostname)) {
+        return `/api/image-proxy?url=${encodeURIComponent(normalizedSrc)}`;
+      }
+    } catch {
+      // Not an absolute URL; leave as-is.
+    }
+    return normalizedSrc;
+  })();
+
+  const canRender = Boolean(effectiveSrc) && !failed;
+  if (!canRender) {
+    return <div className={placeholderClassName || "bg-gray-100"} aria-hidden />;
+  }
+
+  return (
+    <img
+      src={effectiveSrc}
+      alt={alt || ""}
+      className={className}
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 // Types for the component
 type DevicePlatform = "android" | "ios";
 
@@ -894,20 +939,21 @@ function NativeComponentPreview({
             <div className="space-y-3">
               {items.map((item, idx) => (
                 <div key={idx} className="flex gap-3 p-3 bg-white rounded-lg border border-gray-200">
-                  {item?.image ? (
-                    <img src={item.image} alt={item?.name || "Item"} className="w-16 h-16 rounded-md object-cover" />
-                  ) : (
-                    <div className="w-16 h-16 rounded-md bg-gray-100" />
-                  )}
+                  <SafeImage
+                    src={item?.image || item?.imageUrl || item?.src}
+                    alt={item?.name || item?.title || "Item"}
+                    className="w-16 h-16 rounded-md object-cover"
+                    placeholderClassName="w-16 h-16 rounded-md bg-gray-100"
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="text-sm font-semibold truncate">{item?.name || "Untitled"}</div>
+                      <div className="text-sm font-semibold truncate">{item?.name || item?.title || item?.label || "Untitled"}</div>
                       <div className="text-sm font-semibold whitespace-nowrap" style={{ color: themeColor }}>
-                        {item?.price || ""}
+                        {item?.price || item?.amount || item?.total || ""}
                       </div>
                     </div>
-                    {item?.description && (
-                      <div className="text-[11px] text-gray-500 mt-1 line-clamp-2">{item.description}</div>
+                    {(item?.description || item?.desc) && (
+                      <div className="text-[11px] text-gray-500 mt-1 line-clamp-2">{item.description || item.desc}</div>
                     )}
                     <div className="flex items-center gap-2 mt-2">
                       {item?.badge && (
@@ -951,18 +997,21 @@ function NativeComponentPreview({
                     onAction(productId ? `product:${productId}` : "product:unknown", item);
                   }}
                 >
-                  {item?.image ? (
-                    <img src={item.image} alt={item?.name || "Item"} className="w-14 h-14 rounded object-cover" />
-                  ) : (
-                    <div className="w-14 h-14 rounded bg-gray-100" />
-                  )}
+                  <SafeImage
+                    src={item?.image || item?.imageUrl || item?.src}
+                    alt={item?.name || item?.title || "Item"}
+                    className="w-14 h-14 rounded object-cover"
+                    placeholderClassName="w-14 h-14 rounded bg-gray-100"
+                  />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{item?.name || item?.label || "Item"}</div>
+                    <div className="text-sm font-medium truncate">{item?.name || item?.title || item?.label || "Item"}</div>
                     <div className="text-[11px] text-gray-500">
-                      {item?.quantity ? `Qty: ${item.quantity}` : item?.status || ""}
+                      {item?.quantity || item?.qty
+                        ? `Qty: ${item.quantity || item.qty}`
+                        : item?.status || item?.variant || ""}
                     </div>
                   </div>
-                  <div className="text-sm font-semibold whitespace-nowrap">{item?.price || item?.total || ""}</div>
+                  <div className="text-sm font-semibold whitespace-nowrap">{item?.price || item?.amount || item?.total || ""}</div>
                 </button>
               ))}
             </div>

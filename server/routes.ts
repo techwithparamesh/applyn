@@ -643,6 +643,77 @@ export async function registerRoutes(
     }
   });
 
+  // Server-side image proxy (avoid client-side blocking / hotlink rules).
+  // NOTE: allowlist only, to prevent SSRF.
+  app.get("/api/image-proxy", requireAuth, async (req, res) => {
+    const parsed = z
+      .object({
+        url: z.string().url().max(2000),
+      })
+      .safeParse(req.query);
+
+    if (!parsed.success) return res.status(400).json({ message: "Invalid url" });
+
+    let target: URL;
+    try {
+      target = new URL(parsed.data.url);
+    } catch {
+      return res.status(400).json({ message: "Invalid url" });
+    }
+
+    if (target.protocol !== "https:") {
+      return res.status(400).json({ message: "Only https URLs are allowed" });
+    }
+
+    const allowedHosts = new Set([
+      "images.unsplash.com",
+      "plus.unsplash.com",
+      "source.unsplash.com",
+      "picsum.photos",
+    ]);
+
+    if (!allowedHosts.has(target.hostname)) {
+      return res.status(403).json({ message: "Host not allowed" });
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+      const upstream = await fetch(target.toString(), {
+        signal: controller.signal,
+        redirect: "follow",
+        headers: {
+          // Some CDNs are picky; a normal UA helps.
+          "User-Agent": "SaaS-Architect/1.0 (+image-proxy)",
+          Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        },
+      }).finally(() => clearTimeout(timeout));
+
+      if (!upstream.ok) {
+        return res.status(502).json({ message: `Upstream error (${upstream.status})` });
+      }
+
+      const contentType = String(upstream.headers.get("content-type") || "");
+      if (!contentType.toLowerCase().startsWith("image/")) {
+        return res.status(415).json({ message: "Upstream is not an image" });
+      }
+
+      const arrayBuffer = await upstream.arrayBuffer();
+      const buf = Buffer.from(arrayBuffer);
+      // Safety limit (prevents very large downloads)
+      if (buf.length > 6 * 1024 * 1024) {
+        return res.status(413).json({ message: "Image too large" });
+      }
+
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "private, max-age=604800");
+      return res.status(200).send(buf);
+    } catch (err: any) {
+      const msg = String(err?.name || "").includes("Abort") ? "Upstream timeout" : "Upstream request failed";
+      return res.status(502).json({ message: msg });
+    }
+  });
+
   app.get("/api/me", (req, res) => {
     const user = getAuthedUser(req);
     if (!user) return res.status(401).json({ message: "Unauthorized" });
