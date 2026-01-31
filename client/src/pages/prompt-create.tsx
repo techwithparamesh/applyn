@@ -1049,6 +1049,29 @@ export default function PromptCreate() {
       const finalPrimaryColor = useTemplateBranding ? getTemplateColor(resolvedIndustryId) : generatedConfig.primaryColor;
       const finalSecondaryColor = useTemplateBranding ? getTemplateSecondaryColor(resolvedIndustryId) : generatedConfig.secondaryColor;
 
+      // Prompt-aware branding tweaks for better fidelity
+      const promptLower = String(prompt || "").toLowerCase();
+      const isStreetwearEcom =
+        resolvedIndustryId === "ecommerce" &&
+        [
+          "streetwear",
+          "street wear",
+          "fashion",
+          "clothing",
+          "apparel",
+          "hoodie",
+          "hoodies",
+          "sneaker",
+          "sneakers",
+          "t-shirt",
+          "tshirt",
+          "tee",
+          "urban",
+        ].some((k) => promptLower.includes(k));
+
+      const finalPrimaryColorResolved = isStreetwearEcom ? "#111827" : finalPrimaryColor;
+      const finalSecondaryColorResolved = isStreetwearEcom ? "#F97316" : finalSecondaryColor;
+
       const modules = buildBusinessModules({
         capabilities: businessCaps,
         modules: domainModules,
@@ -1061,8 +1084,8 @@ export default function PromptCreate() {
         name: resolvedAppName,
         url: appUrl,
         icon: finalIcon,
-        primaryColor: finalPrimaryColor,
-        secondaryColor: finalSecondaryColor,
+        primaryColor: finalPrimaryColorResolved,
+        secondaryColor: finalSecondaryColorResolved,
         platform: "android",
         plan: "preview",
         features: {

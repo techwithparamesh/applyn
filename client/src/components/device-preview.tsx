@@ -692,11 +692,13 @@ function NativeComponentPreview({
   themeColor,
   activeCategory,
   setActiveCategory,
+  onAction,
 }: {
   component: NativeComponent;
   themeColor: string;
   activeCategory: string;
   setActiveCategory: (category: string) => void;
+  onAction: (action: string, payload?: any) => void;
 }) {
   const render = () => {
     switch (component.type) {
@@ -736,6 +738,15 @@ function NativeComponentPreview({
           <button
             onClick={() => {
               if (isCategory) setActiveCategory(text);
+              const explicitAction = component.props?.action || component.props?.buttonAction;
+              if (!isCategory && typeof explicitAction === "string" && explicitAction.trim()) {
+                onAction(explicitAction.trim());
+              }
+
+              // Heuristic for older templates: checkout button often has text only.
+              if (!isCategory && !explicitAction && /checkout/i.test(text)) {
+                onAction("navigate:checkout");
+              }
             }}
             className={
               "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors " +
@@ -812,6 +823,7 @@ function NativeComponentPreview({
                 themeColor={themeColor}
                 activeCategory={activeCategory}
                 setActiveCategory={setActiveCategory}
+                onAction={onAction}
               />
             ))}
           </div>
@@ -828,6 +840,7 @@ function NativeComponentPreview({
                 themeColor={themeColor}
                 activeCategory={activeCategory}
                 setActiveCategory={setActiveCategory}
+                onAction={onAction}
               />
             ))}
           </div>
@@ -844,6 +857,7 @@ function NativeComponentPreview({
                 themeColor={themeColor}
                 activeCategory={activeCategory}
                 setActiveCategory={setActiveCategory}
+                onAction={onAction}
               />
             ))}
           </div>
@@ -856,11 +870,20 @@ function NativeComponentPreview({
           return (
             <div className="bg-white rounded-lg divide-y divide-gray-100 border border-gray-200">
               {items.map((item, idx) => (
-                <div key={idx} className="flex items-center gap-3 p-3">
+                <button
+                  key={idx}
+                  type="button"
+                  className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50"
+                  onClick={() => {
+                    const action = typeof item?.action === "string" ? item.action : "";
+                    if (action) onAction(action, item);
+                    else onAction("navigate:" + String(item?.label || item?.name || "").toLowerCase().replace(/\s+/g, ""), item);
+                  }}
+                >
                   <span className="text-lg">{item?.icon || "➡️"}</span>
                   <span className="text-sm flex-1 truncate">{item?.label || item?.name || item?.title}</span>
                   <span className="text-gray-400">›</span>
-                </div>
+                </button>
               ))}
             </div>
           );
@@ -914,7 +937,20 @@ function NativeComponentPreview({
           return (
             <div className="space-y-3">
               {items.map((item, idx) => (
-                <div key={idx} className="flex items-center gap-3 p-2 bg-white rounded-lg border border-gray-200">
+                <button
+                  key={idx}
+                  type="button"
+                  className="w-full flex items-center gap-3 p-2 bg-white rounded-lg border border-gray-200 text-left hover:bg-gray-50"
+                  onClick={() => {
+                    if (variant === "orders") {
+                      const orderId = String(item?.id || item?.name || item?.label || "");
+                      onAction(orderId ? `order:${orderId}` : "order:unknown", item);
+                      return;
+                    }
+                    const productId = String(item?.id || item?.productId || "");
+                    onAction(productId ? `product:${productId}` : "product:unknown", item);
+                  }}
+                >
                   {item?.image ? (
                     <img src={item.image} alt={item?.name || "Item"} className="w-14 h-14 rounded object-cover" />
                   ) : (
@@ -927,7 +963,7 @@ function NativeComponentPreview({
                     </div>
                   </div>
                   <div className="text-sm font-semibold whitespace-nowrap">{item?.price || item?.total || ""}</div>
-                </div>
+                </button>
               ))}
             </div>
           );
@@ -1092,7 +1128,16 @@ function NativeComponentPreview({
               {component.props?.subtitle && <div className="text-xs text-white/80 mt-1">{component.props.subtitle}</div>}
               {component.props?.buttonText && (
                 <div className="mt-3">
-                  <button className="px-4 py-2 bg-white text-gray-900 rounded-full text-xs font-semibold">{component.props.buttonText}</button>
+                  <button
+                    type="button"
+                    className="px-4 py-2 bg-white text-gray-900 rounded-full text-xs font-semibold"
+                    onClick={() => {
+                      const a = component.props?.buttonAction;
+                      if (typeof a === "string" && a.trim()) onAction(a.trim());
+                    }}
+                  >
+                    {component.props.buttonText}
+                  </button>
                 </div>
               )}
             </div>
@@ -1110,7 +1155,15 @@ function NativeComponentPreview({
         return (
           <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
             {visible.slice(0, 6).map((product, idx) => (
-              <div key={idx} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+              <button
+                key={idx}
+                type="button"
+                className="bg-white rounded-lg border border-gray-200 overflow-hidden text-left hover:bg-gray-50"
+                onClick={() => {
+                  const productId = String(product?.id || product?.productId || idx);
+                  onAction(`product:${productId}`, product);
+                }}
+              >
                 {product.image && <img src={product.image} alt={product.name} className="w-full h-24 object-cover" />}
                 <div className="p-2">
                   <div className="text-xs font-medium truncate">{product.name}</div>
@@ -1119,7 +1172,7 @@ function NativeComponentPreview({
                     {product.rating && <div className="text-[10px] text-amber-600">★ {product.rating}</div>}
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         );
@@ -1152,13 +1205,75 @@ function NativeScreensPreview({
 }) {
   const [activeCategory, setActiveCategory] = useState("All");
   const [moreOpen, setMoreOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [modal, setModal] = useState<null | { kind: "product" | "order" | "checkout" | "info"; payload?: any }>(null);
   const activeScreen = screens[activeScreenIndex] || screens[0];
 
   const screenTitle = activeScreen?.name || "Home";
   const screenSubtitle = activeScreen?.isHome ? "Welcome back" : "";
 
+  const showToast = (message: string) => {
+    setToast(message);
+    window.setTimeout(() => setToast((cur) => (cur === message ? null : cur)), 1600);
+  };
+
+  const navigateTo = (tokenRaw: string) => {
+    const token = String(tokenRaw || "").trim();
+    if (!token) return false;
+    const byId = screens.findIndex((s) => String(s.id).toLowerCase() === token.toLowerCase());
+    if (byId >= 0) {
+      setMoreOpen(false);
+      onScreenChange(byId);
+      return true;
+    }
+
+    const byName = screens.findIndex((s) => String(s.name).toLowerCase() === token.toLowerCase());
+    if (byName >= 0) {
+      setMoreOpen(false);
+      onScreenChange(byName);
+      return true;
+    }
+    return false;
+  };
+
+  const handleAction = (action: string, payload?: any) => {
+    const a = String(action || "").trim();
+    if (!a) return;
+
+    if (a.startsWith("navigate:")) {
+      const target = a.slice("navigate:".length);
+      if (!navigateTo(target)) {
+        setModal({ kind: "info", payload: { title: "Not available", message: `Screen '${target}' isn't in this template yet.` } });
+      }
+      return;
+    }
+
+    if (a === "logout") {
+      showToast("Logout (preview)");
+      return;
+    }
+
+    if (a.startsWith("product:")) {
+      setModal({ kind: "product", payload: payload || { id: a.slice("product:".length) } });
+      return;
+    }
+
+    if (a.startsWith("order:")) {
+      setModal({ kind: "order", payload: payload || { id: a.slice("order:".length) } });
+      return;
+    }
+
+    if (a === "checkout" || a === "navigate:checkout") {
+      setModal({ kind: "checkout" });
+      return;
+    }
+
+    // Fallback: show something happened.
+    setModal({ kind: "info", payload: { title: "Action", message: a } });
+  };
+
   return (
-    <div className="h-full flex flex-col bg-white overflow-hidden">
+    <div className="h-full flex flex-col bg-white overflow-hidden relative">
       <div className="flex-1 min-h-0 overflow-y-auto bg-[#F6F7FB]">
         <div className="px-4 pt-4 pb-6">
           {/* Screen header */}
@@ -1186,11 +1301,118 @@ function NativeScreensPreview({
               themeColor={themeColor}
               activeCategory={activeCategory}
               setActiveCategory={setActiveCategory}
+              onAction={handleAction}
             />
           ))}
           </div>
         </div>
       </div>
+
+      {/* Lightweight toast */}
+      {toast && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50">
+          <div className="px-3 py-2 rounded-xl bg-black/80 text-white text-xs shadow-lg border border-white/10">
+            {toast}
+          </div>
+        </div>
+      )}
+
+      {/* Simple modal */}
+      {modal && (
+        <div className="absolute inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white border border-gray-200 shadow-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <div className="text-sm font-semibold text-gray-900">
+                {modal.kind === "product" ? "Product" : modal.kind === "order" ? "Order" : modal.kind === "checkout" ? "Checkout" : modal.payload?.title || "Info"}
+              </div>
+              <button
+                type="button"
+                className="text-xs px-2 py-1 rounded-lg border border-gray-200 text-gray-700"
+                onClick={() => setModal(null)}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3">
+              {modal.kind === "product" && (
+                <>
+                  {modal.payload?.image ? (
+                    <img src={modal.payload.image} alt={modal.payload?.name || "Product"} className="w-full h-40 object-cover rounded-xl" />
+                  ) : (
+                    <div className="w-full h-40 bg-gray-100 rounded-xl" />
+                  )}
+                  <div>
+                    <div className="text-sm font-semibold text-gray-900">{modal.payload?.name || "Product"}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{modal.payload?.desc || modal.payload?.category || "Preview product detail"}</div>
+                    <div className="text-sm font-bold mt-1" style={{ color: themeColor }}>
+                      {modal.payload?.price || modal.payload?.total || ""}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2 rounded-xl text-white text-sm font-semibold"
+                    style={{ backgroundColor: themeColor }}
+                    onClick={() => {
+                      showToast("Added to cart (preview)");
+                      setModal(null);
+                    }}
+                  >
+                    Add to cart
+                  </button>
+                </>
+              )}
+
+              {modal.kind === "order" && (
+                <>
+                  <div className="text-sm font-semibold text-gray-900">{modal.payload?.id || modal.payload?.name || "Order"}</div>
+                  <div className="text-xs text-gray-500">Status: {modal.payload?.status || ""}</div>
+                  <div className="text-xs text-gray-500">Total: {modal.payload?.total || modal.payload?.price || ""}</div>
+                  <div className="text-xs text-gray-500">Date: {modal.payload?.date || ""}</div>
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-gray-900 text-sm font-semibold"
+                    onClick={() => setModal(null)}
+                  >
+                    OK
+                  </button>
+                </>
+              )}
+
+              {modal.kind === "checkout" && (
+                <>
+                  <div className="text-xs text-gray-500">Address</div>
+                  <input className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="Full name" />
+                  <input className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="Street address" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="City" />
+                    <input className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="Postal code" />
+                  </div>
+                  <div className="text-xs text-gray-500 mt-2">Payment (placeholder)</div>
+                  <div className="px-3 py-3 rounded-xl border border-dashed border-gray-200 text-xs text-gray-500">
+                    Card / UPI placeholder
+                  </div>
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2 rounded-xl text-white text-sm font-semibold"
+                    style={{ backgroundColor: themeColor }}
+                    onClick={() => {
+                      showToast("Order placed (preview)");
+                      setModal(null);
+                    }}
+                  >
+                    Place order
+                  </button>
+                </>
+              )}
+
+              {modal.kind === "info" && (
+                <div className="text-sm text-gray-700">{modal.payload?.message || ""}</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Native-style bottom navigation */}
       <div className="relative h-16 bg-white/90 backdrop-blur border-t border-gray-200 flex items-center justify-around px-1 shrink-0">

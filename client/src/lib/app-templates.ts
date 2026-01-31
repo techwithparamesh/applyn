@@ -3607,6 +3607,252 @@ export function buildEditorScreensFromTemplate(
 
   const clonedTemplate = cloneTemplate(template);
 
+  // Prompt-aware specialization (keeps screen structure but swaps seed content)
+  const rawPrompt = String(opts?.prompt || "");
+  const prompt = rawPrompt.toLowerCase();
+
+  type EcommerceVariant = "default" | "streetwear";
+  const detectEcommerceVariant = (p: string): EcommerceVariant => {
+    const has = (needle: string) => p.includes(needle);
+    const streetwearSignals = [
+      "streetwear",
+      "street wear",
+      "fashion",
+      "clothing",
+      "apparel",
+      "hoodie",
+      "hoodies",
+      "tee",
+      "t-shirt",
+      "tshirt",
+      "sneaker",
+      "sneakers",
+      "jacket",
+      "denim",
+      "caps",
+      "hat",
+      "urban",
+    ];
+    if (streetwearSignals.some((k) => has(k))) return "streetwear";
+    return "default";
+  };
+
+  const applyEcommerceVariant = (variant: EcommerceVariant) => {
+    if (variant !== "streetwear") return;
+
+    const seed = {
+      hero: {
+        title: appName,
+        subtitle: "Streetwear essentials & new drops",
+        buttonText: "Shop New Drops",
+        buttonAction: "navigate:products",
+        backgroundImage: "https://images.unsplash.com/photo-1520975916090-3105956dac38?w=1200",
+        overlayColor: "rgba(0,0,0,0.55)",
+      },
+      categories: [
+        { title: "Hoodies", icon: "🧥", backgroundColor: "#111827" },
+        { title: "Tees", icon: "👕", backgroundColor: "#1F2937" },
+        { title: "Sneakers", icon: "👟", backgroundColor: "#0B1220" },
+      ],
+      categoryButtons: ["All", "New Drops", "Hoodies", "Sneakers"],
+      products: [
+        {
+          id: "1",
+          name: "UrbanFit Oversized Hoodie",
+          price: "$79.00",
+          originalPrice: "$99.00",
+          image: "https://images.unsplash.com/photo-1520975958225-087f1c1a8a0b?w=600",
+          rating: 4.8,
+          badge: "Drop",
+          category: "Hoodies",
+          desc: "Heavyweight fleece, boxy fit",
+        },
+        {
+          id: "2",
+          name: "Graphic Tee — Night City",
+          price: "$39.00",
+          image: "https://images.unsplash.com/photo-1520975941868-6c16a4e0f1a6?w=600",
+          rating: 4.7,
+          category: "Tees",
+          desc: "Soft cotton, oversized print",
+        },
+        {
+          id: "3",
+          name: "Tech Joggers",
+          price: "$69.00",
+          image: "https://images.unsplash.com/photo-1520975934898-8a27c061b5aa?w=600",
+          rating: 4.6,
+          badge: "Best Seller",
+          category: "New Drops",
+          desc: "Tapered fit with utility pockets",
+        },
+        {
+          id: "4",
+          name: "High-Top Sneakers",
+          price: "$119.00",
+          image: "https://images.unsplash.com/photo-1520975956461-9c6d2d3fa4df?w=600",
+          rating: 4.9,
+          category: "Sneakers",
+          desc: "Cushioned sole, premium suede",
+        },
+        {
+          id: "5",
+          name: "Denim Jacket — Washed",
+          price: "$109.00",
+          image: "https://images.unsplash.com/photo-1520975987353-4a4b1d1d0b7f?w=600",
+          rating: 4.5,
+          category: "New Drops",
+          desc: "Classic cut, modern wash",
+        },
+        {
+          id: "6",
+          name: "Beanie — Minimal",
+          price: "$24.00",
+          image: "https://images.unsplash.com/photo-1520975947713-124b0e3f5c28?w=600",
+          rating: 4.4,
+          category: "Accessories",
+          desc: "Ribbed knit, one size",
+        },
+        {
+          id: "7",
+          name: "Cargo Pants",
+          price: "$89.00",
+          image: "https://images.unsplash.com/photo-1520975939456-1b73b5e7c2b4?w=600",
+          rating: 4.6,
+          category: "New Drops",
+          desc: "Relaxed fit, heavy canvas",
+        },
+        {
+          id: "8",
+          name: "Cap — Logo",
+          price: "$29.00",
+          image: "https://images.unsplash.com/photo-1520975975132-1b5a1f4df0a0?w=600",
+          rating: 4.5,
+          category: "Accessories",
+          desc: "Structured crown, embroidered logo",
+        },
+      ],
+      offers: [
+        { title: "Winter Drop", subtitle: "Limited quantities", image: "https://images.unsplash.com/photo-1520975922023-6b2c7b04c7b8?w=900", buttonText: "Shop" },
+        { title: "Free Shipping", subtitle: "On orders over $75", image: "https://images.unsplash.com/photo-1520975927448-3f0e9a6b4f58?w=900", buttonText: "Details" },
+      ],
+      cartItems: [
+        { id: "1", name: "UrbanFit Oversized Hoodie", price: "$79.00", quantity: 1, image: "https://images.unsplash.com/photo-1520975958225-087f1c1a8a0b?w=300" },
+        { id: "2", name: "Graphic Tee — Night City", price: "$39.00", quantity: 2, image: "https://images.unsplash.com/photo-1520975941868-6c16a4e0f1a6?w=300" },
+        { id: "4", name: "High-Top Sneakers", price: "$119.00", quantity: 1, image: "https://images.unsplash.com/photo-1520975956461-9c6d2d3fa4df?w=300" },
+      ],
+    };
+
+    const findFirst = (components: any[], predicate: (c: any) => boolean): any | null => {
+      for (const c of components || []) {
+        if (predicate(c)) return c;
+        if (Array.isArray(c?.children)) {
+          const found: any | null = findFirst(c.children, predicate);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const replaceAll = (components: any[], mutate: (c: any) => void) => {
+      for (const c of components || []) {
+        mutate(c);
+        if (Array.isArray(c?.children)) replaceAll(c.children, mutate);
+      }
+    };
+
+    const homeScreen = clonedTemplate.screens.find((s) => String(s.name).toLowerCase() === "home");
+    if (homeScreen) {
+      const hero = findFirst(homeScreen.components, (c) => c?.type === "hero");
+      if (hero?.props) {
+        hero.props = { ...hero.props, ...seed.hero };
+      }
+
+      // Featured Categories cards
+      const featuredSection = homeScreen.components.find(
+        (c: any) => c?.type === "section" && String(c?.props?.title || "").toLowerCase().includes("featured categories")
+      );
+      const cards: any[] = [];
+      if (featuredSection?.children?.length) {
+        replaceAll(featuredSection.children, (c) => {
+          if (c?.type === "card" && c?.props?.compact) cards.push(c);
+        });
+      }
+      for (let i = 0; i < cards.length && i < seed.categories.length; i++) {
+        const next = seed.categories[i];
+        cards[i].props = {
+          ...cards[i].props,
+          title: next.title,
+          icon: next.icon,
+          backgroundColor: next.backgroundColor,
+        };
+      }
+
+      // Popular products
+      const popularGrid = findFirst(homeScreen.components, (c) => c?.type === "productGrid" && Array.isArray(c?.props?.products));
+      if (popularGrid?.props) {
+        popularGrid.props = {
+          ...popularGrid.props,
+          products: seed.products.slice(0, 4).map(({ originalPrice, badge, category, desc, ...rest }) => ({
+            ...rest,
+            badge,
+            category,
+            desc,
+          })),
+        };
+      }
+
+      // Offers carousel
+      const offersCarousel = findFirst(homeScreen.components, (c) => c?.type === "carousel" && Array.isArray(c?.props?.items));
+      if (offersCarousel?.props) {
+        offersCarousel.props = { ...offersCarousel.props, items: seed.offers };
+      }
+    }
+
+    const productsScreen = clonedTemplate.screens.find((s) => String(s.name).toLowerCase() === "products");
+    if (productsScreen) {
+      // Replace category filter button texts (the 4-button row)
+      const filterGrid = findFirst(productsScreen.components, (c) => c?.type === "grid" && Number(c?.props?.columns) === 4);
+      if (filterGrid?.children?.length) {
+        const buttons = filterGrid.children.filter((c: any) => c?.type === "button");
+        for (let i = 0; i < buttons.length && i < seed.categoryButtons.length; i++) {
+          buttons[i].props = { ...buttons[i].props, text: seed.categoryButtons[i] };
+        }
+      }
+
+      const grid = findFirst(productsScreen.components, (c) => c?.type === "productGrid" && Array.isArray(c?.props?.products));
+      if (grid?.props) {
+        grid.props = { ...grid.props, products: seed.products };
+      }
+    }
+
+    const cartScreen = clonedTemplate.screens.find((s) => String(s.name).toLowerCase() === "cart");
+    if (cartScreen) {
+      const cartList = findFirst(cartScreen.components, (c) => c?.type === "list" && c?.props?.variant === "cart");
+      if (cartList?.props) {
+        cartList.props = { ...cartList.props, items: seed.cartItems };
+      }
+
+      // Make checkout explicit
+      const checkoutBtn = findFirst(cartScreen.components, (c) => c?.type === "button" && String(c?.props?.text || "").toLowerCase().includes("checkout"));
+      if (checkoutBtn?.props) {
+        checkoutBtn.props = { ...checkoutBtn.props, action: "navigate:checkout" };
+      }
+    }
+
+    const accountScreen = clonedTemplate.screens.find((s) => String(s.name).toLowerCase() === "account");
+    if (accountScreen) {
+      const header = accountScreen.components.find((c: any) => c?.type === "container" && c?.props?.align === "center");
+      if (header?.props) {
+        header.props = { ...header.props, backgroundColor: "#111827" };
+      }
+    }
+  };
+
+  if (templateId === "ecommerce") {
+    applyEcommerceVariant(detectEcommerceVariant(prompt));
+  }
+
   const subtitles: Record<string, string> = {
     ecommerce: "Shop the best products online",
     ecommerce_bamboo: "Plastic-free bamboo toothbrushes",
