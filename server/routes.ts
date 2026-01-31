@@ -22,6 +22,7 @@ import {
   type User,
   userRoleSchema,
 } from "@shared/schema";
+import { editorScreensSchema } from "@shared/editor-screens";
 import { getPlan, PLANS, type PlanId } from "@shared/pricing";
 import { storage } from "./storage";
 import { hashPassword, sanitizeUser, verifyPassword } from "./auth";
@@ -4468,7 +4469,7 @@ export async function registerRoutes(
 
   // Extended update schema that includes editorScreens for visual editor
   const updateAppSchema = insertAppSchema.omit({ status: true }).partial().extend({
-    editorScreens: z.array(z.any()).optional(),
+    editorScreens: editorScreensSchema,
   });
 
   // --- Website import wizard (extract links) ---

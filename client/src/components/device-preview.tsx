@@ -41,6 +41,9 @@ import { getTemplateById } from "@/lib/app-templates";
 import type { NativeComponent as NativeComponentType, NativeScreen as NativeScreenType } from "@/native/types";
 import { NativeComponentRenderer } from "@/native/render";
 import { SafeImage } from "@/native/components/SafeImage";
+import { PreviewThemeProvider } from "@/design/preview-theme";
+import { themeForBusinessType } from "@/design/business-mapping";
+import type { BusinessType } from "@shared/blueprints";
 
 // Types for the component
 type DevicePlatform = "android" | "ios";
@@ -1069,17 +1072,37 @@ function NativeAppContent({
   activeScreenIndex,
   onScreenChange,
 }: NativeAppContentProps) {
-  const themeColor = primaryColor || "#2563EB";
+  const resolveBusinessType = (raw: string | undefined): BusinessType => {
+    const v = String(raw || "").trim().toLowerCase();
+    if (v.includes("ecommerce") || v.includes("e commerce") || v.includes("store") || v.includes("shop")) return "ecommerce";
+    if (v.includes("restaurant") || v.includes("food") || v.includes("cafe")) return "restaurant";
+    if (v.includes("real estate") || v.includes("realestate") || v.includes("property")) return "realestate";
+    if (v.includes("health") || v.includes("clinic") || v.includes("medical")) return "healthcare";
+    if (v.includes("salon") || v.includes("spa") || v.includes("beauty")) return "salon";
+    if (v.includes("education") || v.includes("school") || v.includes("course")) return "education";
+    if (v.includes("news") || v.includes("blog") || v.includes("magazine")) return "news";
+    if (v.includes("music") || v.includes("band")) return "music";
+    if (v.includes("radio") || v.includes("station")) return "radio";
+    if (v.includes("church") || v.includes("ministry")) return "church";
+    if (v.includes("business") || v.includes("company") || v.includes("agency")) return "business";
+    return "business";
+  };
+
+  const businessType = resolveBusinessType(industry);
+  const themeId = themeForBusinessType(businessType);
+  const themeColor = "var(--app-primary)";
 
   // If real native screens exist, preview those (matches Visual Editor output)
   if (screens && Array.isArray(screens) && screens.length > 0) {
     return (
-      <NativeScreensPreview
-        screens={screens}
-        themeColor={themeColor}
-        activeScreenIndex={activeScreenIndex}
-        onScreenChange={onScreenChange}
-      />
+      <PreviewThemeProvider themeId={themeId} primaryOverride={primaryColor || undefined}>
+        <NativeScreensPreview
+          screens={screens}
+          themeColor={themeColor}
+          activeScreenIndex={activeScreenIndex}
+          onScreenChange={onScreenChange}
+        />
+      </PreviewThemeProvider>
     );
   }
   

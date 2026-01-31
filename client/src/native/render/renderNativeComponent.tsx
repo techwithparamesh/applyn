@@ -6,6 +6,45 @@ import { HeroSection } from "@/native/components/HeroSection";
 import { ProductGrid } from "@/native/components/ProductGrid";
 import { Divider, Heading, Spacer, TextBlock } from "@/native/components/Primitives";
 
+const SPACE_PX_TO_VAR: Record<number, string> = {
+  0: "0px",
+  8: "var(--space-2)",
+  12: "var(--space-3)",
+  16: "var(--space-4)",
+  20: "var(--space-5)",
+  24: "var(--space-6)",
+};
+
+function paddingClass(padding: unknown): string | null {
+  if (typeof padding === "string" && padding.includes("var(--space-")) {
+    return `p-[${padding}]`;
+  }
+  if (typeof padding === "number" && padding in SPACE_PX_TO_VAR) {
+    return `p-[${SPACE_PX_TO_VAR[padding]}]`;
+  }
+  return null;
+}
+
+function gapStyleClass(gap: unknown): string | null {
+  if (typeof gap === "string" && gap.includes("var(--space-")) {
+    return `gap-[${gap}]`;
+  }
+  if (typeof gap === "number" && gap in SPACE_PX_TO_VAR) {
+    return `gap-[${SPACE_PX_TO_VAR[gap]}]`;
+  }
+  return null;
+}
+
+function gridColsClass(cols: unknown): string | null {
+  const c = typeof cols === "number" ? cols : Number(cols);
+  if (!Number.isFinite(c)) return null;
+  if (c === 1) return "grid-cols-1";
+  if (c === 2) return "grid-cols-2";
+  if (c === 3) return "grid-cols-3";
+  if (c === 4) return "grid-cols-4";
+  return null;
+}
+
 export function renderNativeComponent(
   component: NativeComponent,
   ctx: NativeRenderContext,
@@ -131,8 +170,12 @@ export function renderNativeComponent(
     case "container": {
       const padding = component.props?.padding ?? 0;
       const backgroundColor = component.props?.backgroundColor;
+      const pClass = paddingClass(padding);
       return (
-        <div className="rounded-lg" style={{ padding, backgroundColor }}>
+        <div
+          className={(pClass ? `${pClass} ` : "") + "rounded-[var(--app-radius-card)]"}
+          style={!pClass || backgroundColor ? { ...(pClass ? {} : { padding }), ...(backgroundColor ? { backgroundColor } : {}) } : undefined}
+        >
           {component.children?.map((child) => (
             <NativeComponentRenderer key={child.id} component={child} ctx={ctx} />
           ))}
@@ -142,8 +185,17 @@ export function renderNativeComponent(
     case "grid": {
       const cols = component.props?.columns || 2;
       const gap = component.props?.gap ?? 8;
+      const colsClass = gridColsClass(cols);
+      const gapClass = gapStyleClass(gap);
       return (
-        <div className="grid" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gap }}>
+        <div
+          className={
+            "grid " +
+            (colsClass ? colsClass + " " : "") +
+            (gapClass ? gapClass : "")
+          }
+          style={!colsClass || !gapClass ? { ...(colsClass ? {} : { gridTemplateColumns: `repeat(${cols}, 1fr)` }), ...(gapClass ? {} : { gap }) } : undefined}
+        >
           {component.children?.map((child) => (
             <NativeComponentRenderer key={child.id} component={child} ctx={ctx} />
           ))}
@@ -152,9 +204,13 @@ export function renderNativeComponent(
     }
     case "section": {
       const padding = component.props?.padding ?? 0;
+      const pClass = paddingClass(padding);
       return (
-        <div className="rounded-lg" style={{ padding }}>
-          {component.props?.title && <div className="text-lg font-semibold mb-2">{component.props.title}</div>}
+        <div
+          className={(pClass ? `${pClass} ` : "") + "rounded-[var(--app-radius-card)]"}
+          style={!pClass ? { padding } : undefined}
+        >
+          {component.props?.title && <div className="text-lg font-semibold mb-2 text-[color:var(--app-text)]">{component.props.title}</div>}
           {component.children?.map((child) => (
             <NativeComponentRenderer key={child.id} component={child} ctx={ctx} />
           ))}
@@ -337,7 +393,7 @@ export function renderNativeComponent(
         <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
           {items.slice(0, 6).map((s, idx) => (
             <div key={idx} className="bg-white rounded-xl border border-gray-200 p-3">
-              <div className="text-lg font-bold" style={{ color: ctx.themeColor }}>
+              <div className="text-lg font-bold text-[color:var(--app-primary)]">
                 {s?.value ?? s?.number ?? "0"}
               </div>
               <div className="text-[11px] text-gray-500 mt-0.5">{s?.label || s?.title || "Stat"}</div>

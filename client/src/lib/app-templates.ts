@@ -9,6 +9,9 @@
  * - Placeholder content that's easy to customize
  */
 
+import { buildBlueprintForTemplate } from "@/sections/presets";
+import { buildEditorScreensFromBlueprint } from "@/sections/blueprint-to-screens";
+
 // Component types matching visual editor
 export type ComponentType = 
   | "text" 
@@ -3602,6 +3605,17 @@ export function buildEditorScreensFromTemplate(
   appName: string,
   opts?: { prompt?: string }
 ): any[] | null {
+  // Prefer strict section blueprints when available (locks layout; AI fills content only).
+  // Falls back to legacy component templates for other industries.
+  const blueprint = buildBlueprintForTemplate({
+    templateId,
+    appName,
+    prompt: opts?.prompt,
+  });
+  if (blueprint) {
+    return buildEditorScreensFromBlueprint(blueprint) as any[];
+  }
+
   const template = getTemplateById(templateId);
   if (!template) return null;
 

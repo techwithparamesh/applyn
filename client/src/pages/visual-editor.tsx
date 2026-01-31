@@ -85,6 +85,8 @@ import { QRCodeSVG } from "qrcode.react";
 import { AppBuilderStepper } from "@/components/app-builder-stepper";
 import { buildAppFromBlueprint } from "@/lib/blueprint/builder";
 import type { AppBlueprint } from "@/lib/blueprint/types";
+import { validateEditorScreensOrThrow } from "@/lib/editor-screens/validate";
+import { editorComponentTypeSchema } from "@shared/editor-screens";
 
 // Component types for the editor (extended to support industry templates)
 type ComponentType =
@@ -223,13 +225,14 @@ const SECTION_TEMPLATES = [
         children: [
           {
             id: "contact-form-1",
-            type: "form" as ComponentType,
-            props: { submitText: "Submit" },
-            children: [
-              { id: "name-input", type: "input" as ComponentType, props: { label: "Name", placeholder: "Your name", required: true } },
-              { id: "email-input", type: "input" as ComponentType, props: { label: "Email", placeholder: "your@email.com", type: "email", required: true } },
-              { id: "submit-btn", type: "button" as ComponentType, props: { text: "Send Message", variant: "primary" } },
-            ]
+            type: "contactForm" as ComponentType,
+            props: {
+              fields: [
+                { label: "Name", placeholder: "Your name", type: "text" },
+                { label: "Email", placeholder: "your@email.com", type: "email" },
+              ],
+              buttonText: "Send Message",
+            },
           }
         ]
       }
@@ -1924,12 +1927,40 @@ export default function VisualEditor() {
   }, [app, webviewPages, websitePreviewUrl]);
 
   const search = paletteSearch.trim().toLowerCase();
+
+  const supportedEditorComponentTypes = useMemo(() => new Set<string>(editorComponentTypeSchema.options), []);
+  const isSupportedEditorComponentType = useCallback(
+    (type: ComponentType) => supportedEditorComponentTypes.has(String(type)),
+    [supportedEditorComponentTypes],
+  );
+
+  const getUnsupportedTypesInTree = useCallback(
+    (components: any[]) => {
+      const out = new Set<string>();
+      const walk = (node: any) => {
+        if (!node || typeof node !== "object") return;
+        const t = String(node?.type || "");
+        if (t && !supportedEditorComponentTypes.has(t)) out.add(t);
+        const children = Array.isArray(node?.children) ? node.children : [];
+        for (const c of children) walk(c);
+      };
+      for (const c of components || []) walk(c);
+      return Array.from(out).sort();
+    },
+    [supportedEditorComponentTypes],
+  );
   const componentGroups = useMemo(() => {
     const groups: Array<{ title: string; items: Array<{ type: ComponentType; name: string; icon: any }> }> = [
-      { title: "Basic", items: BASIC_COMPONENTS.map((c) => ({ type: c.type, name: c.name, icon: c.icon })) },
-      { title: "Form", items: FORM_COMPONENTS },
-      { title: "Media", items: MEDIA_COMPONENTS },
-    ];
+      {
+        title: "Basic",
+        items: BASIC_COMPONENTS.map((c) => ({ type: c.type, name: c.name, icon: c.icon })).filter((i) =>
+          isSupportedEditorComponentType(i.type),
+        ),
+      },
+      { title: "Form", items: FORM_COMPONENTS.filter((i) => isSupportedEditorComponentType(i.type)) },
+      { title: "Media", items: MEDIA_COMPONENTS.filter((i) => isSupportedEditorComponentType(i.type)) },
+    ].filter((g) => g.items.length > 0);
+
     if (!search) return groups;
     return groups
       .map((g) => ({
@@ -1937,12 +1968,13 @@ export default function VisualEditor() {
         items: g.items.filter((i) => i.name.toLowerCase().includes(search) || String(i.type).toLowerCase().includes(search)),
       }))
       .filter((g) => g.items.length > 0);
-  }, [search]);
+  }, [isSupportedEditorComponentType, search]);
 
   const filteredSections = useMemo(() => {
-    if (!search) return SECTION_TEMPLATES;
-    return SECTION_TEMPLATES.filter((t) => t.name.toLowerCase().includes(search) || String(t.id).toLowerCase().includes(search));
-  }, [search]);
+    const supportedTemplates = SECTION_TEMPLATES.filter((t) => getUnsupportedTypesInTree(t.components as any).length === 0);
+    if (!search) return supportedTemplates;
+    return supportedTemplates.filter((t) => t.name.toLowerCase().includes(search) || String(t.id).toLowerCase().includes(search));
+  }, [getUnsupportedTypesInTree, search]);
 
   // Helper function to personalize template content with app name
   const personalizeTemplateContent = useCallback((template: IndustryTemplate, appName: string): EditorScreen[] => {
@@ -2375,6 +2407,15 @@ export default function VisualEditor() {
   // Add component to screen
   const addComponent = useCallback((type: ComponentType) => {
     if (!activeScreen) return;
+
+    if (!isSupportedEditorComponentType(type)) {
+      toast({
+        title: "Component not supported",
+        description: `"${String(type)}" can't be used in native preview yet.`,
+        variant: "destructive",
+      });
+      return;
+    }
     
     const newComponent: EditorComponent = {
       id: generateId(),
@@ -2391,7 +2432,7 @@ export default function VisualEditor() {
     setSelectedComponentId(newComponent.id);
     setHasChanges(true);
     return newComponent.id;
-  }, [activeScreen, activeScreenId]);
+  }, [activeScreen, activeScreenId, isSupportedEditorComponentType, toast]);
 
   const updateComponentById = useCallback((componentId: string, props: Record<string, any>) => {
     if (!componentId || !activeScreen) return;
@@ -2822,6 +2863,16 @@ export default function VisualEditor() {
   // Add template section
   const addTemplate = useCallback((template: typeof SECTION_TEMPLATES[0]) => {
     if (!activeScreen) return;
+
+    const unsupported = getUnsupportedTypesInTree(template.components as any);
+    if (unsupported.length > 0) {
+      toast({
+        title: "Section not supported",
+        description: `This section uses unsupported component type(s): ${unsupported.join(", ")}`,
+        variant: "destructive",
+      });
+      return;
+    }
     
     const cloneWithNewIds = (comps: EditorComponent[]): EditorComponent[] => {
       return comps.map(comp => ({
@@ -2838,7 +2889,7 @@ export default function VisualEditor() {
         : screen
     ));
     setHasChanges(true);
-  }, [activeScreen, activeScreenId]);
+  }, [activeScreen, activeScreenId, getUnsupportedTypesInTree, toast]);
 
   // Update component
   const updateComponent = useCallback((props: Record<string, any>) => {
@@ -2963,8 +3014,8 @@ export default function VisualEditor() {
   // Save mutation
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("PATCH", `/api/apps/${id}`, { editorScreens: screens });
-      if (!res.ok) throw new Error("Failed to save");
+      const validatedScreens = validateEditorScreensOrThrow(screens);
+      const res = await apiRequest("PATCH", `/api/apps/${id}`, { editorScreens: validatedScreens });
       return res.json();
     },
     onSuccess: () => {
@@ -2973,8 +3024,12 @@ export default function VisualEditor() {
       queryClient.invalidateQueries({ queryKey: [`/api/apps/${id}`] });
       toast({ title: "Saved!", description: "Your changes have been saved." });
     },
-    onError: () => {
-      toast({ title: "Save failed", description: "Please try again.", variant: "destructive" });
+    onError: (err: any) => {
+      toast({
+        title: "Save failed",
+        description: err?.message ?? "Please try again.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -2988,8 +3043,9 @@ export default function VisualEditor() {
       }
 
       const built = await buildAppFromBlueprint(parsed);
+      // Ensure blueprint generation stays within renderer-supported component types.
+      validateEditorScreensOrThrow(built.screens);
       const res = await apiRequest("PATCH", `/api/apps/${id}`, built.patch);
-      if (!res.ok) throw new Error("Failed to apply blueprint");
       return { built, app: await res.json() };
     },
     onSuccess: ({ built }) => {

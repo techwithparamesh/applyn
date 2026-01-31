@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { editorScreensSchema } from "./editor-screens";
 
 export const insertUserSchema = z.object({
   name: z.string().min(2).max(200).optional(),
@@ -128,7 +129,7 @@ export const insertAppSchema = z.object({
   // Flag to indicate this is a native-only app (no website URL)
   isNativeOnly: z.boolean().optional(),
   // Initial visual editor data (stored as JSON)
-  editorScreens: z.array(z.any()).optional(),
+  editorScreens: editorScreensSchema,
   // App modules + navigation (stored as JSON)
   modules: z.array(appModuleSchema).optional(),
   navigation: appNavigationSchema.optional(),
