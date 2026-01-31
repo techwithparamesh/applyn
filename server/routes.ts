@@ -29,6 +29,7 @@ import { sendPasswordResetEmail, isEmailConfigured, sendTeamMemberWelcomeEmail, 
 import crypto from "crypto";
 import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { getMysqlDb, getMysqlPool } from "./db-mysql";
+import { MemoryCache } from "./lib/memory-cache";
 import {
   apps,
   appCustomers,
@@ -79,7 +80,8 @@ import {
   canSubmitToAppStore,
 } from "./build-validation";
 import { decryptToken, encryptToken } from "./security/token-encryption";
-import { PlayPublisher, type PlayCredentials, type PlayTrack } from "./publishing/playPublisher";
+import type { PlayCredentials, PlayTrack } from "./publishing/playPublisher";
+import { createPlayService } from "./services/play/playService";
 import { validateForPublish } from "./publishing/publishValidator";
 import { scanPolicy } from "./publishing/policyScanner";
 
@@ -503,80 +505,37 @@ export async function registerRoutes(
     keyGenerator: (req: any) => getAuthedUser(req)?.id || req.ip || "unknown",
   });
 
-  // Prevent concurrent Google Play publish/promote operations per app.
-  // Uses MySQL advisory locks when available; otherwise falls back to an in-process lock.
-  const inProcessPublishLocks = new Map<string, number>();
+  // Small in-memory cache for same-origin image proxies.
+  // This avoids repeated upstream downloads while keeping client responses cacheable.
+  const imageResponseCache = new MemoryCache({
+    maxEntries: Number(process.env.IMAGE_CACHE_MAX_ENTRIES || 250),
+    defaultTtlMs: Number(process.env.IMAGE_CACHE_TTL_MS || 7 * 24 * 60 * 60 * 1000),
+  });
 
-  const withPlayPublishLock = async <T,>(appId: string, fn: () => Promise<T>): Promise<T> => {
-    const lockName = `play_publish:${appId}`;
-    const timeoutSec = Number(process.env.PUBLISH_LOCK_TIMEOUT_SEC || 10);
+  const playService = createPlayService({ storage, artifactsRoot: safeArtifactsRoot() });
+  const { playPublisher } = playService;
+  const { withPlayPublishLock, resolvePlayCredentialsForApp } = playService;
 
-    // Prefer MySQL advisory lock in production.
+  app.get("/api/health", async (_req, res) => {
+    res.json({ ok: true, time: new Date().toISOString(), uptimeSec: Math.floor(process.uptime()) });
+  });
+
+  // Liveness: process is up.
+  app.get("/api/health/live", (_req, res) => {
+    res.json({ ok: true, time: new Date().toISOString() });
+  });
+
+  // Readiness: dependencies reachable (DB when STORAGE=mysql).
+  app.get("/api/health/ready", async (_req, res) => {
     try {
       if (String(process.env.STORAGE || "").toLowerCase() === "mysql") {
         const pool = getMysqlPool();
-        const [rows] = await pool.query("SELECT GET_LOCK(?, ?) AS got", [lockName, timeoutSec]);
-        const got = Array.isArray(rows) ? (rows as any)[0]?.got : (rows as any)?.got;
-        if (Number(got) !== 1) {
-          throw Object.assign(new Error("Publish already in progress for this app."), { status: 409 });
-        }
-        try {
-          return await fn();
-        } finally {
-          try {
-            await pool.query("SELECT RELEASE_LOCK(?)", [lockName]);
-          } catch {
-            // ignore
-          }
-        }
+        await pool.query("SELECT 1");
       }
+      return res.json({ ok: true, time: new Date().toISOString() });
     } catch (err: any) {
-      // If MySQL lock fails unexpectedly, fall back to in-process locking.
-      if (err?.status === 409) throw err;
+      return res.status(503).json({ ok: false, message: "Not ready", details: err?.message || String(err) });
     }
-
-    const now = Date.now();
-    const ttlMs = Number(process.env.PUBLISH_LOCK_TTL_MS || 2 * 60 * 1000);
-    const existingUntil = inProcessPublishLocks.get(lockName);
-    if (existingUntil && existingUntil > now) {
-      throw Object.assign(new Error("Publish already in progress for this app."), { status: 409 });
-    }
-
-    inProcessPublishLocks.set(lockName, now + ttlMs);
-    try {
-      return await fn();
-    } finally {
-      inProcessPublishLocks.delete(lockName);
-    }
-  };
-
-  const playPublisher = new PlayPublisher({
-    storage,
-    artifactsRoot: safeArtifactsRoot(),
-  });
-
-  const resolvePlayCredentialsForApp = async (appItem: any, user: User): Promise<PlayCredentials> => {
-    const mode = (appItem as any)?.playPublishingMode === "user" ? "user" : "central";
-    if (mode === "central") return { type: "central" };
-
-    const freshUser = await storage.getUser(user.id);
-    const enc = typeof (freshUser as any)?.playRefreshTokenEnc === "string" ? String((freshUser as any).playRefreshTokenEnc).trim() : "";
-    if (!enc) {
-      throw new Error("No Google Play account connected. Connect your Play account via OAuth first.");
-    }
-
-    let refreshToken: string;
-    try {
-      refreshToken = decryptToken(enc);
-    } catch (err: any) {
-      throw new Error(err?.message || "Failed to decrypt Play refresh token");
-    }
-
-    return { type: "user", oauthRefreshToken: refreshToken };
-  };
-
-  app.get("/api/health", (_req, res) => {
-    res.json({ ok: true, time: new Date().toISOString() });
   });
 
   // Secure Unsplash proxy (keeps UNSPLASH_ACCESS_KEY server-side)
@@ -662,6 +621,17 @@ export async function registerRoutes(
     const w = parsed.data.w ?? 900;
     const orientation = parsed.data.orientation ?? "squarish";
 
+    const cacheKey = `unsplash-proxy:${q.toLowerCase()}:${w}:${orientation}`;
+    const cached = imageResponseCache.get(cacheKey);
+    if (cached) {
+      const inm = String(req.headers["if-none-match"] || "").trim();
+      res.setHeader("Content-Type", cached.contentType);
+      res.setHeader("Cache-Control", "private, max-age=604800");
+      res.setHeader("ETag", cached.etag);
+      if (inm && inm === cached.etag) return res.status(304).end();
+      return res.status(200).send(cached.body);
+    }
+
     try {
       const searchRes = await fetch(
         `https://api.unsplash.com/search/photos?query=${encodeURIComponent(q)}&per_page=1&orientation=${encodeURIComponent(orientation)}`,
@@ -724,9 +694,16 @@ export async function registerRoutes(
         return res.status(413).json({ message: "Image too large" });
       }
 
-      res.setHeader("Content-Type", contentType);
+      const stored = imageResponseCache.set(cacheKey, {
+        body: buf,
+        contentType,
+        ttlMs: Number(process.env.IMAGE_CACHE_TTL_MS || 7 * 24 * 60 * 60 * 1000),
+      });
+
+      res.setHeader("Content-Type", stored.contentType);
       res.setHeader("Cache-Control", "private, max-age=604800");
-      return res.status(200).send(buf);
+      res.setHeader("ETag", stored.etag);
+      return res.status(200).send(stored.body);
     } catch (err: any) {
       const msg = String(err?.name || "").includes("Abort") ? "Upstream timeout" : "Unsplash request failed";
       return res.status(502).json({ message: msg });
@@ -766,6 +743,17 @@ export async function registerRoutes(
       return res.status(403).json({ message: "Host not allowed" });
     }
 
+    const cacheKey = `image-proxy:${target.toString()}`;
+    const cached = imageResponseCache.get(cacheKey);
+    if (cached) {
+      const inm = String(req.headers["if-none-match"] || "").trim();
+      res.setHeader("Content-Type", cached.contentType);
+      res.setHeader("Cache-Control", "private, max-age=604800");
+      res.setHeader("ETag", cached.etag);
+      if (inm && inm === cached.etag) return res.status(304).end();
+      return res.status(200).send(cached.body);
+    }
+
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 12000);
@@ -795,9 +783,16 @@ export async function registerRoutes(
         return res.status(413).json({ message: "Image too large" });
       }
 
-      res.setHeader("Content-Type", contentType);
+      const stored = imageResponseCache.set(cacheKey, {
+        body: buf,
+        contentType,
+        ttlMs: Number(process.env.IMAGE_CACHE_TTL_MS || 7 * 24 * 60 * 60 * 1000),
+      });
+
+      res.setHeader("Content-Type", stored.contentType);
       res.setHeader("Cache-Control", "private, max-age=604800");
-      return res.status(200).send(buf);
+      res.setHeader("ETag", stored.etag);
+      return res.status(200).send(stored.body);
     } catch (err: any) {
       const msg = String(err?.name || "").includes("Abort") ? "Upstream timeout" : "Upstream request failed";
       return res.status(502).json({ message: msg });
