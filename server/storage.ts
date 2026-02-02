@@ -71,6 +71,7 @@ export interface IStorage {
   getUserByResetToken(token: string): Promise<User | undefined>;
   createUser(user: InsertUser & { role?: UserRole; mustChangePassword?: boolean }): Promise<User>;
   updateUser(id: string, patch: Partial<{ name: string; password: string; role?: UserRole; mustChangePassword?: boolean }>): Promise<User | undefined>;
+  setUserPermissions(id: string, permissions: string[] | null): Promise<User | undefined>;
   deleteUser(id: string): Promise<boolean>;
   linkGoogleId(userId: string, googleId: string): Promise<User | undefined>;
   setResetToken(userId: string, token: string, expiresAt: Date): Promise<User | undefined>;
@@ -143,7 +144,11 @@ export interface IStorage {
   createPayment(userId: string, payment: InsertPayment): Promise<Payment>;
   getPayment(id: string): Promise<Payment | undefined>;
   getPaymentByOrderId(orderId: string): Promise<Payment | undefined>;
-  updatePaymentStatus(id: string, status: PaymentStatus, providerPaymentId?: string | null): Promise<Payment | undefined>;
+  updatePaymentStatus(
+    id: string,
+    status: PaymentStatus,
+    providerPaymentId?: string | null,
+  ): Promise<{ payment?: Payment; updated: boolean }>;
   listPaymentsByUser(userId: string): Promise<Payment[]>;
   getCompletedPaymentForApp(appId: string): Promise<Payment | undefined>;
   countCompletedBuildsForApp(appId: string, sinceDate?: Date): Promise<number>;
@@ -234,6 +239,14 @@ export class MemStorage implements IStorage {
     return this.users.get(id);
   }
 
+  async setUserPermissions(id: string, permissions: string[] | null): Promise<User | undefined> {
+    const existing = this.users.get(id);
+    if (!existing) return undefined;
+    const updated: User = { ...existing, permissions: permissions ?? [] } as any;
+    this.users.set(id, updated);
+    return updated;
+  }
+
   async getAllUsers(): Promise<User[]> {
     return Array.from(this.users.values());
   }
@@ -260,6 +273,7 @@ export class MemStorage implements IStorage {
       name: insertUser.name ?? null,
       username: insertUser.username,
       role: insertUser.role ?? "user",
+      permissions: [],
       googleId: (insertUser as any).googleId ?? null,
       password: insertUser.password,
       mustChangePassword: insertUser.mustChangePassword ?? false,
@@ -819,6 +833,14 @@ export class MemStorage implements IStorage {
   async createPayment(userId: string, payment: InsertPayment): Promise<Payment> {
     const id = randomUUID();
     const now = new Date();
+
+    const amountPaise = Number((payment as any).amountPaise);
+    if (!Number.isFinite(amountPaise) || amountPaise < 0) {
+      throw new Error("Invalid payment amountPaise");
+    }
+    const amountInrLegacy = Number.isFinite((payment as any).amountInr)
+      ? Number((payment as any).amountInr)
+      : Math.floor(amountPaise / 100);
     const row: Payment = {
       id,
       userId,
@@ -826,7 +848,8 @@ export class MemStorage implements IStorage {
       provider: payment.provider ?? "razorpay",
       providerOrderId: payment.providerOrderId ?? null,
       providerPaymentId: payment.providerPaymentId ?? null,
-      amountInr: payment.amountInr,
+      amountPaise,
+      amountInr: amountInrLegacy,
       plan: payment.plan ?? "starter",
       status: "pending",
       createdAt: now,
@@ -844,17 +867,27 @@ export class MemStorage implements IStorage {
     return Array.from(this.payments.values()).find((p) => p.providerOrderId === orderId);
   }
 
-  async updatePaymentStatus(id: string, status: PaymentStatus, providerPaymentId?: string | null): Promise<Payment | undefined> {
+  async updatePaymentStatus(
+    id: string,
+    status: PaymentStatus,
+    providerPaymentId?: string | null,
+  ): Promise<{ payment?: Payment; updated: boolean }> {
     const existing = this.payments.get(id);
-    if (!existing) return undefined;
-    const updated: Payment = {
+    if (!existing) return { payment: undefined, updated: false };
+
+    // Atomic semantics: only transition from pending.
+    if (existing.status !== "pending") {
+      return { payment: existing, updated: false };
+    }
+
+    const updatedPayment: Payment = {
       ...existing,
       status,
       providerPaymentId: providerPaymentId ?? existing.providerPaymentId,
       updatedAt: new Date(),
     };
-    this.payments.set(id, updated);
-    return updated;
+    this.payments.set(id, updatedPayment);
+    return { payment: updatedPayment, updated: true };
   }
 
   async listPaymentsByUser(userId: string): Promise<Payment[]> {
@@ -1063,10 +1096,12 @@ export class MemStorage implements IStorage {
 
     const users = Array.from(this.users.values());
     const apps = Array.from(this.apps.values());
-    const payments = Array.from(this.payments.values()).filter(p => p.status === "completed" && p.amountInr > 0);
+    const payments = Array.from(this.payments.values()).filter(
+      (p) => p.status === "completed" && Number((p as any).amountPaise || 0) > 0,
+    );
     const builds = Array.from(this.buildJobs.values());
 
-    const totalRevenue = payments.reduce((sum, p) => sum + p.amountInr, 0);
+    const totalRevenue = payments.reduce((sum, p) => sum + Number((p as any).amountPaise || 0) / 100, 0);
     const usersToday = users.filter(u => u.createdAt >= today).length;
     const usersThisWeek = users.filter(u => u.createdAt >= weekAgo).length;
     const usersThisMonth = users.filter(u => u.createdAt >= monthAgo).length;
@@ -1076,9 +1111,9 @@ export class MemStorage implements IStorage {
     const paymentsToday = payments.filter(p => p.createdAt >= today).length;
     const paymentsThisWeek = payments.filter(p => p.createdAt >= weekAgo).length;
     const paymentsThisMonth = payments.filter(p => p.createdAt >= monthAgo).length;
-    const revenueToday = payments.filter(p => p.createdAt >= today).reduce((sum, p) => sum + p.amountInr, 0);
-    const revenueThisWeek = payments.filter(p => p.createdAt >= weekAgo).reduce((sum, p) => sum + p.amountInr, 0);
-    const revenueThisMonth = payments.filter(p => p.createdAt >= monthAgo).reduce((sum, p) => sum + p.amountInr, 0);
+    const revenueToday = payments.filter(p => p.createdAt >= today).reduce((sum, p) => sum + Number((p as any).amountPaise || 0) / 100, 0);
+    const revenueThisWeek = payments.filter(p => p.createdAt >= weekAgo).reduce((sum, p) => sum + Number((p as any).amountPaise || 0) / 100, 0);
+    const revenueThisMonth = payments.filter(p => p.createdAt >= monthAgo).reduce((sum, p) => sum + Number((p as any).amountPaise || 0) / 100, 0);
 
     // Users by day (last 30 days)
     const usersByDay: Array<{ date: string; count: number }> = [];
@@ -1094,7 +1129,9 @@ export class MemStorage implements IStorage {
     for (let i = 29; i >= 0; i--) {
       const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
       const nextDate = new Date(date.getTime() + 24 * 60 * 60 * 1000);
-      const amount = payments.filter(p => p.createdAt >= date && p.createdAt < nextDate).reduce((sum, p) => sum + p.amountInr, 0);
+      const amount = payments
+        .filter(p => p.createdAt >= date && p.createdAt < nextDate)
+        .reduce((sum, p) => sum + Number((p as any).amountPaise || 0) / 100, 0);
       revenueByDay.push({ date: date.toISOString().split('T')[0], amount });
     }
 

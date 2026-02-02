@@ -30,10 +30,12 @@ import {
   Activity,
   ChevronUp,
   ChevronDown,
-  Loader2
+  Loader2,
+  Crown
 } from "lucide-react";
 import { motion } from "framer-motion";
 
+import { usePlanGate } from "@/lib/plan-gate";
 type AppItem = {
   id: string;
   name: string;
@@ -74,6 +76,8 @@ export default function AppAnalytics() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const [timeRange, setTimeRange] = useState("7d");
+  const { isAllowed, requirePlan } = usePlanGate();
+  const analyticsAllowed = isAllowed("advanced_analytics");
 
   const { data: me, isLoading: meLoading } = useQuery({
     queryKey: ["/api/me"],
@@ -120,7 +124,7 @@ export default function AppAnalytics() {
       if (!res.ok) return null;
       return res.json();
     },
-    enabled: !!app,
+    enabled: !!app && analyticsAllowed,
   });
 
   if (meLoading || appLoading) {
@@ -214,6 +218,30 @@ export default function AppAnalytics() {
             </Select>
           </div>
         </motion.div>
+
+        {!analyticsAllowed && (
+          <Card className="glass border-white/10 mb-6">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <Crown className="h-5 w-5 text-yellow-400" />
+                Advanced analytics is a premium feature
+              </CardTitle>
+              <CardDescription>
+                Unlock revenue, orders, customers, and event trends. Preview UI stays fully enabled; only analytics data is gated.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                className="bg-cyan-600 hover:bg-cyan-700"
+                onClick={() =>
+                  requirePlan("advanced_analytics", { requiredPlan: "pro", reason: "Advanced analytics requires Pro or Agency." })
+                }
+              >
+                Unlock Premium Features
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Stats Grid */}
         <motion.div 

@@ -4,7 +4,7 @@ import type {
   SectionBlueprint,
 } from "@shared/blueprints";
 import { createIdFactory } from "@/sections/id-factory";
-import { hydrateImageRefToUrl } from "@/sections/image-hydration";
+import { hydrateImageRefToUrl, hydrateKeywordToUrl } from "@/sections/image-hydration";
 
 type NativeComponent = {
   id: string;
@@ -24,20 +24,28 @@ type NativeScreen = {
 function spacerHeight(size: "xs" | "sm" | "md" | "lg") {
   switch (size) {
     case "xs":
-      return "var(--space-2)";
+      return "var(--space-8)";
     case "sm":
-      return "var(--space-3)";
+      return "var(--space-16)";
     case "lg":
-      return "var(--space-6)";
+      return "var(--space-32)";
     default:
-      return "var(--space-4)";
+      return "var(--space-24)";
   }
 }
 
-function buildSectionComponents(section: SectionBlueprint, nextId: () => string): NativeComponent[] {
+function buildSectionComponents(
+  section: SectionBlueprint,
+  nextId: () => string,
+  industry: AppBlueprint["businessType"],
+): NativeComponent[] {
   switch (section.type) {
     case "hero": {
-      const backgroundImage = hydrateImageRefToUrl(section.background);
+      const backgroundImage = section.background
+        ? section.background.kind === "url"
+          ? section.background.url
+          : hydrateKeywordToUrl(section.background.keyword, { industry, variant: "hero", ratio: "16:9" })
+        : undefined;
       return [
         {
           id: nextId(),
@@ -59,7 +67,7 @@ function buildSectionComponents(section: SectionBlueprint, nextId: () => string)
         {
           id: nextId(),
           type: "grid",
-          props: { columns: section.columns, gap: 12 },
+          props: { columns: section.columns, gap: "var(--space-grid-gap)" },
           children: section.categories.map((c) => ({
             id: nextId(),
             type: "card",
@@ -77,7 +85,7 @@ function buildSectionComponents(section: SectionBlueprint, nextId: () => string)
         {
           id: nextId(),
           type: "section",
-          props: { title: section.title || "Categories", padding: 16 },
+          props: { title: section.title || "Categories", padding: "var(--space-section-y)" },
           children,
         },
       ];
@@ -89,7 +97,7 @@ function buildSectionComponents(section: SectionBlueprint, nextId: () => string)
           type: "section",
           props: {
             title: section.title || "Products",
-            padding: 16,
+            padding: "var(--space-section-y)",
             showMore: !!section.showMoreAction,
             showMoreAction: section.showMoreAction,
           },
@@ -103,7 +111,12 @@ function buildSectionComponents(section: SectionBlueprint, nextId: () => string)
                   id: p.id,
                   name: p.name,
                   price: p.price,
-                  image: hydrateImageRefToUrl(p.image),
+                  image:
+                    p.image?.kind === "url"
+                      ? p.image.url
+                      : p.image?.kind === "keyword"
+                        ? hydrateKeywordToUrl(p.image.keyword, { industry, variant: "card", ratio: "1:1" })
+                        : undefined,
                   rating: p.rating,
                   badge: p.badge,
                   category: p.category,
@@ -121,7 +134,7 @@ function buildSectionComponents(section: SectionBlueprint, nextId: () => string)
         {
           id: nextId(),
           type: "section",
-          props: { title: section.title || "Offers", padding: 16, backgroundColor: "#FFF3E0" },
+          props: { title: section.title || "Offers", padding: "var(--space-section-y)", backgroundColor: "#FFF3E0" },
           children: [
             {
               id: nextId(),
@@ -130,7 +143,12 @@ function buildSectionComponents(section: SectionBlueprint, nextId: () => string)
                 items: section.items.map((i) => ({
                   title: i.title,
                   subtitle: i.subtitle,
-                  image: hydrateImageRefToUrl(i.image),
+                  image:
+                    i.image?.kind === "url"
+                      ? i.image.url
+                      : i.image?.kind === "keyword"
+                        ? hydrateKeywordToUrl(i.image.keyword, { industry, variant: "hero", ratio: "16:9" })
+                        : undefined,
                   buttonText: i.ctaText,
                   action: i.ctaAction,
                 })),
@@ -145,7 +163,7 @@ function buildSectionComponents(section: SectionBlueprint, nextId: () => string)
         {
           id: nextId(),
           type: "container",
-          props: { padding: 16, backgroundColor: "#f5f5f5" },
+          props: { padding: "var(--space-card)", backgroundColor: "#f5f5f5" },
           children: [
             {
               id: nextId(),
@@ -161,12 +179,12 @@ function buildSectionComponents(section: SectionBlueprint, nextId: () => string)
         {
           id: nextId(),
           type: "container",
-          props: { padding: 16 },
+          props: { padding: "var(--space-card)" },
           children: [
             {
               id: nextId(),
               type: "grid",
-              props: { columns: Math.min(4, Math.max(2, section.chips.length)), gap: 8, scrollable: true },
+              props: { columns: Math.min(4, Math.max(2, section.chips.length)), gap: "var(--space-8)", scrollable: true },
               children: section.chips.map((text, idx) => ({
                 id: nextId(),
                 type: "button",
@@ -189,7 +207,12 @@ function buildSectionComponents(section: SectionBlueprint, nextId: () => string)
               name: i.name,
               price: i.price,
               quantity: i.quantity,
-              image: hydrateImageRefToUrl(i.image),
+              image:
+                i.image?.kind === "url"
+                  ? i.image.url
+                  : i.image?.kind === "keyword"
+                    ? hydrateKeywordToUrl(i.image.keyword, { industry, variant: "card", ratio: "1:1" })
+                    : undefined,
             })),
           },
         },
@@ -242,10 +265,10 @@ function buildSectionComponents(section: SectionBlueprint, nextId: () => string)
   }
 }
 
-function buildScreenComponents(screen: ScreenBlueprint, nextId: () => string): NativeComponent[] {
+function buildScreenComponents(screen: ScreenBlueprint, nextId: () => string, industry: AppBlueprint["businessType"]): NativeComponent[] {
   const out: NativeComponent[] = [];
   for (const section of screen.sections) {
-    out.push(...buildSectionComponents(section, nextId));
+    out.push(...buildSectionComponents(section, nextId, industry));
   }
   return out;
 }
@@ -257,6 +280,6 @@ export function buildEditorScreensFromBlueprint(blueprint: AppBlueprint): Native
     name: s.name,
     icon: s.icon,
     isHome: s.isHome,
-    components: buildScreenComponents(s, nextId),
+    components: buildScreenComponents(s, nextId, blueprint.businessType),
   }));
 }

@@ -13,7 +13,7 @@ export function ProductCard({
   return (
     <button
       type="button"
-      className="bg-white rounded-lg border border-gray-200 overflow-hidden text-left hover:bg-gray-50"
+      className="app-card app-card-hover overflow-hidden text-left app-press"
       onClick={() => {
         const productId = String(product?.id || product?.productId || "").trim();
         onAction(`product:${productId || "unknown"}`, product);
@@ -22,13 +22,15 @@ export function ProductCard({
       <SafeImage
         src={product?.image || product?.imageUrl || product?.src}
         alt={product?.name || product?.title || "Product"}
-        className="w-full h-24 object-cover"
-        placeholderClassName="w-full h-24 bg-gray-100"
+        className="w-full aspect-square object-cover"
+        placeholderClassName="w-full aspect-square bg-white/5"
       />
-      <div className="p-2">
-        <div className="text-xs font-medium truncate">{product?.name || product?.title || "Product"}</div>
-        <div className="flex items-center justify-between mt-1">
-          <div className="text-sm font-bold" style={{ color: themeColor }}>
+      <div className="p-[var(--space-card)]">
+        <div className="text-[length:var(--font-body)] font-medium text-[color:var(--app-text)] truncate">
+          {product?.name || product?.title || "Product"}
+        </div>
+        <div className="flex items-center justify-between mt-[var(--space-8)]">
+          <div className="text-[length:var(--font-h2)] font-[var(--font-weight-h2)]" style={{ color: themeColor }}>
             {product?.price || product?.amount || ""}
           </div>
           {product?.rating && <div className="text-[10px] text-amber-600">★ {product.rating}</div>}

@@ -42,6 +42,17 @@ export class MysqlStorage {
     return rows[0] as unknown as User;
   }
 
+  async setUserPermissions(id: string, permissions: string[] | null): Promise<User | undefined> {
+    await getMysqlDb()
+      .update(users)
+      .set({
+        permissions: permissions ?? null,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id));
+    return await this.getUser(id);
+  }
+
   async getAllUsers(): Promise<User[]> {
     const rows = await getMysqlDb().select().from(users);
     return rows as unknown as User[];
@@ -84,6 +95,7 @@ export class MysqlStorage {
       username: user.username,
       googleId: user.googleId ?? null,
       role: user.role ?? "user",
+      permissions: [],
       password: user.password,
       mustChangePassword: user.mustChangePassword ?? false,
       createdAt: now,
@@ -925,6 +937,15 @@ export class MysqlStorage {
     const id = randomUUID();
     const now = new Date();
 
+    const amountPaise = Number((payment as any).amountPaise);
+    if (!Number.isFinite(amountPaise) || amountPaise < 0) {
+      throw new Error("Invalid payment amountPaise");
+    }
+    // Keep the legacy integer-rupees column populated for older code/rows.
+    const amountInrLegacy = Number.isFinite((payment as any).amountInr)
+      ? Number((payment as any).amountInr)
+      : Math.floor(amountPaise / 100);
+
     await getMysqlDb().insert(payments).values({
       id,
       userId,
@@ -932,7 +953,8 @@ export class MysqlStorage {
       provider: payment.provider ?? "razorpay",
       providerOrderId: payment.providerOrderId ?? null,
       providerPaymentId: payment.providerPaymentId ?? null,
-      amountInr: payment.amountInr,
+      amountPaise: amountPaise as any,
+      amountInr: amountInrLegacy,
       plan: payment.plan ?? "starter",
       status: "pending",
       createdAt: now,
@@ -956,20 +978,30 @@ export class MysqlStorage {
     return rows[0] as unknown as Payment;
   }
 
-  async updatePaymentStatus(id: string, status: PaymentStatus, providerPaymentId?: string | null): Promise<Payment | undefined> {
-    const existing = await this.getPayment(id);
-    if (!existing) return undefined;
-
-    await getMysqlDb()
+  async updatePaymentStatus(
+    id: string,
+    status: PaymentStatus,
+    providerPaymentId?: string | null,
+  ): Promise<{ payment?: Payment; updated: boolean }> {
+    // Atomic transition: only mutate pending -> (completed|failed)
+    const result = await getMysqlDb()
       .update(payments)
       .set({
         status,
-        providerPaymentId: providerPaymentId ?? existing.providerPaymentId,
+        providerPaymentId: providerPaymentId ?? sql`${payments.providerPaymentId}`,
         updatedAt: new Date(),
       })
-      .where(eq(payments.id, id));
+      .where(and(eq(payments.id, id), eq(payments.status, "pending")));
 
-    return await this.getPayment(id);
+    const affected =
+      (result as any)?.rowsAffected ??
+      (result as any)?.affectedRows ??
+      (result as any)?.[0]?.affectedRows ??
+      0;
+
+    // Always return the current row for idempotency.
+    const payment = await this.getPayment(id);
+    return { payment, updated: Number(affected) > 0 };
   }
 
   async listPaymentsByUser(userId: string): Promise<Payment[]> {
@@ -1259,14 +1291,15 @@ export class MysqlStorage {
     // Total counts
     const [totalUsersRes] = await getMysqlDb().select({ count: count() }).from(users);
     const [totalAppsRes] = await getMysqlDb().select({ count: count() }).from(apps);
+    const amountPaiseExpr = sql<number>`COALESCE(${payments.amountPaise}, ${payments.amountInr} * 100)`;
     const [totalPaymentsRes] = await getMysqlDb()
       .select({ count: count() })
       .from(payments)
-      .where(and(eq(payments.status, "completed"), sql`${payments.amountInr} > 0`));
+      .where(and(eq(payments.status, "completed"), sql`${amountPaiseExpr} > 0`));
     const [totalRevenueRes] = await getMysqlDb()
-      .select({ total: sql<number>`COALESCE(SUM(${payments.amountInr}), 0)` })
+      .select({ total: sql<number>`COALESCE(SUM(${amountPaiseExpr}), 0) / 100` })
       .from(payments)
-      .where(and(eq(payments.status, "completed"), sql`${payments.amountInr} > 0`));
+      .where(and(eq(payments.status, "completed"), sql`${amountPaiseExpr} > 0`));
 
     // Users by period
     const [usersTodayRes] = await getMysqlDb().select({ count: count() }).from(users).where(gte(users.createdAt, today));
@@ -1279,15 +1312,15 @@ export class MysqlStorage {
     const [appsMonthRes] = await getMysqlDb().select({ count: count() }).from(apps).where(gte(apps.createdAt, monthAgo));
 
     // Payments by period
-    const paymentConditions = and(eq(payments.status, "completed"), sql`${payments.amountInr} > 0`);
+    const paymentConditions = and(eq(payments.status, "completed"), sql`${amountPaiseExpr} > 0`);
     const [paymentsTodayRes] = await getMysqlDb().select({ count: count() }).from(payments).where(and(paymentConditions, gte(payments.createdAt, today)));
     const [paymentsWeekRes] = await getMysqlDb().select({ count: count() }).from(payments).where(and(paymentConditions, gte(payments.createdAt, weekAgo)));
     const [paymentsMonthRes] = await getMysqlDb().select({ count: count() }).from(payments).where(and(paymentConditions, gte(payments.createdAt, monthAgo)));
 
     // Revenue by period
-    const [revenueTodayRes] = await getMysqlDb().select({ total: sql<number>`COALESCE(SUM(${payments.amountInr}), 0)` }).from(payments).where(and(paymentConditions, gte(payments.createdAt, today)));
-    const [revenueWeekRes] = await getMysqlDb().select({ total: sql<number>`COALESCE(SUM(${payments.amountInr}), 0)` }).from(payments).where(and(paymentConditions, gte(payments.createdAt, weekAgo)));
-    const [revenueMonthRes] = await getMysqlDb().select({ total: sql<number>`COALESCE(SUM(${payments.amountInr}), 0)` }).from(payments).where(and(paymentConditions, gte(payments.createdAt, monthAgo)));
+    const [revenueTodayRes] = await getMysqlDb().select({ total: sql<number>`COALESCE(SUM(${amountPaiseExpr}), 0) / 100` }).from(payments).where(and(paymentConditions, gte(payments.createdAt, today)));
+    const [revenueWeekRes] = await getMysqlDb().select({ total: sql<number>`COALESCE(SUM(${amountPaiseExpr}), 0) / 100` }).from(payments).where(and(paymentConditions, gte(payments.createdAt, weekAgo)));
+    const [revenueMonthRes] = await getMysqlDb().select({ total: sql<number>`COALESCE(SUM(${amountPaiseExpr}), 0) / 100` }).from(payments).where(and(paymentConditions, gte(payments.createdAt, monthAgo)));
 
     // Users by day (last 30 days)
     const usersByDayRes = await getMysqlDb()
@@ -1313,7 +1346,7 @@ export class MysqlStorage {
     const revenueByDayRes = await getMysqlDb()
       .select({
         date: sql<string>`DATE(${payments.createdAt})`,
-        amount: sql<number>`COALESCE(SUM(${payments.amountInr}), 0)`,
+        amount: sql<number>`COALESCE(SUM(${amountPaiseExpr}), 0) / 100`,
       })
       .from(payments)
       .where(and(paymentConditions, gte(payments.createdAt, thirtyDaysAgo)))

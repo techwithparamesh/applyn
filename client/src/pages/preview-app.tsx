@@ -16,6 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { getAppUrlDisplay, isHttpUrl } from "@/lib/utils";
 import { AppBuilderStepper } from "@/components/app-builder-stepper";
 import { PageLoading, PageState } from "@/components/page-state";
+import { usePlanGate } from "@/lib/plan-gate";
 
 type AppItem = {
   id: string;
@@ -50,6 +51,7 @@ export default function PreviewApp() {
   const [, setLocation] = useLocation();
   const search = useSearch();
   const { toast } = useToast();
+  const { requirePlan } = usePlanGate();
   
   // QR Code modal state
   const [showQRModal, setShowQRModal] = useState(false);
@@ -331,8 +333,10 @@ export default function PreviewApp() {
 
   const handleDownload = (platform: string) => {
     if (platform === "ios") {
+      if (!requirePlan("download_build", { requiredPlan: "pro", reason: "iOS build downloads require Pro or Agency." })) return;
       window.location.href = `/api/apps/${app.id}/download-ios`;
     } else {
+      if (!requirePlan("download_build", { requiredPlan: "starter", reason: "Build downloads require a paid plan." })) return;
       window.location.href = `/api/apps/${app.id}/download`;
     }
   };

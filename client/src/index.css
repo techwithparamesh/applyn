@@ -65,6 +65,53 @@
   --font-display: 'Plus Jakarta Sans', 'Inter', sans-serif;
 }
 
+/* Native preview design-system utilities (scoped via CSS vars from PreviewThemeProvider) */
+.app-shadow-soft {
+  box-shadow: var(--app-shadow-soft);
+}
+
+.app-shadow-medium {
+  box-shadow: var(--app-shadow-medium);
+}
+
+.app-card {
+  border-radius: var(--app-radius-card);
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow-card);
+}
+
+.app-card-hover {
+  transition: box-shadow 150ms ease, transform 150ms ease;
+}
+
+.app-card-hover:hover {
+  box-shadow: var(--app-shadow-medium);
+}
+
+.app-press {
+  transition: transform 150ms ease;
+}
+
+.app-press:active {
+  transform: scale(0.97);
+}
+
+.app-fade-in {
+  animation: app-fade-in 240ms ease both;
+}
+
+@keyframes app-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 :root, .dark {
   /* Premium Dark Theme */
   --background: 230 25% 5%;

@@ -8,8 +8,11 @@
     "dev": "cross-env NODE_ENV=development node --import tsx server/index.ts",
     "build": "tsx script/build.ts",
     "start": "cross-env NODE_ENV=production node dist/index.cjs",
-    "check": "tsc",
+    "validate:templates": "tsx script/validate-templates.ts",
+    "check": "tsc && npm run validate:templates",
     "e2e:sanity": "cross-env NODE_ENV=development tsx script/e2e-sanity.ts",
+    "webhooks:migrate-prefixed:dry": "tsx script/migrate-webhook-event-allowlists.ts",
+    "webhooks:migrate-prefixed:apply": "tsx script/migrate-webhook-event-allowlists.ts --apply",
     "db:push": "drizzle-kit push",
     "worker": "cross-env NODE_ENV=production node --import tsx server/worker.ts",
     "docker:android-builder": "docker build -f docker/android-builder/Dockerfile -t applyn-android-builder:latest ."

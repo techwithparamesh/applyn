@@ -11,7 +11,9 @@ export const insertUserSchema = z.object({
   password: z.string().min(8).max(200),
 });
 
-export const userRoleSchema = z.enum(["admin", "support", "user"]);
+// NOTE: Historically this codebase used role="support" for staff users.
+// Keep it for backward compatibility while also supporting role="staff".
+export const userRoleSchema = z.enum(["admin", "staff", "support", "user"]);
 export type UserRole = z.infer<typeof userRoleSchema>;
 
 // Subscription status for yearly renewal model
@@ -27,6 +29,8 @@ export type User = {
   name: string | null;
   username: string;
   role: UserRole;
+  // Minimal RBAC: staff permissions (nullable; treat null as empty array)
+  permissions?: string[] | null;
   googleId?: string | null;
   // Phase 2: Google Play user-connected publishing (encrypted refresh token)
   playRefreshTokenEnc?: string | null;
@@ -116,7 +120,7 @@ export type AppFeatures = z.infer<typeof appFeaturesSchema>;
 export const insertAppSchema = z.object({
   name: z.string().min(2).max(200),
   url: z.string().url().max(2000),
-  icon: z.string().max(10).default("🚀"), // Can be empty if user has custom logo
+  icon: z.string().max(32).default("rocket"), // Icon ID; can be empty if user has custom logo
   iconUrl: z.string().max(500000).nullable().optional(), // base64 or URL
   iconColor: z.string().min(4).max(32).default("#2563EB").optional(), // Icon background color
   primaryColor: z.string().min(4).max(32).default("#2563EB"),
@@ -279,7 +283,10 @@ export const insertPaymentSchema = z.object({
   provider: paymentProviderSchema.default("razorpay"),
   providerOrderId: z.string().max(128).optional().nullable(),
   providerPaymentId: z.string().max(128).optional().nullable(),
-  amountInr: z.number().int().positive(),
+  // Money is stored as integer paise (authoritative).
+  // amountInr remains for backwards compatibility with older rows/clients.
+  amountPaise: z.number().int().positive(),
+  amountInr: z.number().int().nonnegative().optional(),
   plan: z.string().max(50).default("starter"),
 });
 
@@ -293,7 +300,8 @@ export type Payment = {
   provider: PaymentProvider;
   providerOrderId: string | null;
   providerPaymentId: string | null;
-  amountInr: number;
+  amountPaise: number;
+  amountInr?: number;
   plan: string;
   status: PaymentStatus;
   createdAt: Date;

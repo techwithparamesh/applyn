@@ -10,7 +10,7 @@
  * - Accurate status bars for each platform
  * - Android navigation bar (Back / Home / Recent)
  * - iOS notch and home indicator
- * - Plan-based locking for iOS preview
+ * - Premium-only preview UI (no plan-based visual degradation)
  * - Smooth transition animations
  */
 
@@ -24,7 +24,6 @@ import {
   Menu, 
   Loader2, 
   RefreshCw,
-  Lock,
   Smartphone,
   Apple,
   ChevronLeft,
@@ -44,6 +43,8 @@ import { SafeImage } from "@/native/components/SafeImage";
 import { PreviewThemeProvider } from "@/design/preview-theme";
 import { themeForBusinessType } from "@/design/business-mapping";
 import type { BusinessType } from "@shared/blueprints";
+import { NATIVE_ICON_IDS, NativeIcon } from "@/native/icons";
+import { usePlanGate } from "@/lib/plan-gate";
 
 // Types for the component
 type DevicePlatform = "android" | "ios";
@@ -85,7 +86,7 @@ interface DevicePreviewProps {
   screenIndex?: number;
   /** Callback when native preview screen changes */
   onScreenIndexChange?: (index: number) => void;
-  /** Platforms available based on user's plan */
+  /** Back-compat only: ignored (preview UI is always premium) */
   availablePlatforms?: DevicePlatform[];
   /** Initial selected platform */
   defaultPlatform?: DevicePlatform;
@@ -111,7 +112,7 @@ export function DevicePreview({
   url = "https://example.com",
   appName = "My App",
   primaryColor = "", // Empty = no custom color, show neutral
-  icon = "📱",
+  icon = "rocket",
   preferLivePreview = false,
   screens,
   industry,
@@ -124,6 +125,7 @@ export function DevicePreview({
   showToggle = true,
   showPreviewModeToggle = false,
 }: DevicePreviewProps) {
+  const { shouldShowWatermark } = usePlanGate();
   const [selectedPlatform, setSelectedPlatform] = useState<DevicePlatform>(defaultPlatform);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -193,14 +195,8 @@ export function DevicePreview({
   // Show native renderer if: we have screens data, OR it's a native-only app, OR it's a runtime URL
   const isNativeApp = hasScreensData || isNativeOnly || isNativeScheme || isRuntimeUrl || (!isHttp && (!rawUrl || rawUrl === "https://example.com"));
 
-  // Check if a platform is available based on user's plan
-  const isPlatformAvailable = (platform: DevicePlatform) => {
-    return availablePlatforms.includes(platform);
-  };
-
   // Handle platform change
   const handlePlatformChange = (platform: DevicePlatform) => {
-    if (!isPlatformAvailable(platform)) return;
     setSelectedPlatform(platform);
     onPlatformChange?.(platform);
   };
@@ -244,28 +240,21 @@ export function DevicePreview({
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => handlePlatformChange("android")}
-                    disabled={!isPlatformAvailable("android")}
                     className={`
                       relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300
                       ${selectedPlatform === "android" 
                         ? "bg-green-500/20 text-green-400 shadow-lg shadow-green-500/10" 
                         : "text-muted-foreground hover:text-white hover:bg-white/5"
                       }
-                      ${!isPlatformAvailable("android") ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                      cursor-pointer
                     `}
                   >
                     <AndroidIcon className="w-4 h-4" />
                     <span>Android</span>
-                    {!isPlatformAvailable("android") && (
-                      <Lock className="w-3 h-3 ml-1 text-yellow-500" />
-                    )}
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="bg-gray-900 border-white/10">
-                  {isPlatformAvailable("android") 
-                    ? "Preview how your app will appear on Android devices"
-                    : "Android app build available in Premium plan"
-                  }
+                  Preview how your app will appear on Android devices
                 </TooltipContent>
               </Tooltip>
 
@@ -274,28 +263,21 @@ export function DevicePreview({
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => handlePlatformChange("ios")}
-                    disabled={!isPlatformAvailable("ios")}
                     className={`
                       relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300
                       ${selectedPlatform === "ios" 
                         ? "bg-white/20 text-white shadow-lg shadow-white/10" 
                         : "text-muted-foreground hover:text-white hover:bg-white/5"
                       }
-                      ${!isPlatformAvailable("ios") ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                      cursor-pointer
                     `}
                   >
                     <Apple className="w-4 h-4" />
                     <span>iOS</span>
-                    {!isPlatformAvailable("ios") && (
-                      <Lock className="w-3 h-3 ml-1 text-yellow-500" />
-                    )}
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="bg-gray-900 border-white/10">
-                  {isPlatformAvailable("ios") 
-                    ? "Preview how your app will appear on iOS devices"
-                    : "iOS app build available in Premium plan"
-                  }
+                  Preview how your app will appear on iOS devices
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -332,6 +314,7 @@ export function DevicePreview({
               industry={industry}
               activeScreenIndex={activeScreenIndex}
               onScreenChange={handleScreenChange}
+              showWatermark={shouldShowWatermark}
             />
           ) : (
             <AndroidDeviceFrame
@@ -353,6 +336,7 @@ export function DevicePreview({
               industry={industry}
               activeScreenIndex={activeScreenIndex}
               onScreenChange={handleScreenChange}
+              showWatermark={shouldShowWatermark}
             />
           )}
         </motion.div>
@@ -392,9 +376,10 @@ function AppIcon({ icon, appName, className = "w-6 h-6" }: { icon: string; appNa
     );
   }
   
-  // If it's an emoji, show it
-  if (icon && !isUrl) {
-    return <span className="text-base">{icon}</span>;
+  // If it's a known icon ID, render as a NativeIcon (emoji-free)
+  const normalized = String(icon || "").trim().toLowerCase();
+  if (normalized && NATIVE_ICON_IDS.includes(normalized)) {
+    return <NativeIcon name={normalized} className={className} />;
   }
   
   // Fallback: show app initials in a nice circle
@@ -429,6 +414,8 @@ interface DeviceFrameProps {
   industry?: string;
   activeScreenIndex?: number;
   onScreenChange?: (index: number) => void;
+
+  showWatermark?: boolean;
 }
 
 function IOSDeviceFrame({
@@ -450,6 +437,7 @@ function IOSDeviceFrame({
   industry,
   activeScreenIndex,
   onScreenChange,
+  showWatermark,
 }: DeviceFrameProps) {
   const phoneScreenWidth = 272;
 
@@ -465,6 +453,13 @@ function IOSDeviceFrame({
       <div className="h-[64px] w-[3px] bg-gray-800 absolute -right-[17px] top-[142px] rounded-r-lg"></div>
 
       <div className="rounded-[2rem] overflow-hidden w-full h-full bg-white relative flex flex-col">
+        {showWatermark ? (
+          <div className="absolute bottom-3 right-3 z-50 pointer-events-none">
+            <div className="px-2 py-1 rounded-full bg-black/40 text-white/80 text-[10px] backdrop-blur-sm border border-white/10">
+              Built with <span className="text-white font-medium">Applyn</span>
+            </div>
+          </div>
+        ) : null}
         {/* iOS Status Bar - matches header color */}
         <div 
           className={`h-7 flex items-center justify-between px-5 text-[10px] font-medium text-white select-none z-20 ${!primaryColor ? 'bg-gray-800' : ''}`}
@@ -577,6 +572,7 @@ function AndroidDeviceFrame({
   industry,
   activeScreenIndex,
   onScreenChange,
+  showWatermark,
 }: DeviceFrameProps) {
   const phoneScreenWidth = 272;
 
@@ -592,6 +588,13 @@ function AndroidDeviceFrame({
       <div className="h-[60px] w-[3px] bg-gray-800 absolute -right-[15px] top-[160px] rounded-r-lg"></div>
 
       <div className="rounded-[1.25rem] overflow-hidden w-full h-full bg-white relative flex flex-col">
+        {showWatermark ? (
+          <div className="absolute bottom-3 right-3 z-50 pointer-events-none">
+            <div className="px-2 py-1 rounded-full bg-black/40 text-white/80 text-[10px] backdrop-blur-sm border border-white/10">
+              Built with <span className="text-white font-medium">Applyn</span>
+            </div>
+          </div>
+        ) : null}
         {/* Android Status Bar - matches header color */}
         <div 
           className={`h-6 flex items-center justify-between px-4 text-[10px] font-medium text-white select-none z-20 ${!primaryColor ? 'bg-gray-800' : ''}`}
@@ -946,7 +949,7 @@ function NativeScreensPreview({
       )}
 
       {/* Native-style bottom navigation */}
-      <div className="relative h-16 bg-white/90 backdrop-blur border-t border-gray-200 flex items-center justify-around px-1 shrink-0">
+      <div className="relative h-16 bg-[color:var(--app-surface)]/90 backdrop-blur border-t border-[color:var(--app-border)] flex items-center justify-around px-1 shrink-0">
         {(() => {
           const hasOverflow = screens.length > 5;
           const tabScreens = hasOverflow ? screens.slice(0, 4) : screens.slice(0, 5);
@@ -962,8 +965,8 @@ function NativeScreensPreview({
                   onScreenChange(i);
                 }}
                 className={
-                  "relative flex flex-col items-center justify-center gap-1 min-w-0 w-full h-full px-2 transition-colors " +
-                  (isActive ? "text-gray-900" : "text-gray-500")
+                  "relative flex flex-col items-center justify-center gap-1 min-w-0 w-full h-full px-2 transition-colors duration-150 active:scale-[0.97] " +
+                  (isActive ? "text-[color:var(--app-text)]" : "text-[color:var(--app-muted-text)]")
                 }
               >
                 {isActive && (
@@ -972,7 +975,10 @@ function NativeScreensPreview({
                     style={{ backgroundColor: themeColor }}
                   />
                 )}
-                <span className={"text-[20px] leading-none " + (isActive ? "" : "opacity-90")}>{screen.icon || "📄"}</span>
+                <NativeIcon
+                  name={screen.icon}
+                  className={"h-5 w-5 " + (isActive ? "" : "opacity-90")}
+                />
                 <span
                   className="text-[10px] font-medium truncate max-w-[74px]"
                   style={isActive ? { color: themeColor } : undefined}
@@ -994,8 +1000,8 @@ function NativeScreensPreview({
                   key="__more"
                   onClick={() => setMoreOpen((v) => !v)}
                   className={
-                    "relative flex flex-col items-center justify-center gap-1 min-w-0 w-full h-full px-2 transition-colors " +
-                    (isMoreActive ? "text-gray-900" : "text-gray-500")
+                    "relative flex flex-col items-center justify-center gap-1 min-w-0 w-full h-full px-2 transition-colors duration-150 active:scale-[0.97] " +
+                    (isMoreActive ? "text-[color:var(--app-text)]" : "text-[color:var(--app-muted-text)]")
                   }
                   aria-haspopup="menu"
                   aria-expanded={moreOpen}
@@ -1006,7 +1012,7 @@ function NativeScreensPreview({
                       style={{ backgroundColor: themeColor }}
                     />
                   )}
-                  <span className={"text-[20px] leading-none " + (isMoreActive ? "" : "opacity-90")}>⋯</span>
+                  <NativeIcon name="more" className={"h-5 w-5 " + (isMoreActive ? "" : "opacity-90")} />
                   <span
                     className="text-[10px] font-medium truncate max-w-[74px]"
                     style={isMoreActive ? { color: themeColor } : undefined}
@@ -1019,9 +1025,9 @@ function NativeScreensPreview({
               {hasOverflow && moreOpen && (
                 <div
                   role="menu"
-                  className="absolute bottom-full left-3 right-3 mb-2 rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden"
+                  className="absolute bottom-full left-3 right-3 mb-2 rounded-[var(--app-radius-card)] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] app-shadow-medium overflow-hidden"
                 >
-                  <div className="px-3 py-2 text-[11px] font-semibold text-gray-700 border-b border-gray-100">
+                  <div className="px-3 py-2 text-[11px] font-semibold text-[color:var(--app-muted-text)] border-b border-[color:var(--app-border)]">
                     More screens
                   </div>
                   <div className="max-h-48 overflow-y-auto">
@@ -1038,11 +1044,13 @@ function NativeScreensPreview({
                           }}
                           className={
                             "w-full px-3 py-2.5 flex items-center justify-between text-left text-sm " +
-                            (isActive ? "bg-gray-50 text-gray-900" : "text-gray-700 hover:bg-gray-50")
+                            (isActive
+                              ? "bg-white/5 text-[color:var(--app-text)]"
+                              : "text-[color:var(--app-text)]/90 hover:bg-white/5")
                           }
                         >
                           <span className="flex items-center gap-2 min-w-0">
-                            <span className="text-lg leading-none">{s.icon || "📄"}</span>
+                            <NativeIcon name={s.icon} className="h-4 w-4 opacity-90" />
                             <span className="truncate">{s.name}</span>
                           </span>
                           {isActive && (

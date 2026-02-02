@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -26,6 +27,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { AppBuilderStepper } from "@/components/app-builder-stepper";
 import { PageLoading, PageState } from "@/components/page-state";
+import { usePlanGate } from "@/lib/plan-gate";
+import { requiredPlanForFeature, formatPlanLabel } from "@/lib/plan-gate";
+import { track } from "@/lib/analytics";
+import { Lock } from "lucide-react";
 import { AlertTriangle, ArrowLeft, RefreshCw } from "lucide-react";
 import { PlaySetupWizard } from "@/components/play-setup-wizard";
 
@@ -124,6 +129,8 @@ export default function Publish() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const { toast } = useToast();
+  const { requirePlan, isAllowed } = usePlanGate();
+  const [publishGateMomentum, setPublishGateMomentum] = useState<null | "publish_play">(null);
 
   if (!id) {
     return (
@@ -157,6 +164,29 @@ export default function Publish() {
     queryFn: fetchMe,
   });
   const isStaff = meQuery.data?.role === "admin" || meQuery.data?.role === "support";
+
+  const runPublishGate = useCallback(
+    async () => {
+      void track("funnel.publish.click", {
+        appId: id,
+        staff: isStaff,
+        allowed: isStaff ? true : isAllowed("publish_play"),
+        requiredPlan: requiredPlanForFeature("publish_play"),
+      });
+
+      if (isStaff) return true;
+      setPublishGateMomentum("publish_play");
+      await new Promise((r) => setTimeout(r, 900));
+      setPublishGateMomentum(null);
+
+      void track("funnel.publish.gate_start", { appId: id });
+
+      return requirePlan("publish_play", {
+        reason: `Publishing to Google Play requires ${formatPlanLabel(requiredPlanForFeature("publish_play"))} or higher.`,
+      });
+    },
+    [id, isAllowed, isStaff, requirePlan],
+  );
 
   const preflightQuery = useQuery({
     queryKey: ["publish-preflight", id],
@@ -477,34 +507,75 @@ export default function Publish() {
                       <Button
                         variant="outline"
                         className="border-white/10"
-                        onClick={() => void publishInternalMutation.mutateAsync()}
+                        onClick={() => {
+                          void (async () => {
+                            const ok = await runPublishGate();
+                            if (!ok) return;
+                            await publishInternalMutation.mutateAsync();
+                          })();
+                        }}
                         disabled={publishInternalMutation.isPending}
                       >
-                        {publishInternalMutation.isPending ? "Publishing…" : "Publish Internal"}
+                        {publishInternalMutation.isPending
+                          ? "Publishing…"
+                          : publishGateMomentum === "publish_play"
+                            ? "Preparing production build…"
+                            : "Publish Internal"}
                       </Button>
 
                       {publishingMode === "central" ? (
                         <Button
                           variant="outline"
                           className="border-white/10"
-                          onClick={() => void requestProdMutation.mutateAsync()}
+                          onClick={() => {
+                            void (async () => {
+                              const ok = await runPublishGate();
+                              if (!ok) return;
+                              await requestProdMutation.mutateAsync();
+                            })();
+                          }}
                           disabled={requestProdMutation.isPending}
                         >
-                          {requestProdMutation.isPending ? "Requesting…" : "Request Production Approval"}
+                          {requestProdMutation.isPending
+                            ? "Requesting…"
+                            : publishGateMomentum === "publish_play"
+                              ? "Preparing production build…"
+                              : "Request Production Approval"}
                         </Button>
                       ) : null}
 
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button
-                            disabled={
-                              publishProdMutation.isPending ||
-                              (!isStaff && !!preflightQuery.data?.policyBlocked) ||
-                              !preflightQuery.data?.validation?.isValid
-                            }
-                          >
-                            Publish Production
-                          </Button>
+                          <div className="inline-flex items-center gap-2">
+                            <Button
+                              disabled={
+                                publishProdMutation.isPending ||
+                                (!isStaff && !!preflightQuery.data?.policyBlocked) ||
+                                !preflightQuery.data?.validation?.isValid
+                              }
+                            >
+                              Publish Production
+                            </Button>
+
+                            {!isStaff && !isAllowed("publish_play") ? (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge
+                                      variant="outline"
+                                      className="border-white/10 bg-white/5 text-white/80 inline-flex items-center gap-1 cursor-help"
+                                    >
+                                      <Lock className="h-3 w-3" />
+                                      {formatPlanLabel(requiredPlanForFeature("publish_play"))}
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="bg-gray-900 border-white/10">
+                                    Publishing is a {formatPlanLabel(requiredPlanForFeature("publish_play"))} feature. Click Publish to upgrade.
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : null}
+                          </div>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
@@ -515,7 +586,15 @@ export default function Publish() {
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => void publishProdMutation.mutateAsync()}>
+                            <AlertDialogAction
+                              onClick={() => {
+                                void (async () => {
+                                  const ok = await runPublishGate();
+                                  if (!ok) return;
+                                  await publishProdMutation.mutateAsync();
+                                })();
+                              }}
+                            >
                               Confirm Publish
                             </AlertDialogAction>
                           </AlertDialogFooter>

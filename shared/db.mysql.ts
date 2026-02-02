@@ -1,4 +1,4 @@
-import { mysqlTable, int, text, timestamp, varchar, boolean, index, customType, tinyint } from "drizzle-orm/mysql-core";
+import { mysqlTable, int, text, timestamp, varchar, boolean, index, customType, tinyint, json } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: varchar("id", { length: 36 }).primaryKey(),
@@ -8,6 +8,8 @@ export const users = mysqlTable("users", {
   playRefreshTokenEnc: text("play_refresh_token_enc"),
   playConnectedAt: timestamp("play_connected_at", { mode: "date" }),
   role: varchar("role", { length: 16 }).notNull().default("user"),
+  // Minimal RBAC: JSON array of permission strings (nullable; treat null as empty array)
+  permissions: json("permissions"),
   password: text("password").notNull(),
   mustChangePassword: boolean("must_change_password").notNull().default(false), // Force password change on first login
   emailVerified: boolean("email_verified").notNull().default(false),
@@ -151,6 +153,7 @@ export const appCustomers = mysqlTable("app_customers", {
 export const appProducts = mysqlTable("app_products", {
   id: varchar("id", { length: 36 }).primaryKey(),
   appId: varchar("app_id", { length: 36 }).notNull(),
+  sku: varchar("sku", { length: 64 }),
   name: varchar("name", { length: 200 }).notNull(),
   description: text("description"),
   imageUrl: text("image_url"),
@@ -164,12 +167,136 @@ export const appProducts = mysqlTable("app_products", {
   activeIdx: index("app_products_active_idx").on(table.appId, table.active),
 }));
 
+// --- App Runtime (ecommerce engine) tables ---
+
+export const appEcommerceSettings = mysqlTable(
+  "app_ecommerce_settings",
+  {
+    appId: varchar("app_id", { length: 36 }).primaryKey(),
+    taxRateBps: int("tax_rate_bps").notNull().default(0),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_ecommerce_settings_app_idx").on(table.appId),
+  }),
+);
+
+export const appProductVariants = mysqlTable(
+  "app_product_variants",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    productId: varchar("product_id", { length: 36 }).notNull(),
+    sku: varchar("sku", { length: 64 }),
+    name: varchar("name", { length: 200 }).notNull(),
+    attributes: text("attributes"), // JSON
+    priceCents: int("price_cents"), // Optional override
+    active: tinyint("active").notNull().default(1),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_product_variants_app_idx").on(table.appId),
+    productIdx: index("app_product_variants_product_idx").on(table.appId, table.productId),
+    skuIdx: index("app_product_variants_sku_idx").on(table.appId, table.sku),
+    activeIdx: index("app_product_variants_active_idx").on(table.appId, table.active),
+  }),
+);
+
+export const appInventory = mysqlTable(
+  "app_inventory",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    productId: varchar("product_id", { length: 36 }).notNull(),
+    variantId: varchar("variant_id", { length: 36 }),
+    sku: varchar("sku", { length: 64 }),
+    stock: int("stock").notNull().default(0),
+    lowStockThreshold: int("low_stock_threshold").notNull().default(0),
+    backorderAllowed: tinyint("backorder_allowed").notNull().default(0),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_inventory_app_idx").on(table.appId),
+    productIdx: index("app_inventory_product_idx").on(table.appId, table.productId),
+    variantIdx: index("app_inventory_variant_idx").on(table.appId, table.variantId),
+    skuIdx: index("app_inventory_sku_idx").on(table.appId, table.sku),
+  }),
+);
+
+export const appInventoryMovements = mysqlTable(
+  "app_inventory_movements",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    productId: varchar("product_id", { length: 36 }).notNull(),
+    variantId: varchar("variant_id", { length: 36 }),
+    delta: int("delta").notNull(),
+    reason: varchar("reason", { length: 64 }).notNull(),
+    refType: varchar("ref_type", { length: 32 }),
+    refId: varchar("ref_id", { length: 36 }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_inventory_movements_app_idx").on(table.appId),
+    productIdx: index("app_inventory_movements_product_idx").on(table.appId, table.productId),
+    createdAtIdx: index("app_inventory_movements_created_at_idx").on(table.createdAt),
+  }),
+);
+
+export const appCoupons = mysqlTable(
+  "app_coupons",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    code: varchar("code", { length: 64 }).notNull(),
+    type: varchar("type", { length: 16 }).notNull().default("percent"), // percent|fixed
+    percentBps: int("percent_bps"),
+    amountCents: int("amount_cents"),
+    active: tinyint("active").notNull().default(1),
+    startsAt: timestamp("starts_at", { mode: "date" }),
+    endsAt: timestamp("ends_at", { mode: "date" }),
+    maxRedemptions: int("max_redemptions"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_coupons_app_idx").on(table.appId),
+    codeIdx: index("app_coupons_code_idx").on(table.appId, table.code),
+    activeIdx: index("app_coupons_active_idx").on(table.appId, table.active),
+  }),
+);
+
+export const appShippingMethods = mysqlTable(
+  "app_shipping_methods",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    deliveryFeeCents: int("delivery_fee_cents").notNull().default(0),
+    active: tinyint("active").notNull().default(1),
+    sortOrder: int("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_shipping_methods_app_idx").on(table.appId),
+    activeIdx: index("app_shipping_methods_active_idx").on(table.appId, table.active),
+  }),
+);
+
 export const appOrders = mysqlTable("app_orders", {
   id: varchar("id", { length: 36 }).primaryKey(),
   appId: varchar("app_id", { length: 36 }).notNull(),
   customerId: varchar("customer_id", { length: 36 }),
   status: varchar("status", { length: 24 }).notNull().default("created"),
   currency: varchar("currency", { length: 8 }).notNull().default("INR"),
+  subtotalCents: int("subtotal_cents").notNull().default(0),
+  discountCents: int("discount_cents").notNull().default(0),
+  shippingCents: int("shipping_cents").notNull().default(0),
+  taxCents: int("tax_cents").notNull().default(0),
   totalCents: int("total_cents").notNull().default(0),
   paymentProvider: varchar("payment_provider", { length: 16 }),
   paymentStatus: varchar("payment_status", { length: 16 }).notNull().default("pending"),
@@ -187,7 +314,9 @@ export const appOrderItems = mysqlTable("app_order_items", {
   id: varchar("id", { length: 36 }).primaryKey(),
   orderId: varchar("order_id", { length: 36 }).notNull(),
   productId: varchar("product_id", { length: 36 }),
+  variantId: varchar("variant_id", { length: 36 }),
   name: varchar("name", { length: 200 }).notNull(),
+  sku: varchar("sku", { length: 64 }),
   quantity: int("quantity").notNull().default(1),
   unitPriceCents: int("unit_price_cents").notNull(),
   lineTotalCents: int("line_total_cents").notNull(),
@@ -195,6 +324,46 @@ export const appOrderItems = mysqlTable("app_order_items", {
 }, (table) => ({
   orderIdx: index("app_order_items_order_idx").on(table.orderId),
 }));
+
+export const appOrderAddresses = mysqlTable(
+  "app_order_addresses",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    orderId: varchar("order_id", { length: 36 }).notNull(),
+    kind: varchar("kind", { length: 16 }).notNull().default("shipping"),
+    name: varchar("name", { length: 200 }).notNull(),
+    phone: varchar("phone", { length: 40 }),
+    line1: varchar("line1", { length: 255 }).notNull(),
+    line2: varchar("line2", { length: 255 }),
+    city: varchar("city", { length: 120 }).notNull(),
+    state: varchar("state", { length: 120 }),
+    postalCode: varchar("postal_code", { length: 32 }),
+    country: varchar("country", { length: 2 }).notNull().default("IN"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    orderIdx: index("app_order_addresses_order_idx").on(table.orderId),
+  }),
+);
+
+export const appOrderRefunds = mysqlTable(
+  "app_order_refunds",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    orderId: varchar("order_id", { length: 36 }).notNull(),
+    amountCents: int("amount_cents").notNull(),
+    reason: text("reason"),
+    status: varchar("status", { length: 24 }).notNull().default("processed"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    processedAt: timestamp("processed_at", { mode: "date" }),
+  },
+  (table) => ({
+    appIdx: index("app_order_refunds_app_idx").on(table.appId),
+    orderIdx: index("app_order_refunds_order_idx").on(table.orderId),
+    createdAtIdx: index("app_order_refunds_created_at_idx").on(table.createdAt),
+  }),
+);
 
 export const appEvents = mysqlTable("app_events", {
   id: varchar("id", { length: 36 }).primaryKey(),
@@ -315,8 +484,10 @@ export const appRestaurantReservations = mysqlTable(
     id: varchar("id", { length: 36 }).primaryKey(),
     appId: varchar("app_id", { length: 36 }).notNull(),
     customerId: varchar("customer_id", { length: 36 }).notNull(),
+    tableId: varchar("table_id", { length: 36 }),
     partySize: int("party_size").notNull().default(2),
     reservedAt: timestamp("reserved_at", { mode: "date" }).notNull(),
+    durationMinutes: int("duration_minutes").notNull().default(90),
     notes: text("notes"),
     status: varchar("status", { length: 24 }).notNull().default("requested"),
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
@@ -326,6 +497,165 @@ export const appRestaurantReservations = mysqlTable(
     appIdx: index("app_restaurant_reservations_app_idx").on(table.appId),
     customerIdx: index("app_restaurant_reservations_customer_idx").on(table.appId, table.customerId),
     reservedAtIdx: index("app_restaurant_reservations_reserved_at_idx").on(table.appId, table.reservedAt),
+  }),
+);
+
+export const appRestaurantTables = mysqlTable(
+  "app_restaurant_tables",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    name: varchar("name", { length: 80 }).notNull(),
+    capacity: int("capacity").notNull().default(2),
+    active: tinyint("active").notNull().default(1),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_restaurant_tables_app_idx").on(table.appId),
+    activeIdx: index("app_restaurant_tables_active_idx").on(table.appId, table.active),
+  }),
+);
+
+export const appRestaurantMenuCategories = mysqlTable(
+  "app_restaurant_menu_categories",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    sortOrder: int("sort_order").notNull().default(0),
+    active: tinyint("active").notNull().default(1),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_restaurant_menu_categories_app_idx").on(table.appId),
+    activeIdx: index("app_restaurant_menu_categories_active_idx").on(table.appId, table.active),
+  }),
+);
+
+export const appRestaurantMenuItems = mysqlTable(
+  "app_restaurant_menu_items",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    categoryId: varchar("category_id", { length: 36 }),
+    name: varchar("name", { length: 200 }).notNull(),
+    description: text("description"),
+    imageUrl: text("image_url"),
+    currency: varchar("currency", { length: 8 }).notNull().default("INR"),
+    priceCents: int("price_cents").notNull().default(0),
+    prepTimeMinutes: int("prep_time_minutes").notNull().default(15),
+    active: tinyint("active").notNull().default(1),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_restaurant_menu_items_app_idx").on(table.appId),
+    categoryIdx: index("app_restaurant_menu_items_category_idx").on(table.appId, table.categoryId),
+    activeIdx: index("app_restaurant_menu_items_active_idx").on(table.appId, table.active),
+  }),
+);
+
+export const appRestaurantMenuModifiers = mysqlTable(
+  "app_restaurant_menu_modifiers",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    itemId: varchar("item_id", { length: 36 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    minSelect: int("min_select").notNull().default(0),
+    maxSelect: int("max_select").notNull().default(1),
+    required: tinyint("required").notNull().default(0),
+    active: tinyint("active").notNull().default(1),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_restaurant_menu_modifiers_app_idx").on(table.appId),
+    itemIdx: index("app_restaurant_menu_modifiers_item_idx").on(table.appId, table.itemId),
+    activeIdx: index("app_restaurant_menu_modifiers_active_idx").on(table.appId, table.active),
+  }),
+);
+
+export const appRestaurantMenuModifierOptions = mysqlTable(
+  "app_restaurant_menu_modifier_options",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    modifierId: varchar("modifier_id", { length: 36 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    priceDeltaCents: int("price_delta_cents").notNull().default(0),
+    active: tinyint("active").notNull().default(1),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_restaurant_menu_modifier_options_app_idx").on(table.appId),
+    modifierIdx: index("app_restaurant_menu_modifier_options_modifier_idx").on(table.appId, table.modifierId),
+    activeIdx: index("app_restaurant_menu_modifier_options_active_idx").on(table.appId, table.active),
+  }),
+);
+
+export const appRestaurantAvailabilityWindows = mysqlTable(
+  "app_restaurant_availability_windows",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    kind: varchar("kind", { length: 24 }).notNull().default("reservation"), // reservation|menu
+    dayOfWeek: int("day_of_week").notNull().default(0), // 0=Sunday
+    startTime: varchar("start_time", { length: 5 }).notNull(), // HH:MM
+    endTime: varchar("end_time", { length: 5 }).notNull(), // HH:MM
+    active: tinyint("active").notNull().default(1),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_restaurant_availability_windows_app_idx").on(table.appId),
+    kindIdx: index("app_restaurant_availability_windows_kind_idx").on(table.appId, table.kind),
+    activeIdx: index("app_restaurant_availability_windows_active_idx").on(table.appId, table.active),
+  }),
+);
+
+export const appRestaurantOrders = mysqlTable(
+  "app_restaurant_orders",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    customerId: varchar("customer_id", { length: 36 }),
+    fulfillmentType: varchar("fulfillment_type", { length: 16 }).notNull().default("dine_in"), // dine_in|pickup|delivery
+    status: varchar("status", { length: 24 }).notNull().default("created"),
+    kitchenStatus: varchar("kitchen_status", { length: 24 }).notNull().default("queued"),
+    scheduledAt: timestamp("scheduled_at", { mode: "date" }),
+    currency: varchar("currency", { length: 8 }).notNull().default("INR"),
+    totalCents: int("total_cents").notNull().default(0),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_restaurant_orders_app_idx").on(table.appId),
+    customerIdx: index("app_restaurant_orders_customer_idx").on(table.appId, table.customerId),
+    kitchenIdx: index("app_restaurant_orders_kitchen_status_idx").on(table.appId, table.kitchenStatus),
+    createdAtIdx: index("app_restaurant_orders_created_at_idx").on(table.createdAt),
+  }),
+);
+
+export const appRestaurantOrderItems = mysqlTable(
+  "app_restaurant_order_items",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    orderId: varchar("order_id", { length: 36 }).notNull(),
+    itemId: varchar("item_id", { length: 36 }),
+    name: varchar("name", { length: 200 }).notNull(),
+    quantity: int("quantity").notNull().default(1),
+    unitPriceCents: int("unit_price_cents").notNull(),
+    lineTotalCents: int("line_total_cents").notNull(),
+    modifiers: text("modifiers"), // JSON
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    orderIdx: index("app_restaurant_order_items_order_idx").on(table.orderId),
   }),
 );
 
@@ -431,8 +761,16 @@ export const appRealEstateListings = mysqlTable(
     title: varchar("title", { length: 255 }).notNull(),
     description: text("description"),
     address: text("address"),
+    propertyType: varchar("property_type", { length: 32 }),
+    latitude: doubleNumber("latitude"),
+    longitude: doubleNumber("longitude"),
+    amenities: text("amenities"), // JSON
     currency: varchar("currency", { length: 8 }).notNull().default("INR"),
     priceCents: int("price_cents").notNull().default(0),
+    availabilityStatus: varchar("availability_status", { length: 24 }).notNull().default("available"),
+    bedrooms: int("bedrooms"),
+    bathrooms: int("bathrooms"),
+    areaSqft: int("area_sqft"),
     imageUrl: text("image_url"),
     active: tinyint("active").notNull().default(1),
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
@@ -441,6 +779,38 @@ export const appRealEstateListings = mysqlTable(
   (table) => ({
     appIdx: index("app_real_estate_listings_app_idx").on(table.appId),
     activeIdx: index("app_real_estate_listings_active_idx").on(table.appId, table.active),
+  }),
+);
+
+export const appRealEstateListingMedia = mysqlTable(
+  "app_real_estate_listing_media",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    listingId: varchar("listing_id", { length: 36 }).notNull(),
+    kind: varchar("kind", { length: 24 }).notNull().default("image"), // image|video
+    url: text("url").notNull(),
+    sortOrder: int("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    listingIdx: index("app_real_estate_listing_media_listing_idx").on(table.appId, table.listingId),
+  }),
+);
+
+export const appRealEstatePriceHistory = mysqlTable(
+  "app_real_estate_price_history",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    listingId: varchar("listing_id", { length: 36 }).notNull(),
+    currency: varchar("currency", { length: 8 }).notNull().default("INR"),
+    priceCents: int("price_cents").notNull(),
+    recordedAt: timestamp("recorded_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    listingIdx: index("app_real_estate_price_history_listing_idx").on(table.appId, table.listingId),
+    recordedIdx: index("app_real_estate_price_history_recorded_idx").on(table.recordedAt),
   }),
 );
 
@@ -455,11 +825,73 @@ export const appRealEstateInquiries = mysqlTable(
     email: varchar("email", { length: 320 }),
     phone: varchar("phone", { length: 40 }),
     message: text("message"),
+    status: varchar("status", { length: 24 }).notNull().default("new"),
+    assignedAgentId: varchar("assigned_agent_id", { length: 36 }),
+    slaDueAt: timestamp("sla_due_at", { mode: "date" }),
+    lastFollowUpAt: timestamp("last_follow_up_at", { mode: "date" }),
+    nextFollowUpAt: timestamp("next_follow_up_at", { mode: "date" }),
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   },
   (table) => ({
     appListingIdx: index("app_real_estate_inquiries_app_listing_idx").on(table.appId, table.listingId),
     appCustomerIdx: index("app_real_estate_inquiries_app_customer_idx").on(table.appId, table.customerId),
+    statusIdx: index("app_real_estate_inquiries_status_idx").on(table.appId, table.status),
+  }),
+);
+
+export const appRealEstateInquiryFollowups = mysqlTable(
+  "app_real_estate_inquiry_followups",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    inquiryId: varchar("inquiry_id", { length: 36 }).notNull(),
+    note: text("note"),
+    dueAt: timestamp("due_at", { mode: "date" }),
+    doneAt: timestamp("done_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    inquiryIdx: index("app_real_estate_inquiry_followups_inquiry_idx").on(table.appId, table.inquiryId),
+    dueIdx: index("app_real_estate_inquiry_followups_due_idx").on(table.dueAt),
+  }),
+);
+
+export const appRealEstateAgentAvailability = mysqlTable(
+  "app_real_estate_agent_availability",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    agentId: varchar("agent_id", { length: 36 }).notNull(),
+    startAt: timestamp("start_at", { mode: "date" }).notNull(),
+    endAt: timestamp("end_at", { mode: "date" }).notNull(),
+    active: tinyint("active").notNull().default(1),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    agentIdx: index("app_real_estate_agent_availability_agent_idx").on(table.appId, table.agentId),
+    startIdx: index("app_real_estate_agent_availability_start_idx").on(table.startAt),
+  }),
+);
+
+export const appRealEstateTours = mysqlTable(
+  "app_real_estate_tours",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    listingId: varchar("listing_id", { length: 36 }).notNull(),
+    inquiryId: varchar("inquiry_id", { length: 36 }),
+    agentId: varchar("agent_id", { length: 36 }).notNull(),
+    status: varchar("status", { length: 24 }).notNull().default("scheduled"),
+    startAt: timestamp("start_at", { mode: "date" }).notNull(),
+    endAt: timestamp("end_at", { mode: "date" }).notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    listingIdx: index("app_real_estate_tours_listing_idx").on(table.appId, table.listingId),
+    agentIdx: index("app_real_estate_tours_agent_idx").on(table.appId, table.agentId),
+    startIdx: index("app_real_estate_tours_start_idx").on(table.startAt),
   }),
 );
 
@@ -507,10 +939,13 @@ export const appDoctorAppointments = mysqlTable(
     appId: varchar("app_id", { length: 36 }).notNull(),
     customerId: varchar("customer_id", { length: 36 }).notNull(),
     doctorId: varchar("doctor_id", { length: 36 }).notNull(),
+    appointmentTypeId: varchar("appointment_type_id", { length: 36 }),
     status: varchar("status", { length: 24 }).notNull().default("requested"),
     startAt: timestamp("start_at", { mode: "date" }).notNull(),
     endAt: timestamp("end_at", { mode: "date" }).notNull(),
     notes: text("notes"),
+    cancelledAt: timestamp("cancelled_at", { mode: "date" }),
+    completedAt: timestamp("completed_at", { mode: "date" }),
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   },
@@ -518,6 +953,123 @@ export const appDoctorAppointments = mysqlTable(
     appIdx: index("app_doctor_appointments_app_idx").on(table.appId),
     customerIdx: index("app_doctor_appointments_customer_idx").on(table.appId, table.customerId),
     startAtIdx: index("app_doctor_appointments_start_at_idx").on(table.appId, table.startAt),
+  }),
+);
+
+export const appHealthcareAppointmentTypes = mysqlTable(
+  "app_healthcare_appointment_types",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    name: varchar("name", { length: 200 }).notNull(),
+    durationMinutes: int("duration_minutes").notNull().default(15),
+    bufferBeforeMinutes: int("buffer_before_minutes").notNull().default(0),
+    bufferAfterMinutes: int("buffer_after_minutes").notNull().default(0),
+    cancellationPolicyHours: int("cancellation_policy_hours").notNull().default(0),
+    currency: varchar("currency", { length: 8 }).notNull().default("INR"),
+    priceCents: int("price_cents").notNull().default(0),
+    active: tinyint("active").notNull().default(1),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_healthcare_appointment_types_app_idx").on(table.appId),
+    activeIdx: index("app_healthcare_appointment_types_active_idx").on(table.appId, table.active),
+  }),
+);
+
+export const appHealthcareProviderAvailability = mysqlTable(
+  "app_healthcare_provider_availability",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    doctorId: varchar("doctor_id", { length: 36 }).notNull(),
+    startAt: timestamp("start_at", { mode: "date" }).notNull(),
+    endAt: timestamp("end_at", { mode: "date" }).notNull(),
+    active: tinyint("active").notNull().default(1),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    doctorIdx: index("app_healthcare_provider_availability_doctor_idx").on(table.appId, table.doctorId),
+    startIdx: index("app_healthcare_provider_availability_start_idx").on(table.startAt),
+    activeIdx: index("app_healthcare_provider_availability_active_idx").on(table.appId, table.active),
+  }),
+);
+
+export const appPatients = mysqlTable(
+  "app_patients",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    customerId: varchar("customer_id", { length: 36 }),
+    name: varchar("name", { length: 200 }).notNull(),
+    email: varchar("email", { length: 320 }),
+    phone: varchar("phone", { length: 40 }),
+    dob: timestamp("dob", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appIdx: index("app_patients_app_idx").on(table.appId),
+    customerIdx: index("app_patients_customer_idx").on(table.appId, table.customerId),
+    emailIdx: index("app_patients_email_idx").on(table.appId, table.email),
+  }),
+);
+
+export const appPatientVisits = mysqlTable(
+  "app_patient_visits",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    patientId: varchar("patient_id", { length: 36 }).notNull(),
+    appointmentId: varchar("appointment_id", { length: 36 }),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    patientIdx: index("app_patient_visits_patient_idx").on(table.appId, table.patientId),
+    createdAtIdx: index("app_patient_visits_created_at_idx").on(table.createdAt),
+  }),
+);
+
+export const appInvoices = mysqlTable(
+  "app_invoices",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    patientId: varchar("patient_id", { length: 36 }).notNull(),
+    appointmentId: varchar("appointment_id", { length: 36 }),
+    currency: varchar("currency", { length: 8 }).notNull().default("INR"),
+    totalCents: int("total_cents").notNull().default(0),
+    status: varchar("status", { length: 24 }).notNull().default("issued"),
+    dueAt: timestamp("due_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    patientIdx: index("app_invoices_patient_idx").on(table.appId, table.patientId),
+    statusIdx: index("app_invoices_status_idx").on(table.appId, table.status),
+    createdAtIdx: index("app_invoices_created_at_idx").on(table.createdAt),
+  }),
+);
+
+export const appInvoicePayments = mysqlTable(
+  "app_invoice_payments",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appId: varchar("app_id", { length: 36 }).notNull(),
+    invoiceId: varchar("invoice_id", { length: 36 }).notNull(),
+    provider: varchar("provider", { length: 24 }).notNull().default("manual"),
+    providerRef: varchar("provider_ref", { length: 128 }),
+    amountCents: int("amount_cents").notNull().default(0),
+    status: varchar("status", { length: 24 }).notNull().default("paid"),
+    paidAt: timestamp("paid_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    invoiceIdx: index("app_invoice_payments_invoice_idx").on(table.appId, table.invoiceId),
+    paidAtIdx: index("app_invoice_payments_paid_at_idx").on(table.paidAt),
   }),
 );
 
@@ -673,8 +1225,11 @@ export const payments = mysqlTable("payments", {
   userId: varchar("user_id", { length: 36 }).notNull(),
   appId: varchar("app_id", { length: 36 }),
   provider: varchar("provider", { length: 16 }).notNull().default("razorpay"),
-  providerOrderId: varchar("provider_order_id", { length: 128 }),
+  providerOrderId: varchar("provider_order_id", { length: 128 }).unique(),
   providerPaymentId: varchar("provider_payment_id", { length: 128 }),
+  // Authoritative storage: integer paise.
+  // Nullable for safe rollout; migrate existing rows with: amount_paise = amount_inr * 100.
+  amountPaise: int("amount_paise"),
   amountInr: int("amount_inr").notNull(),
   plan: varchar("plan", { length: 50 }).notNull().default("starter"),
   status: varchar("status", { length: 16 }).notNull().default("pending"),
@@ -684,6 +1239,7 @@ export const payments = mysqlTable("payments", {
   userIdIdx: index("payments_user_id_idx").on(table.userId),
   appIdIdx: index("payments_app_id_idx").on(table.appId),
   statusIdx: index("payments_status_idx").on(table.status),
+  providerOrderIdIdx: index("payments_provider_order_id_idx").on(table.providerOrderId),
 }));
 
 // Push notification device tokens

@@ -86,7 +86,9 @@ import { AppBuilderStepper } from "@/components/app-builder-stepper";
 import { buildAppFromBlueprint } from "@/lib/blueprint/builder";
 import type { AppBlueprint } from "@/lib/blueprint/types";
 import { validateEditorScreensOrThrow } from "@/lib/editor-screens/validate";
-import { editorComponentTypeSchema } from "@shared/editor-screens";
+import { editorComponentTypeSchema, migrateLegacySpacingInEditorScreens } from "@shared/editor-screens";
+import { SPACING_TOKENS, type SpacingToken } from "@shared/blueprints";
+import { NATIVE_ICON_IDS, NativeIcon } from "@/native/icons";
 
 // Component types for the editor (extended to support industry templates)
 type ComponentType =
@@ -175,12 +177,12 @@ const SECTION_TEMPLATES = [
   {
     id: "hero-1",
     name: "Hero Banner",
-    preview: "🖼️",
+    preview: "Hero",
     components: [
       {
         id: "hero-container",
         type: "container" as ComponentType,
-        props: { padding: 40, backgroundColor: "#f8f9fa" },
+        props: { padding: "var(--space-48)", backgroundColor: "#f8f9fa" },
         children: [
           { id: "hero-title", type: "heading" as ComponentType, props: { text: "Welcome to Our App", level: 1, color: "#000" } },
           { id: "hero-subtitle", type: "text" as ComponentType, props: { text: "Discover amazing features and services", fontSize: 16, color: "#666" } },
@@ -192,21 +194,21 @@ const SECTION_TEMPLATES = [
   {
     id: "features-grid",
     name: "Features Grid",
-    preview: "⬛⬛⬛",
+    preview: "Grid",
     components: [
       {
         id: "features-section",
         type: "section" as ComponentType,
-        props: { title: "Our Features", padding: 20 },
+        props: { title: "Our Features", padding: "var(--space-section-y)" },
         children: [
           {
             id: "features-grid",
             type: "grid" as ComponentType,
-            props: { columns: 3, gap: 16 },
+            props: { columns: 3, gap: "var(--space-grid-gap)" },
             children: [
-              { id: "f1", type: "card" as ComponentType, props: { title: "Feature 1", description: "Description here", icon: "⚡" } },
-              { id: "f2", type: "card" as ComponentType, props: { title: "Feature 2", description: "Description here", icon: "🚀" } },
-              { id: "f3", type: "card" as ComponentType, props: { title: "Feature 3", description: "Description here", icon: "💡" } },
+              { id: "f1", type: "card" as ComponentType, props: { title: "Feature 1", description: "Description here", icon: "zap" } },
+              { id: "f2", type: "card" as ComponentType, props: { title: "Feature 2", description: "Description here", icon: "rocket" } },
+              { id: "f3", type: "card" as ComponentType, props: { title: "Feature 3", description: "Description here", icon: "lightbulb" } },
             ]
           }
         ]
@@ -216,12 +218,12 @@ const SECTION_TEMPLATES = [
   {
     id: "contact-form",
     name: "Contact Form",
-    preview: "📝",
+    preview: "Form",
     components: [
       {
         id: "contact-section",
         type: "section" as ComponentType,
-        props: { title: "Contact Us", padding: 20 },
+        props: { title: "Contact Us", padding: "var(--space-section-y)" },
         children: [
           {
             id: "contact-form-1",
@@ -243,6 +245,25 @@ const SECTION_TEMPLATES = [
 // Generate unique ID
 const generateId = () => `comp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+const SPACING_TOKEN_OPTIONS: { value: SpacingToken; label: string }[] = (SPACING_TOKENS as readonly SpacingToken[]).map(
+  (t) => {
+    const label =
+      t === "var(--space-0)" ? "0" :
+      t === "var(--space-4)" ? "4" :
+      t === "var(--space-8)" ? "8" :
+      t === "var(--space-16)" ? "16" :
+      t === "var(--space-24)" ? "24" :
+      t === "var(--space-32)" ? "32" :
+      t === "var(--space-48)" ? "48" :
+      t === "var(--space-section-y)" ? "Section Y" :
+      t === "var(--space-hero-y)" ? "Hero Y" :
+      t === "var(--space-grid-gap)" ? "Grid Gap" :
+      t === "var(--space-card)" ? "Card Padding" :
+      t;
+    return { value: t, label };
+  },
+);
+
 // Default props for each component type
 const getDefaultProps = (type: ComponentType): Record<string, any> => {
   switch (type) {
@@ -250,14 +271,14 @@ const getDefaultProps = (type: ComponentType): Record<string, any> => {
     case "heading": return { text: "Heading", level: 2, color: "#000000" };
     case "image": return { src: "", alt: "Image", width: "100%", height: "auto" };
     case "button": return { text: "Button", variant: "primary", action: "none", backgroundColor: "#06b6d4", textColor: "#ffffff" };
-    case "container": return { padding: 16, backgroundColor: "transparent", direction: "column", gap: 12 };
-    case "fixedContainer": return { padding: 12, backgroundColor: "#ffffff", direction: "row", gap: 12, top: 0, zIndex: 20, shadow: true };
-    case "grid": return { columns: 2, gap: 16 };
+    case "container": return { padding: "var(--space-card)", backgroundColor: "transparent", direction: "column", gap: "var(--space-16)" };
+    case "fixedContainer": return { padding: "var(--space-16)", backgroundColor: "#ffffff", direction: "row", gap: "var(--space-16)", top: 0, zIndex: 20, shadow: true };
+    case "grid": return { columns: 2, gap: "var(--space-grid-gap)" };
     case "gallery": return { columns: 2, images: [] };
-    case "section": return { title: "Section Title", padding: 20 };
-    case "card": return { title: "Card Title", description: "Card description", icon: "📦" };
+    case "section": return { title: "Section Title", padding: "var(--space-section-y)" };
+    case "card": return { title: "Card Title", description: "Card description", icon: "package" };
     case "divider": return { color: "#e5e7eb", thickness: 1 };
-    case "spacer": return { height: 20 };
+    case "spacer": return { height: "var(--space-16)" };
     case "icon": return { icon: "⭐", size: 24 };
     case "list": return { items: ["Item 1", "Item 2", "Item 3"], ordered: false };
     case "form": return { submitText: "Submit" };
@@ -303,10 +324,15 @@ function ComponentPreview({
   const activeCategory = interaction?.activeCategory || "All";
   
   const renderComponent = () => {
+    const cssLen = (v: any, fallback: string) => {
+      if (typeof v === "number" && Number.isFinite(v)) return `${v}px`;
+      if (typeof v === "string" && v.trim()) return v;
+      return fallback;
+    };
+
     switch (component.type) {
       case "spacer": {
-        const height = Number(component.props?.height ?? 12);
-        return <div style={{ height: Number.isFinite(height) ? height : 12 }} />;
+        return <div style={{ height: cssLen(component.props?.height, "var(--space-16)") }} />;
       }
       case "divider": {
         const thickness = Number(component.props?.thickness ?? 1);
@@ -413,11 +439,11 @@ function ComponentPreview({
         return (
           <div
             style={{
-              padding: component.props.padding,
+              padding: cssLen(component.props.padding, "var(--space-card)"),
               backgroundColor: component.props.backgroundColor,
               display: "flex",
               flexDirection: component.props.direction || "column",
-              gap: component.props.gap ?? 0,
+              gap: cssLen(component.props.gap, "var(--space-0)"),
             }}
             className="border border-dashed border-slate-300 rounded min-h-[60px]"
           >
@@ -442,11 +468,11 @@ function ComponentPreview({
               position: "sticky",
               top: component.props.top ?? 0,
               zIndex: component.props.zIndex ?? 20,
-              padding: component.props.padding,
+              padding: cssLen(component.props.padding, "var(--space-16)"),
               backgroundColor: component.props.backgroundColor,
               display: "flex",
               flexDirection: component.props.direction || "row",
-              gap: component.props.gap ?? 0,
+              gap: cssLen(component.props.gap, "var(--space-0)"),
             }}
             className={`border border-dashed border-slate-300 rounded min-h-[60px] ${component.props.shadow ? "shadow-sm" : ""}`}
           >
@@ -469,7 +495,13 @@ function ComponentPreview({
         );
       case "grid":
         return (
-          <div className="grid gap-4 min-h-[60px]" style={{ gridTemplateColumns: `repeat(${component.props.columns}, 1fr)` }}>
+          <div
+            className="grid min-h-[60px]"
+            style={{
+              gridTemplateColumns: `repeat(${component.props.columns}, 1fr)`,
+              gap: cssLen(component.props.gap, "var(--space-grid-gap)"),
+            }}
+          >
             {component.children?.map((child) => (
               <ComponentPreview
                 key={child.id}
@@ -503,8 +535,8 @@ function ComponentPreview({
               {image ? (
                 <img src={image} alt={title || "Card"} className="w-14 h-14 rounded-lg object-cover" />
               ) : (
-                <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center text-xl">
-                  {icon || "📦"}
+                <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center">
+                  <NativeIcon name={String(icon || "package")} className="h-6 w-6 text-gray-700" />
                 </div>
               )}
               <div className="flex-1 min-w-0">
@@ -525,7 +557,11 @@ function ComponentPreview({
             style={backgroundColor ? { backgroundColor } : undefined}
           >
             <div className="flex items-start gap-3">
-              {icon && <div className="text-2xl leading-none">{icon}</div>}
+              {icon ? (
+                <div className="mt-0.5">
+                  <NativeIcon name={String(icon)} className="h-6 w-6 text-gray-700" />
+                </div>
+              ) : null}
               <div className="flex-1 min-w-0">
                 {title && <div className="text-sm font-semibold text-gray-900 truncate">{title}</div>}
                 {subtitle && <div className="text-[11px] text-gray-500 truncate">{subtitle}</div>}
@@ -539,7 +575,7 @@ function ComponentPreview({
       }
       case "section":
         return (
-          <div style={{ padding: component.props.padding }} className="bg-slate-50 rounded-lg">
+          <div style={{ padding: cssLen(component.props.padding, "var(--space-section-y)") }} className="bg-slate-50 rounded-lg">
             <h2 className="text-xl font-bold mb-4 text-slate-900">{component.props.title}</h2>
             {component.children?.map((child) => (
               <ComponentPreview
@@ -594,7 +630,9 @@ function ComponentPreview({
             <div className="bg-white rounded-lg divide-y divide-gray-100">
               {component.props.items?.map((item: any, i: number) => (
                 <div key={i} className="flex items-center gap-3 p-3 hover:bg-gray-50">
-                  <span className="text-lg">{item.icon}</span>
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-slate-50 border border-slate-200">
+                    <NativeIcon name={String(item?.icon || "list")} className="h-4 w-4 text-slate-700" />
+                  </span>
                   <span className="text-sm flex-1">{item.label}</span>
                   <ChevronRight className="h-4 w-4 text-gray-400" />
                 </div>
@@ -939,13 +977,18 @@ function PropertiesPanel({
         return (
           <div className="space-y-4">
             <div>
-              <Label className={labelClass}>Padding (px)</Label>
-              <Input
-                type="number"
-                value={component.props.padding ?? 0}
-                onChange={(e) => onUpdate({ ...component.props, padding: parseInt(e.target.value || "0") })}
-                className={inputClass}
-              />
+              <Label className={labelClass}>Padding</Label>
+              <Select
+                value={String(component.props.padding || "var(--space-card)")}
+                onValueChange={(v) => onUpdate({ ...component.props, padding: v })}
+              >
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {SPACING_TOKEN_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label className={labelClass}>Direction</Label>
@@ -958,13 +1001,18 @@ function PropertiesPanel({
               </Select>
             </div>
             <div>
-              <Label className={labelClass}>Gap (px)</Label>
-              <Input
-                type="number"
-                value={component.props.gap ?? 0}
-                onChange={(e) => onUpdate({ ...component.props, gap: parseInt(e.target.value || "0") })}
-                className={inputClass}
-              />
+              <Label className={labelClass}>Gap</Label>
+              <Select
+                value={String(component.props.gap || "var(--space-16)")}
+                onValueChange={(v) => onUpdate({ ...component.props, gap: v })}
+              >
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {SPACING_TOKEN_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label className={labelClass}>Background</Label>
@@ -980,13 +1028,18 @@ function PropertiesPanel({
         return (
           <div className="space-y-4">
             <div>
-              <Label className={labelClass}>Padding (px)</Label>
-              <Input
-                type="number"
-                value={component.props.padding ?? 0}
-                onChange={(e) => onUpdate({ ...component.props, padding: parseInt(e.target.value || "0") })}
-                className={inputClass}
-              />
+              <Label className={labelClass}>Padding</Label>
+              <Select
+                value={String(component.props.padding || "var(--space-16)")}
+                onValueChange={(v) => onUpdate({ ...component.props, padding: v })}
+              >
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {SPACING_TOKEN_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label className={labelClass}>Top Offset (px)</Label>
@@ -1017,13 +1070,18 @@ function PropertiesPanel({
               </Select>
             </div>
             <div>
-              <Label className={labelClass}>Gap (px)</Label>
-              <Input
-                type="number"
-                value={component.props.gap ?? 0}
-                onChange={(e) => onUpdate({ ...component.props, gap: parseInt(e.target.value || "0") })}
-                className={inputClass}
-              />
+              <Label className={labelClass}>Gap</Label>
+              <Select
+                value={String(component.props.gap || "var(--space-16)")}
+                onValueChange={(v) => onUpdate({ ...component.props, gap: v })}
+              >
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {SPACING_TOKEN_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label className={labelClass}>Background</Label>
@@ -1199,8 +1257,18 @@ function PropertiesPanel({
               </Select>
             </div>
             <div>
-              <Label className="text-xs text-slate-500">Gap (px)</Label>
-              <Input type="number" value={component.props.gap} onChange={(e) => onUpdate({ ...component.props, gap: parseInt(e.target.value) })} className="mt-1" />
+              <Label className="text-xs text-slate-500">Gap</Label>
+              <Select
+                value={String(component.props.gap || "var(--space-grid-gap)")}
+                onValueChange={(v) => onUpdate({ ...component.props, gap: v })}
+              >
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {SPACING_TOKEN_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         );
@@ -1216,8 +1284,24 @@ function PropertiesPanel({
               <Textarea value={component.props.description} onChange={(e) => onUpdate({ ...component.props, description: e.target.value })} rows={2} className="mt-1" />
             </div>
             <div>
-              <Label className="text-xs text-slate-500">Icon/Emoji</Label>
-              <Input value={component.props.icon} onChange={(e) => onUpdate({ ...component.props, icon: e.target.value })} className="mt-1" />
+              <Label className="text-xs text-slate-500">Icon</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <div className="h-9 w-9 rounded-lg border border-slate-200 bg-white flex items-center justify-center">
+                  <NativeIcon name={String(component.props.icon || "package")} className="h-5 w-5 text-slate-700" />
+                </div>
+                <Select
+                  value={String(component.props.icon || "package")}
+                  onValueChange={(v) => onUpdate({ ...component.props, icon: v })}
+                >
+                  <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {NATIVE_ICON_IDS.map((id) => (
+                      <SelectItem key={id} value={id}>{id}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">Strict: emojis/custom strings are not allowed.</p>
             </div>
           </div>
         );
@@ -1229,8 +1313,39 @@ function PropertiesPanel({
               <Input value={component.props.title} onChange={(e) => onUpdate({ ...component.props, title: e.target.value })} className="mt-1" />
             </div>
             <div>
-              <Label className="text-xs text-slate-500">Padding (px)</Label>
-              <Input type="number" value={component.props.padding} onChange={(e) => onUpdate({ ...component.props, padding: parseInt(e.target.value) })} className="mt-1" />
+              <Label className="text-xs text-slate-500">Padding</Label>
+              <Select
+                value={String(component.props.padding || "var(--space-section-y)")}
+                onValueChange={(v) => onUpdate({ ...component.props, padding: v })}
+              >
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {SPACING_TOKEN_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        );
+      case "spacer":
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label className="text-xs text-slate-500">Height</Label>
+              <Select
+                value={String(component.props.height || "var(--space-16)")}
+                onValueChange={(v) => onUpdate({ ...component.props, height: v })}
+              >
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {SPACING_TOKEN_OPTIONS
+                    .filter((o) => !["var(--space-section-y)", "var(--space-hero-y)", "var(--space-grid-gap)", "var(--space-card)"].includes(o.value))
+                    .map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         );
@@ -1312,6 +1427,170 @@ function PropertiesPanel({
             </div>
           );
         }
+      case "list":
+        {
+          const variant = String(component.props.variant || "default");
+          const ordered = !!component.props.ordered;
+          const rawItems = component.props.items;
+
+          const menuItems: Array<{ icon?: string; label?: string }> = Array.isArray(rawItems)
+            ? rawItems.map((it: any) => ({
+              icon: typeof it?.icon === "string" ? it.icon : "list",
+              label: typeof it?.label === "string" ? it.label : "Menu Item",
+            }))
+            : [];
+
+          const bulletItemsText: string = Array.isArray(rawItems)
+            ? rawItems.map((it: any) => (typeof it === "string" ? it : String(it?.label || it?.name || it?.title || ""))).filter(Boolean).join("\n")
+            : "";
+
+          return (
+            <div className="space-y-4">
+              <div>
+                <Label className={labelClass}>Variant</Label>
+                <Select
+                  value={variant}
+                  onValueChange={(v) => {
+                    const next: any = { ...component.props, variant: v === "default" ? undefined : v };
+                    if (v === "menu" && !Array.isArray(next.items)) {
+                      next.items = [
+                        { icon: "list", label: "Menu Item" },
+                        { icon: "list", label: "Menu Item" },
+                      ];
+                    }
+                    onUpdate(next);
+                  }}
+                >
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">Bullets</SelectItem>
+                    <SelectItem value="menu">Menu</SelectItem>
+                    <SelectItem value="menu-item">Menu Items</SelectItem>
+                    <SelectItem value="cart">Cart</SelectItem>
+                    <SelectItem value="orders">Orders</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {variant === "default" ? (
+                <>
+                  <div>
+                    <Label className={labelClass}>Items (one per line)</Label>
+                    <Textarea
+                      value={bulletItemsText}
+                      onChange={(e) => {
+                        const nextItems = e.target.value
+                          .split("\n")
+                          .map((s) => s.trim())
+                          .filter(Boolean);
+                        onUpdate({ ...component.props, items: nextItems });
+                      }}
+                      rows={6}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className={labelClass}>Ordered</p>
+                      <p className="text-[11px] text-slate-500">Numbers instead of bullets</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={ordered}
+                      onChange={(e) => onUpdate({ ...component.props, ordered: e.target.checked })}
+                    />
+                  </div>
+                </>
+              ) : null}
+
+              {variant === "menu" ? (
+                <>
+                  <div>
+                    <Label className={labelClass}>Menu Items</Label>
+                    <div className="mt-2 space-y-2">
+                      {menuItems.map((it, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <div className="h-9 w-9 rounded-lg border border-slate-200 bg-white flex items-center justify-center">
+                            <NativeIcon name={String(it.icon || "list")} className="h-5 w-5 text-slate-700" />
+                          </div>
+                          <Select
+                            value={String(it.icon || "list")}
+                            onValueChange={(v) => {
+                              const next = [...menuItems];
+                              next[idx] = { ...next[idx], icon: v };
+                              onUpdate({ ...component.props, items: next });
+                            }}
+                          >
+                            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {NATIVE_ICON_IDS.map((id) => (
+                                <SelectItem key={id} value={id}>{id}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            value={String(it.label || "")}
+                            onChange={(e) => {
+                              const next = [...menuItems];
+                              next[idx] = { ...next[idx], label: e.target.value };
+                              onUpdate({ ...component.props, items: next });
+                            }}
+                            placeholder="Label"
+                            className={`flex-1 ${inputClass}`}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const next = menuItems.filter((_, i) => i !== idx);
+                              onUpdate({ ...component.props, items: next });
+                            }}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          const next = [...menuItems, { icon: "list", label: "Menu Item" }];
+                          onUpdate({ ...component.props, items: next });
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Item
+                      </Button>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-2">Strict: menu icons must be a Lucide icon id.</p>
+                  </div>
+                </>
+              ) : null}
+
+              {variant !== "default" && variant !== "menu" ? (
+                <div>
+                  <Label className={labelClass}>Items (JSON array)</Label>
+                  <Textarea
+                    value={JSON.stringify(Array.isArray(rawItems) ? rawItems : [], null, 2)}
+                    onChange={(e) => {
+                      try {
+                        const parsed = JSON.parse(e.target.value);
+                        if (Array.isArray(parsed)) onUpdate({ ...component.props, items: parsed });
+                      } catch {
+                        // ignore invalid JSON while typing
+                      }
+                    }}
+                    rows={7}
+                    className={`${inputClass} font-mono text-xs`}
+                  />
+                </div>
+              ) : null}
+            </div>
+          );
+        }
       default:
         return <div className="text-sm text-slate-400">Properties for {component.type}</div>;
     }
@@ -1322,7 +1601,7 @@ function PropertiesPanel({
       <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center border border-cyan-500/30">
-            <span className="text-sm">✨</span>
+            <Sparkles className="h-4 w-4 text-cyan-300" />
           </div>
           <span className="text-sm font-medium text-white capitalize">{component.type}</span>
         </div>
@@ -1348,7 +1627,7 @@ export default function VisualEditor() {
   
   // Editor state
   const [screens, setScreensRaw] = useState<EditorScreen[]>([
-    { id: "home", name: "Home", icon: "🏠", components: [], isHome: true }
+    { id: "home", name: "Home", icon: "home", components: [], isHome: true }
   ]);
 
   // Undo/Redo history for screens
@@ -1397,6 +1676,81 @@ export default function VisualEditor() {
 
   const canUndo = historyRef.current.past.length > 0;
   const canRedo = historyRef.current.future.length > 0;
+
+  const migrateSpacing = useCallback(
+    (incoming: any, opts?: { announce?: boolean }) => {
+      const migrated = migrateLegacySpacingInEditorScreens(incoming);
+      if (migrated.didMigrate && opts?.announce !== false) {
+        toast({
+          title: "Spacing upgraded",
+          description: "Legacy px spacing was converted to strict tokens. Review and Save to persist the upgrade.",
+        });
+      }
+      return migrated;
+    },
+    [toast],
+  );
+
+  const migrateCardIcons = useCallback(
+    (incoming: any, opts?: { announce?: boolean }) => {
+      if (!Array.isArray(incoming)) return { screens: incoming, didMigrate: false };
+
+      let didMigrate = false;
+      const allowed = new Set(NATIVE_ICON_IDS.map((x) => String(x).toLowerCase()));
+
+      const migrateComponent = (c: any): any => {
+        if (!c || typeof c !== "object") return c;
+        const next: any = { ...c };
+        const props: any = c.props && typeof c.props === "object" ? { ...c.props } : {};
+
+        if (c.type === "card" && typeof props.icon === "string" && props.icon.trim()) {
+          const normalized = props.icon.trim().toLowerCase();
+          if (!allowed.has(normalized)) {
+            props.icon = "package";
+            didMigrate = true;
+          } else {
+            props.icon = normalized;
+          }
+        }
+
+        if (c.type === "list" && Array.isArray(props.items)) {
+          const nextItems = props.items.map((it: any) => {
+            if (!it || typeof it !== "object") return it;
+            if (typeof it.icon !== "string") return it;
+            const normalized = it.icon.trim().toLowerCase();
+            if (!normalized) return it;
+            if (allowed.has(normalized)) {
+              if (normalized !== it.icon) didMigrate = true;
+              return { ...it, icon: normalized };
+            }
+            didMigrate = true;
+            return { ...it, icon: "list" };
+          });
+          if (nextItems !== props.items) props.items = nextItems;
+        }
+
+        next.props = props;
+        if (Array.isArray(c.children)) next.children = c.children.map(migrateComponent);
+        return next;
+      };
+
+      const migratedScreens = incoming.map((s: any) => {
+        const next = { ...s };
+        if (Array.isArray(s?.components)) next.components = s.components.map(migrateComponent);
+        return next;
+      });
+
+      if (didMigrate && opts?.announce !== false) {
+        toast({
+          title: "Icons upgraded",
+          description: "Legacy emoji/unknown card icons were replaced with Lucide icon IDs. Review and Save to persist.",
+        });
+      }
+
+      return { screens: migratedScreens, didMigrate };
+    },
+    [toast],
+  );
   const [activeScreenId, setActiveScreenId] = useState("home");
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [deviceView, setDeviceView] = useState<"mobile" | "desktop">("mobile");
@@ -1747,7 +2101,7 @@ export default function VisualEditor() {
         id: String(p.id || p.url),
         label: String(p.label || p.url),
         url: String(p.url),
-        icon: typeof p.icon === "string" ? p.icon : "🌐",
+        icon: typeof p.icon === "string" ? p.icon : "globe",
       }));
   }, [app]);
 
@@ -2096,11 +2450,14 @@ export default function VisualEditor() {
         console.log('[Visual Editor] Loading saved screens:', app.editorScreens.length);
         historyRef.current.past = [];
         historyRef.current.future = [];
-        setScreens(app.editorScreens, { recordHistory: false });
+        const spacingMigrated = migrateSpacing(app.editorScreens, { announce: true });
+        const iconMigrated = migrateCardIcons(spacingMigrated.screens, { announce: true });
+        setScreens(iconMigrated.screens as any, { recordHistory: false });
         savedHashRef.current = hashScreens(app.editorScreens as any);
-        setHasChanges(false);
-        const homeScreen = app.editorScreens.find((s: EditorScreen) => s.isHome);
-        setActiveScreenId(homeScreen?.id || app.editorScreens[0].id);
+        setHasChanges(!!spacingMigrated.didMigrate || !!iconMigrated.didMigrate);
+        const homeScreen = (iconMigrated.screens as any as EditorScreen[]).find((s) => s.isHome);
+        const first = (iconMigrated.screens as any as EditorScreen[])[0];
+        setActiveScreenId(homeScreen?.id || first?.id);
         setTemplatesLoaded(true);
         return;
       }
@@ -2116,15 +2473,18 @@ export default function VisualEditor() {
         
         // Personalize template with app name
         const templateScreens = personalizeTemplateContent(template, app.name || 'My App');
-        
-        setScreens(templateScreens);
-        const homeScreen = templateScreens.find(s => s.isHome);
-        setActiveScreenId(homeScreen?.id || templateScreens[0].id);
+
+        const spacingMigrated = migrateSpacing(templateScreens, { announce: false });
+        const iconMigrated = migrateCardIcons(spacingMigrated.screens, { announce: false });
+        setScreens(iconMigrated.screens as any);
+        const homeScreen = (iconMigrated.screens as any as EditorScreen[]).find((s) => s.isHome);
+        const first = (iconMigrated.screens as any as EditorScreen[])[0];
+        setActiveScreenId(homeScreen?.id || first?.id);
         setHasChanges(true);
         setTemplatesLoaded(true);
         
         toast({
-          title: "✨ Template loaded!",
+          title: "Template loaded",
           description: `${template.name} template personalized for ${app.name}. ${templateScreens.length} screens ready to customize.`,
         });
         return;
@@ -2144,7 +2504,7 @@ export default function VisualEditor() {
         {
           id: homeId,
           name: "Home",
-          icon: "🏠",
+          icon: "home",
           isHome: true,
           components: [
             {
@@ -2182,7 +2542,7 @@ export default function VisualEditor() {
         {
           id: generateId(),
           name: "Notifications",
-          icon: "🔔",
+          icon: "bell",
           isHome: false,
           components: [
             {
@@ -2208,7 +2568,7 @@ export default function VisualEditor() {
         {
           id: generateId(),
           name: "Offline",
-          icon: "📴",
+          icon: "wifi-off",
           isHome: false,
           components: [
             {
@@ -2241,7 +2601,9 @@ export default function VisualEditor() {
           ]
         }
       ];
-      setScreens(websiteScreens);
+      const spacingMigrated = migrateSpacing(websiteScreens, { announce: false });
+      const iconMigrated = migrateCardIcons(spacingMigrated.screens, { announce: false });
+      setScreens(iconMigrated.screens as any);
       setActiveScreenId(homeId);
       setHasChanges(true);
       setTemplatesLoaded(true);
@@ -2255,7 +2617,7 @@ export default function VisualEditor() {
         {
           id: homeId,
           name: "Home",
-          icon: "🏠",
+          icon: "home",
           isHome: true,
           components: [
             {
@@ -2284,7 +2646,7 @@ export default function VisualEditor() {
         {
           id: generateId(),
           name: "About",
-          icon: "ℹ️",
+          icon: "info",
           isHome: false,
           components: [
             {
@@ -2318,7 +2680,7 @@ export default function VisualEditor() {
         {
           id: generateId(),
           name: "Contact",
-          icon: "📞",
+          icon: "phone",
           isHome: false,
           components: [
             {
@@ -2362,7 +2724,9 @@ export default function VisualEditor() {
           ]
         }
       ];
-      setScreens(defaultScreens);
+          const spacingMigrated = migrateSpacing(defaultScreens, { announce: false });
+          const iconMigrated = migrateCardIcons(spacingMigrated.screens, { announce: false });
+          setScreens(iconMigrated.screens as any);
       setActiveScreenId(homeId);
       setHasChanges(true);
       setTemplatesLoaded(true);
@@ -3003,7 +3367,7 @@ export default function VisualEditor() {
     const newScreen: EditorScreen = {
       id: generateId(),
       name: `Screen ${screens.length + 1}`,
-      icon: "📄",
+      icon: "file-text",
       components: [],
     };
     setScreens(prev => [...prev, newScreen]);
@@ -3439,7 +3803,7 @@ export default function VisualEditor() {
                                 className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all text-slate-400 hover:bg-slate-800/50 hover:text-white border border-transparent"
                                 title={p.url}
                               >
-                                <span className="text-base">{p.icon || "🌐"}</span>
+                                  <NativeIcon name={String(p.icon || "globe")} className="h-4 w-4 text-slate-500" />
                                 <span className="flex-1 text-left truncate">{p.label}</span>
                                 <ChevronRight className="h-4 w-4 text-slate-600" />
                               </button>
@@ -3976,7 +4340,10 @@ export default function VisualEditor() {
                                   style={{ backgroundColor: themeColor }}
                                 />
                               )}
-                              <span className={"text-[20px] leading-none " + (isActive ? "" : "opacity-90")}>{screen.icon}</span>
+                              <NativeIcon
+                                name={String(screen.icon || "file-text")}
+                                className={"h-5 w-5 " + (isActive ? "" : "opacity-90")}
+                              />
                               <span
                                 className="text-[10px] font-medium truncate max-w-[74px]"
                                 style={{ color: isActive ? themeColor : undefined }}
@@ -4044,7 +4411,7 @@ export default function VisualEditor() {
                                         }
                                       >
                                         <span className="flex items-center gap-2 min-w-0">
-                                          <span className="text-lg leading-none">{s.icon}</span>
+                                          <NativeIcon name={String(s.icon || "file-text")} className="h-4 w-4 opacity-90" />
                                           <span className="truncate">{s.name}</span>
                                         </span>
                                         {isActive && (

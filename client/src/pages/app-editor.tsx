@@ -160,7 +160,7 @@ export default function AppEditor() {
   // State for all configurations
   const [branding, setBranding] = useState<BrandingConfig>({
     name: "",
-    icon: "🚀",
+    icon: "rocket",
     customLogo: null,
     iconColor: "#2563EB",
     primaryColor: "#2563EB",
@@ -198,7 +198,7 @@ export default function AppEditor() {
     if (app) {
       setBranding({
         name: app.name,
-        icon: app.icon || "🚀",
+        icon: app.icon || "rocket",
         customLogo: app.iconUrl || null,
         iconColor: app.iconColor || app.primaryColor || "#2563EB",
         primaryColor: app.primaryColor || "#2563EB",

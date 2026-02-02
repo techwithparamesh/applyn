@@ -32,6 +32,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { NATIVE_ICON_IDS, NativeIcon } from "@/native/icons";
 
 import type { App, AppModule, AppNavigation } from "@shared/schema";
 
@@ -143,12 +144,22 @@ function SortableNavItemRow({ item, screens, modules, onUpdate, onDelete }: Sort
             <Input value={item.label ?? ""} onChange={(e) => onUpdate(item.id, { label: e.target.value })} />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Icon (emoji)</Label>
-            <Input
-              value={item.icon ?? ""}
-              placeholder="🏠"
-              onChange={(e) => onUpdate(item.id, { icon: e.target.value })}
-            />
+            <Label className="text-xs">Icon</Label>
+            <Select value={String(item.icon || "home")} onValueChange={(v) => onUpdate(item.id, { icon: v })}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {NATIVE_ICON_IDS.map((id) => (
+                  <SelectItem key={id} value={id}>
+                    <span className="inline-flex items-center gap-2">
+                      <NativeIcon name={id} className="h-4 w-4 opacity-90" />
+                      <span>{id}</span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -198,7 +209,10 @@ function SortableNavItemRow({ item, screens, modules, onUpdate, onDelete }: Sort
               <SelectContent>
                 {screens.map((s) => (
                   <SelectItem key={s.id} value={s.id}>
-                    {s.icon ? `${s.icon} ` : ""}{s.name}
+                    <span className="inline-flex items-center gap-2">
+                      <NativeIcon name={String(s.icon || "file-text")} className="h-4 w-4 opacity-90" />
+                      <span>{s.name}</span>
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -474,7 +488,7 @@ export default function AppStructure() {
                                 id: newId("nav"),
                                 kind,
                                 label: kind === "screen" ? "Home" : "Website",
-                                icon: kind === "screen" ? "🏠" : "🌐",
+                                icon: kind === "screen" ? "home" : "globe",
                                 screenId: kind === "screen" ? screensForNav[0]?.id : undefined,
                                 url: kind === "webview" ? (app?.url ?? "") : undefined,
                               };

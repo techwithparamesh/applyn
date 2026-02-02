@@ -12,12 +12,11 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { storage } from "./storage";
 import { hashPassword, verifyPassword } from "./auth";
-import { ZodError } from "zod";
-import { fromZodError } from "zod-validation-error";
 import { parseMysqlUrl } from "./db-mysql";
 import { randomBytes } from "crypto";
 import { runWorkerLoop } from "./worker";
 import { startSubscriptionCronInterval } from "./subscription-cron";
+import { errorHandler, requestIdMiddleware, requestLoggingMiddleware } from "./logger";
 
 const app = express();
 const httpServer = createServer(app);
@@ -38,7 +37,7 @@ if (process.env.NODE_ENV !== "production") {
 
 declare module "http" {
   interface IncomingMessage {
-    rawBody: unknown;
+    rawBody?: Buffer;
   }
 }
 
@@ -53,6 +52,9 @@ app.use(
 
 app.use(express.urlencoded({ extended: false, limit: "1mb" }));
 
+// Always attach a requestId (useful for tracing errors and admin support)
+app.use(requestIdMiddleware);
+
 // Basic security headers (lightweight, no extra deps)
 app.use((_req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -65,30 +67,6 @@ app.use((_req, res, next) => {
   next();
 });
 
-function safeJsonStringify(value: unknown) {
-  try {
-    const json = JSON.stringify(
-      value,
-      (key, v) => {
-        const lower = key.toLowerCase();
-        if (
-          lower.includes("password") ||
-          lower.includes("token") ||
-          lower.includes("secret")
-        ) {
-          return "[REDACTED]";
-        }
-        return v;
-      },
-      0,
-    );
-    // Avoid massive log lines
-    return json.length > 4000 ? `${json.slice(0, 4000)}…(truncated)` : json;
-  } catch {
-    return "[unstringifiable]";
-  }
-}
-
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -99,35 +77,6 @@ export function log(message: string, source = "express") {
 
   console.log(`${formattedTime} [${source}] ${message}`);
 }
-
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  // Avoid logging response bodies in production (can include sensitive fields, logs, or user content).
-  if (!isProd) {
-    const originalResJson = res.json;
-    res.json = function (bodyJson, ...args) {
-      capturedJsonResponse = bodyJson;
-      return originalResJson.apply(res, [bodyJson, ...args]);
-    };
-  }
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (!isProd && capturedJsonResponse) {
-        logLine += ` :: ${safeJsonStringify(capturedJsonResponse)}`;
-      }
-
-      log(logLine);
-    }
-  });
-
-  next();
-});
 
 const MemoryStore = MemoryStoreFactory(session);
 const MysqlSession = MySQLStoreFactory(session);
@@ -303,36 +252,14 @@ passport.deserializeUser(async (id: string, done) => {
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Structured request logging (only selected important routes)
+app.use(requestLoggingMiddleware);
+
 (async () => {
   await registerRoutes(httpServer, app);
 
-  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
-    if (err instanceof ZodError) {
-      const pretty = fromZodError(err);
-      if (res.headersSent) return next(err);
-      return res.status(400).json({
-        message: "Invalid request",
-        details: pretty.message,
-        issues: err.issues,
-      });
-    }
-
-    const status = err.status || err.statusCode || 500;
-    const message = err?.message || "Internal Server Error";
-
-    console.error("Internal Server Error:", err);
-
-    if (res.headersSent) {
-      return next(err);
-    }
-
-    // In production, avoid leaking internal details for 5xx.
-    if (isProd && status >= 500) {
-      return res.status(status).json({ message: "Internal Server Error" });
-    }
-
-    return res.status(status).json({ message });
-  });
+  // Central error handler (safe JSON responses, requestId, structured logging)
+  app.use(errorHandler);
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route

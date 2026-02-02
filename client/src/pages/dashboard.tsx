@@ -51,6 +51,7 @@ import { BuildLogsDialog } from "@/components/build-logs-dialog";
 import { motion } from "framer-motion";
 import { BuildErrorAnalyzer } from "@/components/ai-features";
 import { getAppUrlDisplay } from "@/lib/utils";
+import { usePlanGate } from "@/lib/plan-gate";
 
 type AppItem = {
   id: string;
@@ -111,6 +112,7 @@ type SupportTicket = {
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { requirePlan } = usePlanGate();
 
   const { data: me, isLoading } = useQuery<Me | null>({
     queryKey: ["/api/me"],
@@ -385,8 +387,10 @@ export default function Dashboard() {
 
   const handleDownload = (id: string, platform?: string) => {
     if (platform === "ios") {
+      if (!requirePlan("download_build", { requiredPlan: "pro", reason: "iOS build downloads require Pro or Agency." })) return;
       window.location.href = `/api/apps/${id}/download-ios`;
     } else {
+      if (!requirePlan("download_build", { requiredPlan: "starter", reason: "Build downloads require a paid plan." })) return;
       window.location.href = `/api/apps/${id}/download`;
     }
   };

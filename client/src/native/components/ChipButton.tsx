@@ -16,7 +16,7 @@ export function ChipButton({
       type="button"
       onClick={onClick}
       className={
-        "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors " +
+        "px-[var(--space-16)] py-[var(--space-8)] rounded-[var(--app-radius-button)] text-[length:var(--font-small)] font-medium border transition-colors app-press " +
         (isActive
           ? "text-white border-transparent bg-[var(--app-primary)]"
           : "bg-[var(--app-surface)] text-gray-200 border-[color:var(--app-border)]")
@@ -43,7 +43,7 @@ export function PrimaryButton({
   return (
     <button
       type="button"
-      className="w-full px-3 py-2 rounded-[var(--app-radius-button)] text-white text-sm font-semibold bg-[var(--app-primary)]"
+      className="w-full px-[var(--space-24)] py-[var(--space-16)] rounded-[var(--app-radius-button)] text-white text-[length:var(--font-body)] font-semibold bg-[var(--app-primary)] app-press"
       style={themeColor && themeColor !== "var(--app-primary)" ? ({ "--app-primary": themeColor } as any) : undefined}
       onClick={() => {
         const a = String(action || "").trim();

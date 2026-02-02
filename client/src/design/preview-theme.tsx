@@ -39,6 +39,30 @@ export function PreviewThemeProvider({
     el.style.setProperty("--app-radius-card", preset.radiusCard);
     el.style.setProperty("--app-radius-button", preset.radiusButton);
     el.style.setProperty("--app-shadow-card", preset.shadowCard);
+
+    // Global design tokens (strict, opinionated)
+    el.style.setProperty("--space-0", "0px");
+    el.style.setProperty("--space-4", "4px");
+    el.style.setProperty("--space-8", "8px");
+    el.style.setProperty("--space-16", "16px");
+    el.style.setProperty("--space-24", "24px");
+    el.style.setProperty("--space-32", "32px");
+    el.style.setProperty("--space-48", "48px");
+    el.style.setProperty("--space-section-y", "var(--space-32)");
+    el.style.setProperty("--space-hero-y", "var(--space-48)");
+    el.style.setProperty("--space-grid-gap", "var(--space-24)");
+    el.style.setProperty("--space-card", "var(--space-16)");
+
+    el.style.setProperty("--font-h1", "32px");
+    el.style.setProperty("--font-h2", "20px");
+    el.style.setProperty("--font-body", "16px");
+    el.style.setProperty("--font-small", "14px");
+    el.style.setProperty("--font-weight-h1", "750");
+    el.style.setProperty("--font-weight-h2", "650");
+
+    // Shadow system: soft + medium only
+    el.style.setProperty("--app-shadow-soft", "0 10px 24px -18px rgba(0,0,0,0.70)");
+    el.style.setProperty("--app-shadow-medium", "0 18px 36px -24px rgba(0,0,0,0.85)");
   }, [preset, primaryOverride, secondaryOverride]);
 
   return (

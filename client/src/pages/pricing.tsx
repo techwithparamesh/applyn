@@ -27,6 +27,7 @@ import { motion } from "framer-motion";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
+import { track } from "@/lib/analytics";
 import pricingImg from "@assets/generated_images/saas_pricing_plans_illustration.png";
 import { PLANS_LIST, PAID_PLANS_LIST, PLANS, ADDONS, type PlanDefinition } from "@shared/pricing";
 
@@ -47,9 +48,16 @@ export default function Pricing() {
   });
 
   const handleSelectPlan = (planId: string) => {
+    void track("funnel.plan.select", {
+      planId,
+      authed: Boolean(me),
+      intent: planId === "preview" ? "start_preview" : "upgrade",
+    });
+
     if (me) {
       setLocation(`/create?plan=${planId}`);
     } else {
+      void track("funnel.auth.redirect", { to: "login", planId });
       setLocation(`/login?returnTo=${encodeURIComponent(`/create?plan=${planId}`)}`);
     }
   };

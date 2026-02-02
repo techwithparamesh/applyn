@@ -1,5 +1,28 @@
 import { z } from "zod";
 
+// --- Strict design tokens ---
+
+export const SPACING_TOKENS = [
+  "var(--space-0)",
+  "var(--space-4)",
+  "var(--space-8)",
+  "var(--space-16)",
+  "var(--space-24)",
+  "var(--space-32)",
+  "var(--space-48)",
+  "var(--space-section-y)",
+  "var(--space-hero-y)",
+  "var(--space-grid-gap)",
+  "var(--space-card)",
+] as const;
+
+export const spacingTokenSchema = z.enum(SPACING_TOKENS);
+export type SpacingToken = z.infer<typeof spacingTokenSchema>;
+
+export function isSpacingToken(value: unknown): value is SpacingToken {
+  return typeof value === "string" && (SPACING_TOKENS as readonly string[]).includes(value);
+}
+
 // --- Business + theme primitives ---
 
 export const businessTypeSchema = z.enum([

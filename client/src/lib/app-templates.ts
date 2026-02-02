@@ -11,6 +11,21 @@
 
 import { buildBlueprintForTemplate } from "@/sections/presets";
 import { buildEditorScreensFromBlueprint } from "@/sections/blueprint-to-screens";
+import type { SpacingToken } from "@shared/blueprints";
+
+const SPACE = {
+  s0: "var(--space-0)" as SpacingToken,
+  s4: "var(--space-4)" as SpacingToken,
+  s8: "var(--space-8)" as SpacingToken,
+  s16: "var(--space-16)" as SpacingToken,
+  s24: "var(--space-24)" as SpacingToken,
+  s32: "var(--space-32)" as SpacingToken,
+  s48: "var(--space-48)" as SpacingToken,
+  sectionY: "var(--space-section-y)" as SpacingToken,
+  heroY: "var(--space-hero-y)" as SpacingToken,
+  gridGap: "var(--space-grid-gap)" as SpacingToken,
+  card: "var(--space-card)" as SpacingToken,
+} as const;
 
 // Component types matching visual editor
 export type ComponentType = 
@@ -82,13 +97,13 @@ export const ecommerceTemplate: IndustryTemplate = {
   description: "Complete online shopping experience",
   primaryColor: "#F97316",
   secondaryColor: "#FCD34D",
-  icon: "🛒",
+  icon: "cart",
   features: ["bottomNav", "pushNotifications", "offlineScreen", "deepLinking"],
   screens: [
     {
       id: "home",
       name: "Home",
-      icon: "🏠",
+      icon: "home",
       isHome: true,
       components: [
         {
@@ -107,16 +122,16 @@ export const ecommerceTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Featured Categories", padding: 16 },
+          props: { title: "Featured Categories", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
               type: "grid",
-              props: { columns: 3, gap: 12 },
+              props: { columns: 3, gap: SPACE.gridGap },
               children: [
-                { id: uid(), type: "card", props: { title: "Vegetables", icon: "🥬", backgroundColor: "#E8F5E9", compact: true } },
-                { id: uid(), type: "card", props: { title: "Fruits", icon: "🍎", backgroundColor: "#FFEBEE", compact: true } },
-                { id: uid(), type: "card", props: { title: "Dairy", icon: "🥛", backgroundColor: "#FFF8E1", compact: true } },
+                { id: uid(), type: "card", props: { title: "Vegetables", icon: "leaf", backgroundColor: "#E8F5E9", compact: true } },
+                { id: uid(), type: "card", props: { title: "Fruits", icon: "sparkles", backgroundColor: "#FFEBEE", compact: true } },
+                { id: uid(), type: "card", props: { title: "Dairy", icon: "package", backgroundColor: "#FFF8E1", compact: true } },
               ]
             }
           ]
@@ -124,7 +139,7 @@ export const ecommerceTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Popular Products", padding: 16, showMore: true, showMoreAction: "navigate:products" },
+          props: { title: "Popular Products", padding: SPACE.sectionY, showMore: true, showMoreAction: "navigate:products" },
           children: [
             {
               id: uid(),
@@ -144,7 +159,7 @@ export const ecommerceTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Special Offers", padding: 16, backgroundColor: "#FFF3E0" },
+          props: { title: "Special Offers", padding: SPACE.sectionY, backgroundColor: "#FFF3E0" },
           children: [
             {
               id: uid(),
@@ -163,12 +178,12 @@ export const ecommerceTemplate: IndustryTemplate = {
     {
       id: "products",
       name: "Products",
-      icon: "📦",
+      icon: "package",
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 16, backgroundColor: "#f5f5f5" },
+          props: { padding: SPACE.card, backgroundColor: "#f5f5f5" },
           children: [
             {
               id: uid(),
@@ -180,12 +195,12 @@ export const ecommerceTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "container",
-          props: { padding: 16 },
+          props: { padding: SPACE.card },
           children: [
             {
               id: uid(),
               type: "grid",
-              props: { columns: 4, gap: 8, scrollable: true },
+              props: { columns: 4, gap: SPACE.s8, scrollable: true },
               children: [
                 { id: uid(), type: "button", props: { text: "All", variant: "primary", size: "sm" } },
                 { id: uid(), type: "button", props: { text: "Vegetables", variant: "outline", size: "sm" } },
@@ -217,12 +232,12 @@ export const ecommerceTemplate: IndustryTemplate = {
     {
       id: "cart",
       name: "Cart",
-      icon: "🛒",
+      icon: "cart",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Your Cart", subtitle: "3 items", padding: 16 },
+          props: { title: "Your Cart", subtitle: "3 items", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -246,12 +261,12 @@ export const ecommerceTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "container",
-          props: { padding: 16 },
+          props: { padding: SPACE.card },
           children: [
             { id: uid(), type: "text", props: { text: "Subtotal", fontSize: 14, color: "#666", align: "left" } },
             { id: uid(), type: "heading", props: { text: "$20.46", level: 3, color: "#000", align: "right" } },
             { id: uid(), type: "text", props: { text: "Delivery: $3.99", fontSize: 14, color: "#666" } },
-            { id: uid(), type: "spacer", props: { height: 16 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s16 } },
             { id: uid(), type: "button", props: { text: "Proceed to Checkout - $24.45", variant: "primary", fullWidth: true, size: "lg" } },
           ]
         }
@@ -260,12 +275,12 @@ export const ecommerceTemplate: IndustryTemplate = {
     {
       id: "orders",
       name: "Orders",
-      icon: "📋",
+      icon: "list",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Your Orders", padding: 16 },
+          props: { title: "Your Orders", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -286,15 +301,15 @@ export const ecommerceTemplate: IndustryTemplate = {
     {
       id: "account",
       name: "Account",
-      icon: "👤",
+      icon: "user",
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 24, backgroundColor: "#F97316", align: "center" },
+          props: { padding: SPACE.s24, backgroundColor: "#F97316", align: "center" },
           children: [
             { id: uid(), type: "image", props: { src: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200", width: 80, height: 80, borderRadius: 40 } },
-            { id: uid(), type: "spacer", props: { height: 12 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s8 } },
             { id: uid(), type: "heading", props: { text: "John Doe", level: 3, color: "#fff" } },
             { id: uid(), type: "text", props: { text: "john@example.com", fontSize: 14, color: "#fff", opacity: 0.8 } },
           ]
@@ -305,14 +320,14 @@ export const ecommerceTemplate: IndustryTemplate = {
           props: {
             variant: "menu",
             items: [
-              { icon: "📦", label: "My Orders", action: "navigate:orders" },
-              { icon: "📍", label: "Delivery Addresses", action: "navigate:addresses" },
-              { icon: "💳", label: "Payment Methods", action: "navigate:payments" },
-              { icon: "❤️", label: "Wishlist", action: "navigate:wishlist" },
-              { icon: "🔔", label: "Notifications", action: "navigate:notifications" },
-              { icon: "⚙️", label: "Settings", action: "navigate:settings" },
-              { icon: "❓", label: "Help & Support", action: "navigate:support" },
-              { icon: "🚪", label: "Logout", action: "logout", color: "#EF4444" },
+              { icon: "package", label: "My Orders", action: "navigate:orders" },
+              { icon: "map", label: "Delivery Addresses", action: "navigate:addresses" },
+              { icon: "credit-card", label: "Payment Methods", action: "navigate:payments" },
+              { icon: "heart", label: "Wishlist", action: "navigate:wishlist" },
+              { icon: "bell", label: "Notifications", action: "navigate:notifications" },
+              { icon: "settings", label: "Settings", action: "navigate:settings" },
+              { icon: "help-circle", label: "Help & Support", action: "navigate:support" },
+              { icon: "log-out", label: "Logout", action: "logout", color: "#EF4444" },
             ]
           }
         }
@@ -330,13 +345,13 @@ export const ecommerceBambooTemplate: IndustryTemplate = {
   description: "Plastic-free bamboo toothbrushes with subscriptions",
   primaryColor: "#2F6B4F",
   secondaryColor: "#E7DCC8",
-  icon: "🎋",
+  icon: "leaf",
   features: ["bottomNav", "pushNotifications", "offlineScreen", "deepLinking", "whatsappButton"],
   screens: [
     {
       id: "home",
       name: "Home",
-      icon: "🏠",
+      icon: "home",
       isHome: true,
       components: [
         {
@@ -355,17 +370,17 @@ export const ecommerceBambooTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Categories", padding: 16 },
+          props: { title: "Categories", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
               type: "grid",
-              props: { columns: 2, gap: 12 },
+              props: { columns: 2, gap: SPACE.gridGap },
               children: [
-                { id: uid(), type: "card", props: { title: "Adult", icon: "🧑", backgroundColor: "#E9F3ED", compact: true } },
-                { id: uid(), type: "card", props: { title: "Kids", icon: "🧒", backgroundColor: "#F4EFE6", compact: true } },
-                { id: uid(), type: "card", props: { title: "Charcoal", icon: "⚫", backgroundColor: "#EEF2F0", compact: true } },
-                { id: uid(), type: "card", props: { title: "Soft Bristle", icon: "☁️", backgroundColor: "#F6F3EE", compact: true } },
+                { id: uid(), type: "card", props: { title: "Adult", icon: "user", backgroundColor: "#E9F3ED", compact: true } },
+                { id: uid(), type: "card", props: { title: "Kids", icon: "users", backgroundColor: "#F4EFE6", compact: true } },
+                { id: uid(), type: "card", props: { title: "Charcoal", icon: "moon", backgroundColor: "#EEF2F0", compact: true } },
+                { id: uid(), type: "card", props: { title: "Soft Bristle", icon: "cloud", backgroundColor: "#F6F3EE", compact: true } },
               ],
             },
           ],
@@ -373,7 +388,7 @@ export const ecommerceBambooTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Best Sellers", padding: 16, showMore: true, showMoreAction: "navigate:products" },
+          props: { title: "Best Sellers", padding: SPACE.sectionY, showMore: true, showMoreAction: "navigate:products" },
           children: [
             {
               id: uid(),
@@ -421,7 +436,7 @@ export const ecommerceBambooTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Why Bamboo?", padding: 16, backgroundColor: "#F4EFE6" },
+          props: { title: "Why Bamboo?", padding: SPACE.sectionY, backgroundColor: "#F4EFE6" },
           children: [
             {
               id: uid(),
@@ -436,7 +451,7 @@ export const ecommerceBambooTemplate: IndustryTemplate = {
                 ],
               },
             },
-            { id: uid(), type: "spacer", props: { height: 10 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s8 } },
             {
               id: uid(),
               type: "text",
@@ -453,12 +468,12 @@ export const ecommerceBambooTemplate: IndustryTemplate = {
     {
       id: "products",
       name: "Shop",
-      icon: "🛍️",
+      icon: "shop",
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 16, backgroundColor: "#F6F3EE" },
+          props: { padding: SPACE.card, backgroundColor: "#F6F3EE" },
           children: [
             { id: uid(), type: "input", props: { placeholder: "Search bamboo toothbrushes...", type: "search", icon: "search" } },
           ],
@@ -466,12 +481,12 @@ export const ecommerceBambooTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "container",
-          props: { padding: 16 },
+          props: { padding: SPACE.card },
           children: [
             {
               id: uid(),
               type: "grid",
-              props: { columns: 4, gap: 8, scrollable: true },
+              props: { columns: 4, gap: SPACE.s8, scrollable: true },
               children: [
                 { id: uid(), type: "button", props: { text: "All", variant: "primary", size: "sm" } },
                 { id: uid(), type: "button", props: { text: "Adult", variant: "outline", size: "sm" } },
@@ -499,17 +514,17 @@ export const ecommerceBambooTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Materials & Care", padding: 16, backgroundColor: "#E9F3ED" },
+          props: { title: "Materials & Care", padding: SPACE.sectionY, backgroundColor: "#E9F3ED" },
           children: [
             { id: uid(), type: "text", props: { text: "Handle: FSC‑friendly bamboo • Bristles: BPA‑free nylon • Packaging: plastic‑free", fontSize: 13, color: "#0f172a" } },
-            { id: uid(), type: "spacer", props: { height: 10 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s8 } },
             { id: uid(), type: "text", props: { text: "Care: Rinse and dry after use. Replace every 3 months.", fontSize: 13, color: "#334155" } },
           ],
         },
         {
           id: uid(),
           type: "section",
-          props: { title: "Reviews", padding: 16 },
+          props: { title: "Reviews", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -527,18 +542,18 @@ export const ecommerceBambooTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Subscribe & Save", padding: 16, backgroundColor: "#F4EFE6" },
+          props: { title: "Subscribe & Save", padding: SPACE.sectionY, backgroundColor: "#F4EFE6" },
           children: [
             {
               id: uid(),
               type: "grid",
-              props: { columns: 2, gap: 12 },
+              props: { columns: 2, gap: SPACE.gridGap },
               children: [
-                { id: uid(), type: "card", props: { title: "One‑time", icon: "🛒", backgroundColor: "#FFFFFF", compact: false, subtitle: "Buy once, replace later" } },
-                { id: uid(), type: "card", props: { title: "Subscription", icon: "🔁", backgroundColor: "#FFFFFF", compact: false, subtitle: "Every 3 months • Save 10%" } },
+                { id: uid(), type: "card", props: { title: "One‑time", icon: "cart", backgroundColor: "#FFFFFF", compact: false, subtitle: "Buy once, replace later" } },
+                { id: uid(), type: "card", props: { title: "Subscription", icon: "trend", backgroundColor: "#FFFFFF", compact: false, subtitle: "Every 3 months • Save 10%" } },
               ],
             },
-            { id: uid(), type: "spacer", props: { height: 12 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s16 } },
             { id: uid(), type: "button", props: { text: "Start Subscription", variant: "primary", fullWidth: true, size: "lg" } },
           ],
         },
@@ -547,12 +562,12 @@ export const ecommerceBambooTemplate: IndustryTemplate = {
     {
       id: "cart",
       name: "Cart",
-      icon: "🛒",
+      icon: "cart",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Your Cart", subtitle: "2 items", padding: 16 },
+          props: { title: "Your Cart", subtitle: "2 items", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -571,18 +586,18 @@ export const ecommerceBambooTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "container",
-          props: { padding: 16 },
+          props: { padding: SPACE.card },
           children: [
             { id: uid(), type: "text", props: { text: "Subtotal", fontSize: 14, color: "#666", align: "left" } },
             { id: uid(), type: "heading", props: { text: "$21.47", level: 3, color: "#000", align: "right" } },
             { id: uid(), type: "text", props: { text: "Shipping: $3.99", fontSize: 14, color: "#666" } },
             { id: uid(), type: "text", props: { text: "Payment options: Secure checkout or Cash on Delivery (COD)", fontSize: 12, color: "#475569" } },
-            { id: uid(), type: "spacer", props: { height: 12 } },
-            { id: uid(), type: "grid", props: { columns: 2, gap: 10 }, children: [
+            { id: uid(), type: "spacer", props: { height: SPACE.s16 } },
+            { id: uid(), type: "grid", props: { columns: 2, gap: SPACE.s8 }, children: [
               { id: uid(), type: "button", props: { text: "Pay Securely", variant: "primary", fullWidth: true, size: "sm" } },
               { id: uid(), type: "button", props: { text: "Cash on Delivery", variant: "outline", fullWidth: true, size: "sm" } },
             ] },
-            { id: uid(), type: "spacer", props: { height: 12 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s16 } },
             { id: uid(), type: "button", props: { text: "Place Order", variant: "primary", fullWidth: true, size: "lg" } },
           ],
         },
@@ -591,12 +606,12 @@ export const ecommerceBambooTemplate: IndustryTemplate = {
     {
       id: "orders",
       name: "Orders",
-      icon: "📦",
+      icon: "package",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Order Tracking", padding: 16 },
+          props: { title: "Order Tracking", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -610,9 +625,9 @@ export const ecommerceBambooTemplate: IndustryTemplate = {
                 ],
               },
             },
-            { id: uid(), type: "spacer", props: { height: 10 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s8 } },
             { id: uid(), type: "text", props: { text: "Tip: Track updates and delivery ETA from your Orders. Need help? Chat on WhatsApp.", fontSize: 12, color: "#475569" } },
-            { id: uid(), type: "spacer", props: { height: 10 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s8 } },
             { id: uid(), type: "button", props: { text: "WhatsApp Support", variant: "outline", fullWidth: true, size: "lg" } },
           ],
         },
@@ -621,15 +636,15 @@ export const ecommerceBambooTemplate: IndustryTemplate = {
     {
       id: "account",
       name: "Account",
-      icon: "👤",
+      icon: "user",
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 24, backgroundColor: "#2F6B4F", align: "center" },
+          props: { padding: SPACE.s24, backgroundColor: "#2F6B4F", align: "center" },
           children: [
             { id: uid(), type: "image", props: { src: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200", width: 80, height: 80, borderRadius: 40 } },
-            { id: uid(), type: "spacer", props: { height: 12 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s8 } },
             { id: uid(), type: "heading", props: { text: "Eco Customer", level: 3, color: "#fff" } },
             { id: uid(), type: "text", props: { text: "you@example.com", fontSize: 14, color: "#fff", opacity: 0.85 } },
           ],
@@ -640,14 +655,14 @@ export const ecommerceBambooTemplate: IndustryTemplate = {
           props: {
             variant: "menu",
             items: [
-              { icon: "📦", label: "My Orders", action: "navigate:orders" },
-              { icon: "🔁", label: "Subscriptions", action: "navigate:subscriptions" },
-              { icon: "🌿", label: "Sustainability", action: "navigate:sustainability" },
-              { icon: "💳", label: "Payment Methods", action: "navigate:payments" },
-              { icon: "📍", label: "Delivery Addresses", action: "navigate:addresses" },
-              { icon: "💬", label: "WhatsApp Support", action: "whatsapp" },
-              { icon: "⚙️", label: "Settings", action: "navigate:settings" },
-              { icon: "🚪", label: "Logout", action: "logout", color: "#EF4444" },
+              { icon: "package", label: "My Orders", action: "navigate:orders" },
+              { icon: "trend", label: "Subscriptions", action: "navigate:subscriptions" },
+              { icon: "leaf", label: "Sustainability", action: "navigate:sustainability" },
+              { icon: "credit-card", label: "Payment Methods", action: "navigate:payments" },
+              { icon: "map", label: "Delivery Addresses", action: "navigate:addresses" },
+              { icon: "phone", label: "WhatsApp Support", action: "whatsapp" },
+              { icon: "settings", label: "Settings", action: "navigate:settings" },
+              { icon: "log-out", label: "Logout", action: "logout", color: "#EF4444" },
             ],
           },
         },
@@ -665,13 +680,13 @@ export const salonTemplate: IndustryTemplate = {
   description: "Booking and services for beauty business",
   primaryColor: "#EC4899",
   secondaryColor: "#F472B6",
-  icon: "💇",
+  icon: "scissors",
   features: ["bottomNav", "pushNotifications", "whatsappButton"],
   screens: [
     {
       id: "home",
       name: "Home",
-      icon: "🏠",
+      icon: "home",
       isHome: true,
       components: [
         {
@@ -690,17 +705,17 @@ export const salonTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Our Services", padding: 16 },
+          props: { title: "Our Services", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
               type: "grid",
-              props: { columns: 2, gap: 12 },
+              props: { columns: 2, gap: SPACE.gridGap },
               children: [
-                { id: uid(), type: "card", props: { title: "Haircut & Styling", subtitle: "From $45", icon: "✂️", backgroundColor: "#FDF2F8" } },
-                { id: uid(), type: "card", props: { title: "Hair Color", subtitle: "From $85", icon: "🎨", backgroundColor: "#FDF2F8" } },
-                { id: uid(), type: "card", props: { title: "Facial Treatment", subtitle: "From $65", icon: "✨", backgroundColor: "#FDF2F8" } },
-                { id: uid(), type: "card", props: { title: "Nail Art", subtitle: "From $35", icon: "💅", backgroundColor: "#FDF2F8" } },
+                { id: uid(), type: "card", props: { title: "Haircut & Styling", subtitle: "From $45", icon: "scissors", backgroundColor: "#FDF2F8" } },
+                { id: uid(), type: "card", props: { title: "Hair Color", subtitle: "From $85", icon: "palette", backgroundColor: "#FDF2F8" } },
+                { id: uid(), type: "card", props: { title: "Facial Treatment", subtitle: "From $65", icon: "sparkles", backgroundColor: "#FDF2F8" } },
+                { id: uid(), type: "card", props: { title: "Nail Art", subtitle: "From $35", icon: "paintbrush", backgroundColor: "#FDF2F8" } },
               ]
             }
           ]
@@ -708,7 +723,7 @@ export const salonTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Meet Our Stylists", padding: 16 },
+          props: { title: "Meet Our Stylists", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -726,7 +741,7 @@ export const salonTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Client Reviews", padding: 16, backgroundColor: "#FDF2F8" },
+          props: { title: "Client Reviews", padding: SPACE.sectionY, backgroundColor: "#FDF2F8" },
           children: [
             {
               id: uid(),
@@ -745,12 +760,12 @@ export const salonTemplate: IndustryTemplate = {
     {
       id: "services",
       name: "Services",
-      icon: "💇",
+      icon: "scissors",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Hair Services", padding: 16 },
+          props: { title: "Hair Services", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -758,12 +773,12 @@ export const salonTemplate: IndustryTemplate = {
               props: {
                 variant: "service",
                 items: [
-                  { name: "Women's Haircut", duration: "45 min", price: "$55", icon: "✂️" },
-                  { name: "Men's Haircut", duration: "30 min", price: "$35", icon: "✂️" },
-                  { name: "Blowout & Styling", duration: "45 min", price: "$45", icon: "💨" },
-                  { name: "Full Color", duration: "2 hrs", price: "$120", icon: "🎨" },
-                  { name: "Highlights", duration: "2.5 hrs", price: "$150", icon: "✨" },
-                  { name: "Balayage", duration: "3 hrs", price: "$200", icon: "🌟" },
+                  { name: "Women's Haircut", duration: "45 min", price: "$55", icon: "scissors" },
+                  { name: "Men's Haircut", duration: "30 min", price: "$35", icon: "scissors" },
+                  { name: "Blowout & Styling", duration: "45 min", price: "$45", icon: "wind" },
+                  { name: "Full Color", duration: "2 hrs", price: "$120", icon: "palette" },
+                  { name: "Highlights", duration: "2.5 hrs", price: "$150", icon: "sparkles" },
+                  { name: "Balayage", duration: "3 hrs", price: "$200", icon: "star" },
                 ]
               }
             }
@@ -772,7 +787,7 @@ export const salonTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Spa & Facial", padding: 16 },
+          props: { title: "Spa & Facial", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -780,9 +795,9 @@ export const salonTemplate: IndustryTemplate = {
               props: {
                 variant: "service",
                 items: [
-                  { name: "Classic Facial", duration: "60 min", price: "$75", icon: "🧖" },
-                  { name: "Deep Cleansing", duration: "75 min", price: "$95", icon: "✨" },
-                  { name: "Anti-Aging Treatment", duration: "90 min", price: "$125", icon: "🌸" },
+                  { name: "Classic Facial", duration: "60 min", price: "$75", icon: "sparkles" },
+                  { name: "Deep Cleansing", duration: "75 min", price: "$95", icon: "sparkles" },
+                  { name: "Anti-Aging Treatment", duration: "90 min", price: "$125", icon: "leaf" },
                 ]
               }
             }
@@ -793,12 +808,12 @@ export const salonTemplate: IndustryTemplate = {
     {
       id: "booking",
       name: "Book Now",
-      icon: "📅",
+      icon: "calendar",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Book Appointment", padding: 16 },
+          props: { title: "Book Appointment", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -821,7 +836,7 @@ export const salonTemplate: IndustryTemplate = {
     {
       id: "gallery",
       name: "Gallery",
-      icon: "🖼️",
+      icon: "camera",
       components: [
         {
           id: uid(),
@@ -843,15 +858,15 @@ export const salonTemplate: IndustryTemplate = {
     {
       id: "profile",
       name: "Profile",
-      icon: "👤",
+      icon: "user",
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 24, backgroundColor: "#EC4899", align: "center" },
+          props: { padding: SPACE.s24, backgroundColor: "#EC4899", align: "center" },
           children: [
             { id: uid(), type: "image", props: { src: "https://i.pravatar.cc/200?img=5", width: 80, height: 80, borderRadius: 40 } },
-            { id: uid(), type: "spacer", props: { height: 12 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s8 } },
             { id: uid(), type: "heading", props: { text: "Jessica Miller", level: 3, color: "#fff" } },
             { id: uid(), type: "text", props: { text: "Member since 2024", fontSize: 14, color: "#fff", opacity: 0.8 } },
           ]
@@ -862,11 +877,11 @@ export const salonTemplate: IndustryTemplate = {
           props: {
             variant: "menu",
             items: [
-              { icon: "📅", label: "My Appointments", action: "navigate:appointments" },
-              { icon: "⭐", label: "Favorite Services", action: "navigate:favorites" },
-              { icon: "🎁", label: "Rewards & Points", action: "navigate:rewards", badge: "250 pts" },
-              { icon: "🔔", label: "Notifications", action: "navigate:notifications" },
-              { icon: "⚙️", label: "Settings", action: "navigate:settings" },
+              { icon: "calendar", label: "My Appointments", action: "navigate:appointments" },
+              { icon: "heart", label: "Favorite Services", action: "navigate:favorites" },
+              { icon: "gift", label: "Rewards & Points", action: "navigate:rewards", badge: "250 pts" },
+              { icon: "bell", label: "Notifications", action: "navigate:notifications" },
+              { icon: "settings", label: "Settings", action: "navigate:settings" },
             ]
           }
         }
@@ -884,13 +899,13 @@ export const restaurantTemplate: IndustryTemplate = {
   description: "Menu, ordering, and reservations",
   primaryColor: "#EF4444",
   secondaryColor: "#FBBF24",
-  icon: "🍽️",
+  icon: "restaurant",
   features: ["bottomNav", "pushNotifications", "whatsappButton", "deepLinking"],
   screens: [
     {
       id: "home",
       name: "Home",
-      icon: "🏠",
+      icon: "home",
       isHome: true,
       components: [
         {
@@ -909,7 +924,7 @@ export const restaurantTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Today's Specials", padding: 16 },
+          props: { title: "Today's Specials", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -926,17 +941,17 @@ export const restaurantTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Menu Categories", padding: 16 },
+          props: { title: "Menu Categories", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
               type: "grid",
-              props: { columns: 2, gap: 12 },
+              props: { columns: 2, gap: SPACE.gridGap },
               children: [
-                { id: uid(), type: "card", props: { title: "Appetizers", subtitle: "12 items", icon: "🥗", backgroundColor: "#FEF2F2" } },
-                { id: uid(), type: "card", props: { title: "Pasta", subtitle: "15 items", icon: "🍝", backgroundColor: "#FEF2F2" } },
-                { id: uid(), type: "card", props: { title: "Pizza", subtitle: "10 items", icon: "🍕", backgroundColor: "#FEF2F2" } },
-                { id: uid(), type: "card", props: { title: "Desserts", subtitle: "8 items", icon: "🍰", backgroundColor: "#FEF2F2" } },
+                { id: uid(), type: "card", props: { title: "Appetizers", subtitle: "12 items", icon: "leaf", backgroundColor: "#FEF2F2" } },
+                { id: uid(), type: "card", props: { title: "Pasta", subtitle: "15 items", icon: "package", backgroundColor: "#FEF2F2" } },
+                { id: uid(), type: "card", props: { title: "Pizza", subtitle: "10 items", icon: "package", backgroundColor: "#FEF2F2" } },
+                { id: uid(), type: "card", props: { title: "Desserts", subtitle: "8 items", icon: "sparkles", backgroundColor: "#FEF2F2" } },
               ]
             }
           ]
@@ -944,7 +959,7 @@ export const restaurantTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "container",
-          props: { padding: 16 },
+          props: { padding: SPACE.card },
           children: [
             {
               id: uid(),
@@ -952,7 +967,7 @@ export const restaurantTemplate: IndustryTemplate = {
               props: {
                 title: "Reserve a Table",
                 subtitle: "Book your dining experience",
-                icon: "📅",
+                icon: "calendar",
                 backgroundColor: "#EF4444",
                 textColor: "#fff",
                 action: "navigate:reservations"
@@ -963,11 +978,11 @@ export const restaurantTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Location & Hours", padding: 16 },
+          props: { title: "Location & Hours", padding: SPACE.sectionY },
           children: [
             { id: uid(), type: "text", props: { text: "📍 123 Main Street, Downtown", fontSize: 14, color: "#666" } },
             { id: uid(), type: "text", props: { text: "🕐 Mon-Sat: 11AM - 10PM | Sun: 12PM - 9PM", fontSize: 14, color: "#666" } },
-            { id: uid(), type: "spacer", props: { height: 12 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s16 } },
             { id: uid(), type: "map", props: { latitude: 40.7128, longitude: -74.006, zoom: 15, height: 150 } },
           ]
         }
@@ -976,17 +991,17 @@ export const restaurantTemplate: IndustryTemplate = {
     {
       id: "menu",
       name: "Menu",
-      icon: "📋",
+      icon: "list",
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 12 },
+          props: { padding: SPACE.card },
           children: [
             {
               id: uid(),
               type: "grid",
-              props: { columns: 4, gap: 8, scrollable: true },
+              props: { columns: 4, gap: SPACE.s8, scrollable: true },
               children: [
                 { id: uid(), type: "button", props: { text: "All", variant: "primary", size: "sm" } },
                 { id: uid(), type: "button", props: { text: "Appetizers", variant: "outline", size: "sm" } },
@@ -999,7 +1014,7 @@ export const restaurantTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Appetizers", padding: 16 },
+          props: { title: "Appetizers", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1018,7 +1033,7 @@ export const restaurantTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Pasta", padding: 16 },
+          props: { title: "Pasta", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1039,12 +1054,12 @@ export const restaurantTemplate: IndustryTemplate = {
     {
       id: "cart",
       name: "Order",
-      icon: "🛒",
+      icon: "cart",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Your Order", subtitle: "Dine-in • Table 5", padding: 16 },
+          props: { title: "Your Order", subtitle: "Dine-in • Table 5", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1063,16 +1078,16 @@ export const restaurantTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "container",
-          props: { padding: 16 },
+          props: { padding: SPACE.card },
           children: [
             { id: uid(), type: "text", props: { text: "Add special instructions...", fontSize: 14, color: "#666" } },
-            { id: uid(), type: "spacer", props: { height: 16 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s16 } },
             { id: uid(), type: "divider", props: { color: "#e5e7eb" } },
-            { id: uid(), type: "spacer", props: { height: 16 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s16 } },
             { id: uid(), type: "text", props: { text: "Subtotal: $60.96", fontSize: 14 } },
             { id: uid(), type: "text", props: { text: "Tax: $5.18", fontSize: 14, color: "#666" } },
             { id: uid(), type: "heading", props: { text: "Total: $66.14", level: 3 } },
-            { id: uid(), type: "spacer", props: { height: 16 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s16 } },
             { id: uid(), type: "button", props: { text: "Place Order", variant: "primary", fullWidth: true, size: "lg" } },
           ]
         }
@@ -1081,12 +1096,12 @@ export const restaurantTemplate: IndustryTemplate = {
     {
       id: "reservations",
       name: "Reserve",
-      icon: "📅",
+      icon: "calendar",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Table Reservation", padding: 16 },
+          props: { title: "Table Reservation", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1109,15 +1124,15 @@ export const restaurantTemplate: IndustryTemplate = {
     {
       id: "account",
       name: "Account",
-      icon: "👤",
+      icon: "user",
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 24, backgroundColor: "#EF4444", align: "center" },
+          props: { padding: SPACE.s24, backgroundColor: "#EF4444", align: "center" },
           children: [
             { id: uid(), type: "image", props: { src: "https://i.pravatar.cc/200?img=8", width: 80, height: 80, borderRadius: 40 } },
-            { id: uid(), type: "spacer", props: { height: 12 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s8 } },
             { id: uid(), type: "heading", props: { text: "Mike Johnson", level: 3, color: "#fff" } },
             { id: uid(), type: "text", props: { text: "Gold Member • 1,250 points", fontSize: 14, color: "#fff", opacity: 0.8 } },
           ]
@@ -1128,11 +1143,11 @@ export const restaurantTemplate: IndustryTemplate = {
           props: {
             variant: "menu",
             items: [
-              { icon: "📋", label: "Order History", action: "navigate:orders" },
-              { icon: "📅", label: "My Reservations", action: "navigate:my-reservations" },
-              { icon: "⭐", label: "Favorite Dishes", action: "navigate:favorites" },
-              { icon: "🎁", label: "Rewards", action: "navigate:rewards" },
-              { icon: "⚙️", label: "Settings", action: "navigate:settings" },
+              { icon: "list", label: "Order History", action: "navigate:orders" },
+              { icon: "calendar", label: "My Reservations", action: "navigate:my-reservations" },
+              { icon: "star", label: "Favorite Dishes", action: "navigate:favorites" },
+              { icon: "gift", label: "Rewards", action: "navigate:rewards" },
+              { icon: "settings", label: "Settings", action: "navigate:settings" },
             ]
           }
         }
@@ -1150,13 +1165,13 @@ export const biryaniRestaurantTemplate: IndustryTemplate = {
   description: "Biriyani menu, cart, checkout, tracking, profile",
   primaryColor: "#7A1020", // royal maroon
   secondaryColor: "#D4AF37", // gold
-  icon: "👑",
+  icon: "crown",
   features: ["bottomNav", "pushNotifications", "whatsappButton", "deepLinking"],
   screens: [
     {
       id: "home",
       name: "Home",
-      icon: "🏠",
+      icon: "home",
       isHome: true,
       components: [
         {
@@ -1175,7 +1190,7 @@ export const biryaniRestaurantTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Popular Biriyanis", padding: 16 },
+          props: { title: "Popular Biriyanis", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1219,7 +1234,7 @@ export const biryaniRestaurantTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Customer Reviews", padding: 16 },
+          props: { title: "Customer Reviews", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1236,7 +1251,7 @@ export const biryaniRestaurantTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Visit Us", padding: 16 },
+          props: { title: "Visit Us", padding: SPACE.sectionY },
           children: [
             { id: uid(), type: "text", props: { text: "📍 Hyderabad, India", fontSize: 14, color: "#6b7280" } },
             { id: uid(), type: "text", props: { text: "🕐 11:00 AM – 11:30 PM", fontSize: 14, color: "#6b7280" } },
@@ -1248,12 +1263,12 @@ export const biryaniRestaurantTemplate: IndustryTemplate = {
     {
       id: "menu",
       name: "Menu",
-      icon: "📋",
+      icon: "list",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Chicken Biriyani", padding: 16 },
+          props: { title: "Chicken Biriyani", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1304,7 +1319,7 @@ export const biryaniRestaurantTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Mutton Biriyani", padding: 16 },
+          props: { title: "Mutton Biriyani", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1348,7 +1363,7 @@ export const biryaniRestaurantTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Veg Biriyani", padding: 16 },
+          props: { title: "Veg Biriyani", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1392,7 +1407,7 @@ export const biryaniRestaurantTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Special Biriyani", padding: 16 },
+          props: { title: "Special Biriyani", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1443,12 +1458,12 @@ export const biryaniRestaurantTemplate: IndustryTemplate = {
     {
       id: "cart",
       name: "Cart",
-      icon: "🛒",
+      icon: "cart",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Your Cart", padding: 16 },
+          props: { title: "Your Cart", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1474,12 +1489,12 @@ export const biryaniRestaurantTemplate: IndustryTemplate = {
     {
       id: "orders",
       name: "Orders",
-      icon: "📦",
+      icon: "package",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Order Tracking", padding: 16 },
+          props: { title: "Order Tracking", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1492,7 +1507,7 @@ export const biryaniRestaurantTemplate: IndustryTemplate = {
                 ],
               },
             },
-            { id: uid(), type: "spacer", props: { height: 8 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s8 } },
             { id: uid(), type: "text", props: { text: "Status steps: Order Placed → Preparing → Out for Delivery → Delivered", fontSize: 12, color: "#6b7280" } },
           ],
         },
@@ -1501,7 +1516,7 @@ export const biryaniRestaurantTemplate: IndustryTemplate = {
     {
       id: "profile",
       name: "Profile",
-      icon: "👤",
+      icon: "user",
       components: [
         {
           id: uid(),
@@ -1517,7 +1532,7 @@ export const biryaniRestaurantTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Quick Links", padding: 16 },
+          props: { title: "Quick Links", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1525,10 +1540,10 @@ export const biryaniRestaurantTemplate: IndustryTemplate = {
               props: {
                 variant: "menu",
                 items: [
-                  { icon: "📍", label: "Saved Addresses", action: "navigate:addresses" },
-                  { icon: "🧾", label: "Past Orders", action: "navigate:orders" },
-                  { icon: "🎟️", label: "Coupons", action: "navigate:coupons" },
-                  { icon: "⚙️", label: "Settings", action: "navigate:settings" },
+                  { icon: "map", label: "Saved Addresses", action: "navigate:addresses" },
+                  { icon: "file-text", label: "Past Orders", action: "navigate:orders" },
+                  { icon: "ticket", label: "Coupons", action: "navigate:coupons" },
+                  { icon: "settings", label: "Settings", action: "navigate:settings" },
                 ],
               },
             },
@@ -1548,13 +1563,13 @@ export const churchTemplate: IndustryTemplate = {
   description: "Sermons, events, and community",
   primaryColor: "#8B5CF6",
   secondaryColor: "#A78BFA",
-  icon: "⛪",
+  icon: "church",
   features: ["pushNotifications", "offlineScreen"],
   screens: [
     {
       id: "home",
       name: "Home",
-      icon: "🏠",
+      icon: "home",
       isHome: true,
       components: [
         {
@@ -1573,7 +1588,7 @@ export const churchTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "This Week", padding: 16 },
+          props: { title: "This Week", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1582,7 +1597,7 @@ export const churchTemplate: IndustryTemplate = {
                 title: "Sunday Service",
                 subtitle: "9:00 AM & 11:00 AM",
                 description: "Join us for worship and the Word",
-                icon: "🙏",
+                icon: "heart",
                 backgroundColor: "#F5F3FF"
               }
             }
@@ -1591,7 +1606,7 @@ export const churchTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Latest Sermon", padding: 16 },
+          props: { title: "Latest Sermon", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1609,17 +1624,17 @@ export const churchTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Quick Links", padding: 16 },
+          props: { title: "Quick Links", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
               type: "grid",
-              props: { columns: 2, gap: 12 },
+              props: { columns: 2, gap: SPACE.gridGap },
               children: [
-                { id: uid(), type: "card", props: { title: "Give", icon: "💝", backgroundColor: "#F5F3FF", action: "navigate:give" } },
-                { id: uid(), type: "card", props: { title: "Events", icon: "📅", backgroundColor: "#F5F3FF", action: "navigate:events" } },
-                { id: uid(), type: "card", props: { title: "Groups", icon: "👥", backgroundColor: "#F5F3FF", action: "navigate:groups" } },
-                { id: uid(), type: "card", props: { title: "Prayer", icon: "🙏", backgroundColor: "#F5F3FF", action: "navigate:prayer" } },
+                { id: uid(), type: "card", props: { title: "Give", icon: "heart", backgroundColor: "#F5F3FF", action: "navigate:give" } },
+                { id: uid(), type: "card", props: { title: "Events", icon: "calendar", backgroundColor: "#F5F3FF", action: "navigate:events" } },
+                { id: uid(), type: "card", props: { title: "Groups", icon: "users", backgroundColor: "#F5F3FF", action: "navigate:groups" } },
+                { id: uid(), type: "card", props: { title: "Prayer", icon: "heart", backgroundColor: "#F5F3FF", action: "navigate:prayer" } },
               ]
             }
           ]
@@ -1629,12 +1644,12 @@ export const churchTemplate: IndustryTemplate = {
     {
       id: "sermons",
       name: "Sermons",
-      icon: "🎬",
+      icon: "film",
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 16, backgroundColor: "#f5f5f5" },
+          props: { padding: SPACE.card, backgroundColor: "#f5f5f5" },
           children: [
             { id: uid(), type: "input", props: { placeholder: "Search sermons...", type: "search" } }
           ]
@@ -1642,7 +1657,7 @@ export const churchTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Recent Sermons", padding: 16 },
+          props: { title: "Recent Sermons", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1663,12 +1678,12 @@ export const churchTemplate: IndustryTemplate = {
     {
       id: "events",
       name: "Events",
-      icon: "📅",
+      icon: "calendar",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Upcoming Events", padding: 16 },
+          props: { title: "Upcoming Events", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1690,15 +1705,15 @@ export const churchTemplate: IndustryTemplate = {
     {
       id: "give",
       name: "Give",
-      icon: "💝",
+      icon: "heart",
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 24, align: "center" },
+          props: { padding: SPACE.s24, align: "center" },
           children: [
-            { id: uid(), type: "icon", props: { icon: "💝", size: 64 } },
-            { id: uid(), type: "spacer", props: { height: 16 } },
+            { id: uid(), type: "icon", props: { icon: "heart", size: 64 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s16 } },
             { id: uid(), type: "heading", props: { text: "Give Online", level: 2, align: "center" } },
             { id: uid(), type: "text", props: { text: "Thank you for your generosity. Your giving supports our ministry and community.", fontSize: 14, color: "#666", align: "center" } },
           ]
@@ -1706,12 +1721,12 @@ export const churchTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Select Amount", padding: 16 },
+          props: { title: "Select Amount", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
               type: "grid",
-              props: { columns: 3, gap: 12 },
+              props: { columns: 3, gap: SPACE.gridGap },
               children: [
                 { id: uid(), type: "button", props: { text: "$25", variant: "outline", size: "lg" } },
                 { id: uid(), type: "button", props: { text: "$50", variant: "outline", size: "lg" } },
@@ -1726,7 +1741,7 @@ export const churchTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "container",
-          props: { padding: 16 },
+          props: { padding: SPACE.card },
           children: [
             { id: uid(), type: "button", props: { text: "Continue to Payment", variant: "primary", fullWidth: true, size: "lg" } },
           ]
@@ -1736,12 +1751,12 @@ export const churchTemplate: IndustryTemplate = {
     {
       id: "connect",
       name: "Connect",
-      icon: "👥",
+      icon: "users",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Get Connected", padding: 16 },
+          props: { title: "Get Connected", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1749,11 +1764,11 @@ export const churchTemplate: IndustryTemplate = {
               props: {
                 variant: "menu",
                 items: [
-                  { icon: "👋", label: "I'm New Here", action: "navigate:new-here" },
-                  { icon: "👥", label: "Join a Group", action: "navigate:groups" },
-                  { icon: "🙌", label: "Serve", action: "navigate:serve" },
-                  { icon: "🙏", label: "Prayer Request", action: "navigate:prayer" },
-                  { icon: "📞", label: "Contact Us", action: "navigate:contact" },
+                  { icon: "sparkles", label: "I'm New Here", action: "navigate:new-here" },
+                  { icon: "users", label: "Join a Group", action: "navigate:groups" },
+                  { icon: "handshake", label: "Serve", action: "navigate:serve" },
+                  { icon: "heart", label: "Prayer Request", action: "navigate:prayer" },
+                  { icon: "phone", label: "Contact Us", action: "navigate:contact" },
                 ]
               }
             }
@@ -1773,19 +1788,19 @@ export const fitnessTemplate: IndustryTemplate = {
   description: "Workouts, classes, and progress tracking",
   primaryColor: "#10B981",
   secondaryColor: "#34D399",
-  icon: "💪",
+  icon: "dumbbell",
   features: ["bottomNav", "pushNotifications", "deepLinking"],
   screens: [
     {
       id: "home",
       name: "Home",
-      icon: "🏠",
+      icon: "home",
       isHome: true,
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 16, backgroundColor: "#10B981" },
+          props: { padding: SPACE.card, backgroundColor: "#10B981" },
           children: [
             { id: uid(), type: "text", props: { text: "Good morning, Alex! 💪", fontSize: 14, color: "#fff", opacity: 0.8 } },
             { id: uid(), type: "heading", props: { text: "Ready to crush it?", level: 2, color: "#fff" } },
@@ -1794,16 +1809,16 @@ export const fitnessTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Today's Stats", padding: 16 },
+          props: { title: "Today's Stats", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
               type: "stats",
               props: {
                 items: [
-                  { label: "Calories", value: "1,250", icon: "🔥", target: "2,000" },
-                  { label: "Workouts", value: "3", icon: "💪", target: "5" },
-                  { label: "Steps", value: "8,432", icon: "👟", target: "10,000" },
+                  { label: "Calories", value: "1,250", icon: "flame", target: "2,000" },
+                  { label: "Workouts", value: "3", icon: "dumbbell", target: "5" },
+                  { label: "Steps", value: "8,432", icon: "footprints", target: "10,000" },
                 ]
               }
             }
@@ -1812,7 +1827,7 @@ export const fitnessTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Today's Workout", padding: 16 },
+          props: { title: "Today's Workout", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1831,7 +1846,7 @@ export const fitnessTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Upcoming Classes", padding: 16 },
+          props: { title: "Upcoming Classes", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1852,17 +1867,17 @@ export const fitnessTemplate: IndustryTemplate = {
     {
       id: "workouts",
       name: "Workouts",
-      icon: "🏋️",
+      icon: "dumbbell",
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 12 },
+          props: { padding: SPACE.card },
           children: [
             {
               id: uid(),
               type: "grid",
-              props: { columns: 4, gap: 8, scrollable: true },
+              props: { columns: 4, gap: SPACE.s8, scrollable: true },
               children: [
                 { id: uid(), type: "button", props: { text: "All", variant: "primary", size: "sm" } },
                 { id: uid(), type: "button", props: { text: "Strength", variant: "outline", size: "sm" } },
@@ -1875,12 +1890,12 @@ export const fitnessTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Popular Workouts", padding: 16 },
+          props: { title: "Popular Workouts", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
               type: "grid",
-              props: { columns: 1, gap: 12 },
+              props: { columns: 1, gap: SPACE.gridGap },
               children: [
                 { id: uid(), type: "card", props: { title: "Full Body Burn", subtitle: "30 min • Beginner", image: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=600", horizontal: true } },
                 { id: uid(), type: "card", props: { title: "Core Crusher", subtitle: "20 min • Intermediate", image: "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=600", horizontal: true } },
@@ -1894,12 +1909,12 @@ export const fitnessTemplate: IndustryTemplate = {
     {
       id: "classes",
       name: "Classes",
-      icon: "📅",
+      icon: "calendar",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Today's Schedule", padding: 16 },
+          props: { title: "Today's Schedule", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1922,12 +1937,12 @@ export const fitnessTemplate: IndustryTemplate = {
     {
       id: "progress",
       name: "Progress",
-      icon: "📊",
+      icon: "chart",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "This Week", padding: 16 },
+          props: { title: "This Week", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1945,7 +1960,7 @@ export const fitnessTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Weight Progress", padding: 16 },
+          props: { title: "Weight Progress", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -1962,16 +1977,16 @@ export const fitnessTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Achievements", padding: 16 },
+          props: { title: "Achievements", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
               type: "grid",
-              props: { columns: 3, gap: 12 },
+              props: { columns: 3, gap: SPACE.gridGap },
               children: [
-                { id: uid(), type: "card", props: { icon: "🔥", title: "7 Day Streak", compact: true, backgroundColor: "#FEF3C7" } },
-                { id: uid(), type: "card", props: { icon: "💪", title: "50 Workouts", compact: true, backgroundColor: "#D1FAE5" } },
-                { id: uid(), type: "card", props: { icon: "🏃", title: "Marathon", compact: true, backgroundColor: "#DBEAFE" } },
+                { id: uid(), type: "card", props: { icon: "flame", title: "7 Day Streak", compact: true, backgroundColor: "#FEF3C7" } },
+                { id: uid(), type: "card", props: { icon: "dumbbell", title: "50 Workouts", compact: true, backgroundColor: "#D1FAE5" } },
+                { id: uid(), type: "card", props: { icon: "activity", title: "Marathon", compact: true, backgroundColor: "#DBEAFE" } },
               ]
             }
           ]
@@ -1981,15 +1996,15 @@ export const fitnessTemplate: IndustryTemplate = {
     {
       id: "profile",
       name: "Profile",
-      icon: "👤",
+      icon: "user",
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 24, backgroundColor: "#10B981", align: "center" },
+          props: { padding: SPACE.s24, backgroundColor: "#10B981", align: "center" },
           children: [
             { id: uid(), type: "image", props: { src: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=200", width: 80, height: 80, borderRadius: 40 } },
-            { id: uid(), type: "spacer", props: { height: 12 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s8 } },
             { id: uid(), type: "heading", props: { text: "Alex Thompson", level: 3, color: "#fff" } },
             { id: uid(), type: "text", props: { text: "Pro Member • 127 workouts", fontSize: 14, color: "#fff", opacity: 0.8 } },
           ]
@@ -2000,12 +2015,12 @@ export const fitnessTemplate: IndustryTemplate = {
           props: {
             variant: "menu",
             items: [
-              { icon: "📊", label: "My Progress", action: "navigate:progress" },
-              { icon: "🏆", label: "Achievements", action: "navigate:achievements" },
-              { icon: "📋", label: "Workout History", action: "navigate:history" },
-              { icon: "🎯", label: "Goals", action: "navigate:goals" },
-              { icon: "💳", label: "Membership", action: "navigate:membership" },
-              { icon: "⚙️", label: "Settings", action: "navigate:settings" },
+              { icon: "chart", label: "My Progress", action: "navigate:progress" },
+              { icon: "trophy", label: "Achievements", action: "navigate:achievements" },
+              { icon: "list", label: "Workout History", action: "navigate:history" },
+              { icon: "target", label: "Goals", action: "navigate:goals" },
+              { icon: "credit-card", label: "Membership", action: "navigate:membership" },
+              { icon: "settings", label: "Settings", action: "navigate:settings" },
             ]
           }
         }
@@ -2023,19 +2038,19 @@ export const educationTemplate: IndustryTemplate = {
   description: "Online learning platform",
   primaryColor: "#3B82F6",
   secondaryColor: "#60A5FA",
-  icon: "📚",
+  icon: "graduation-cap",
   features: ["bottomNav", "pushNotifications", "offlineScreen"],
   screens: [
     {
       id: "home",
       name: "Home",
-      icon: "🏠",
+      icon: "home",
       isHome: true,
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 16, backgroundColor: "#3B82F6" },
+          props: { padding: SPACE.card, backgroundColor: "#3B82F6" },
           children: [
             { id: uid(), type: "text", props: { text: "Welcome back, Student! 📖", fontSize: 14, color: "#fff", opacity: 0.8 } },
             { id: uid(), type: "heading", props: { text: "Continue Learning", level: 2, color: "#fff" } },
@@ -2044,7 +2059,7 @@ export const educationTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "In Progress", padding: 16 },
+          props: { title: "In Progress", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -2063,17 +2078,17 @@ export const educationTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Categories", padding: 16 },
+          props: { title: "Categories", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
               type: "grid",
-              props: { columns: 2, gap: 12 },
+              props: { columns: 2, gap: SPACE.gridGap },
               children: [
-                { id: uid(), type: "card", props: { title: "Programming", subtitle: "45 courses", icon: "💻", backgroundColor: "#EFF6FF" } },
-                { id: uid(), type: "card", props: { title: "Design", subtitle: "32 courses", icon: "🎨", backgroundColor: "#EFF6FF" } },
-                { id: uid(), type: "card", props: { title: "Business", subtitle: "28 courses", icon: "📈", backgroundColor: "#EFF6FF" } },
-                { id: uid(), type: "card", props: { title: "Marketing", subtitle: "24 courses", icon: "📣", backgroundColor: "#EFF6FF" } },
+                { id: uid(), type: "card", props: { title: "Programming", subtitle: "45 courses", icon: "zap", backgroundColor: "#EFF6FF" } },
+                { id: uid(), type: "card", props: { title: "Design", subtitle: "32 courses", icon: "palette", backgroundColor: "#EFF6FF" } },
+                { id: uid(), type: "card", props: { title: "Business", subtitle: "28 courses", icon: "briefcase", backgroundColor: "#EFF6FF" } },
+                { id: uid(), type: "card", props: { title: "Marketing", subtitle: "24 courses", icon: "megaphone", backgroundColor: "#EFF6FF" } },
               ]
             }
           ]
@@ -2081,7 +2096,7 @@ export const educationTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Popular Courses", padding: 16 },
+          props: { title: "Popular Courses", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -2101,12 +2116,12 @@ export const educationTemplate: IndustryTemplate = {
     {
       id: "courses",
       name: "Courses",
-      icon: "📚",
+      icon: "graduation-cap",
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 16, backgroundColor: "#f5f5f5" },
+          props: { padding: SPACE.card, backgroundColor: "#f5f5f5" },
           children: [
             { id: uid(), type: "input", props: { placeholder: "Search courses...", type: "search" } }
           ]
@@ -2114,12 +2129,12 @@ export const educationTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "container",
-          props: { padding: 12 },
+          props: { padding: SPACE.card },
           children: [
             {
               id: uid(),
               type: "grid",
-              props: { columns: 4, gap: 8, scrollable: true },
+              props: { columns: 4, gap: SPACE.s8, scrollable: true },
               children: [
                 { id: uid(), type: "button", props: { text: "All", variant: "primary", size: "sm" } },
                 { id: uid(), type: "button", props: { text: "Programming", variant: "outline", size: "sm" } },
@@ -2132,7 +2147,7 @@ export const educationTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "All Courses", padding: 16 },
+          props: { title: "All Courses", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -2153,12 +2168,12 @@ export const educationTemplate: IndustryTemplate = {
     {
       id: "my-learning",
       name: "My Learning",
-      icon: "📖",
+      icon: "book",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Continue Watching", padding: 16 },
+          props: { title: "Continue Watching", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -2176,7 +2191,7 @@ export const educationTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Completed", padding: 16 },
+          props: { title: "Completed", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -2195,15 +2210,15 @@ export const educationTemplate: IndustryTemplate = {
     {
       id: "profile",
       name: "Profile",
-      icon: "👤",
+      icon: "user",
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 24, backgroundColor: "#3B82F6", align: "center" },
+          props: { padding: SPACE.s24, backgroundColor: "#3B82F6", align: "center" },
           children: [
             { id: uid(), type: "image", props: { src: "https://i.pravatar.cc/200?img=12", width: 80, height: 80, borderRadius: 40 } },
-            { id: uid(), type: "spacer", props: { height: 12 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s8 } },
             { id: uid(), type: "heading", props: { text: "Student Name", level: 3, color: "#fff" } },
             { id: uid(), type: "text", props: { text: "3 courses in progress", fontSize: 14, color: "#fff", opacity: 0.8 } },
           ]
@@ -2213,9 +2228,9 @@ export const educationTemplate: IndustryTemplate = {
           type: "stats",
           props: {
             items: [
-              { label: "Courses", value: "5", icon: "📚" },
-              { label: "Hours", value: "48", icon: "⏱️" },
-              { label: "Certificates", value: "2", icon: "🏆" },
+              { label: "Courses", value: "5", icon: "graduation-cap" },
+              { label: "Hours", value: "48", icon: "timer" },
+              { label: "Certificates", value: "2", icon: "trophy" },
             ]
           }
         },
@@ -2225,10 +2240,10 @@ export const educationTemplate: IndustryTemplate = {
           props: {
             variant: "menu",
             items: [
-              { icon: "📖", label: "My Learning", action: "navigate:my-learning" },
-              { icon: "🏆", label: "Certificates", action: "navigate:certificates" },
-              { icon: "❤️", label: "Wishlist", action: "navigate:wishlist" },
-              { icon: "⚙️", label: "Settings", action: "navigate:settings" },
+              { icon: "book", label: "My Learning", action: "navigate:my-learning" },
+              { icon: "trophy", label: "Certificates", action: "navigate:certificates" },
+              { icon: "heart", label: "Wishlist", action: "navigate:wishlist" },
+              { icon: "settings", label: "Settings", action: "navigate:settings" },
             ]
           }
         }
@@ -2246,35 +2261,35 @@ export const radioTemplate: IndustryTemplate = {
   description: "Live streaming and podcasts",
   primaryColor: "#06B6D4",
   secondaryColor: "#22D3EE",
-  icon: "📻",
+  icon: "radio",
   features: ["pushNotifications", "offlineScreen"],
   screens: [
     {
       id: "home",
       name: "Live",
-      icon: "📻",
+      icon: "radio",
       isHome: true,
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 24, backgroundColor: "linear-gradient(135deg, #06B6D4 0%, #8B5CF6 100%)", align: "center" },
+          props: { padding: SPACE.s24, backgroundColor: "linear-gradient(135deg, #06B6D4 0%, #8B5CF6 100%)", align: "center" },
           children: [
             { id: uid(), type: "image", props: { src: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=300", width: 200, height: 200, borderRadius: 16 } },
-            { id: uid(), type: "spacer", props: { height: 20 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s16 } },
             { id: uid(), type: "heading", props: { text: "Wave FM", level: 2, color: "#fff" } },
             { id: uid(), type: "text", props: { text: "🔴 LIVE NOW", fontSize: 14, color: "#fff", badge: true } },
-            { id: uid(), type: "spacer", props: { height: 8 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s8 } },
             { id: uid(), type: "text", props: { text: "Morning Show with DJ Alex", fontSize: 16, color: "#fff" } },
-            { id: uid(), type: "spacer", props: { height: 24 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s24 } },
             {
               id: uid(),
               type: "grid",
-              props: { columns: 3, gap: 20 },
+              props: { columns: 3, gap: SPACE.s16 },
               children: [
-                { id: uid(), type: "button", props: { icon: "⏮️", variant: "ghost", circular: true } },
-                { id: uid(), type: "button", props: { icon: "⏸️", variant: "primary", circular: true, size: "lg" } },
-                { id: uid(), type: "button", props: { icon: "⏭️", variant: "ghost", circular: true } },
+                { id: uid(), type: "button", props: { icon: "skip-back", variant: "ghost", circular: true } },
+                { id: uid(), type: "button", props: { icon: "pause", variant: "primary", circular: true, size: "lg" } },
+                { id: uid(), type: "button", props: { icon: "skip-forward", variant: "ghost", circular: true } },
               ]
             }
           ]
@@ -2282,7 +2297,7 @@ export const radioTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Up Next", padding: 16 },
+          props: { title: "Up Next", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -2303,12 +2318,12 @@ export const radioTemplate: IndustryTemplate = {
     {
       id: "podcasts",
       name: "Podcasts",
-      icon: "🎙️",
+      icon: "mic",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Featured Podcasts", padding: 16 },
+          props: { title: "Featured Podcasts", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -2325,7 +2340,7 @@ export const radioTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "All Podcasts", padding: 16 },
+          props: { title: "All Podcasts", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -2346,12 +2361,12 @@ export const radioTemplate: IndustryTemplate = {
     {
       id: "schedule",
       name: "Schedule",
-      icon: "📅",
+      icon: "calendar",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Today's Schedule", padding: 16 },
+          props: { title: "Today's Schedule", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -2374,15 +2389,15 @@ export const radioTemplate: IndustryTemplate = {
     {
       id: "about",
       name: "About",
-      icon: "ℹ️",
+      icon: "info",
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 24, align: "center" },
+          props: { padding: SPACE.s24, align: "center" },
           children: [
             { id: uid(), type: "image", props: { src: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400", width: 120, height: 120, borderRadius: 60 } },
-            { id: uid(), type: "spacer", props: { height: 16 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s16 } },
             { id: uid(), type: "heading", props: { text: "Wave FM", level: 2 } },
             { id: uid(), type: "text", props: { text: "Your favorite online radio station broadcasting 24/7 with the best music mix.", fontSize: 14, color: "#666", align: "center" } },
           ]
@@ -2390,7 +2405,7 @@ export const radioTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Connect With Us", padding: 16 },
+          props: { title: "Connect With Us", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -2409,7 +2424,7 @@ export const radioTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Contact", padding: 16 },
+          props: { title: "Contact", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -2435,19 +2450,19 @@ export const healthcareTemplate: IndustryTemplate = {
   description: "Appointments and health services",
   primaryColor: "#F43F5E",
   secondaryColor: "#FB7185",
-  icon: "🏥",
+  icon: "healthcare",
   features: ["bottomNav", "pushNotifications"],
   screens: [
     {
       id: "home",
       name: "Home",
-      icon: "🏠",
+      icon: "home",
       isHome: true,
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 16, backgroundColor: "#F43F5E" },
+          props: { padding: SPACE.card, backgroundColor: "#F43F5E" },
           children: [
             { id: uid(), type: "text", props: { text: "Welcome back!", fontSize: 14, color: "#fff", opacity: 0.8 } },
             { id: uid(), type: "heading", props: { text: "How can we help you today?", level: 3, color: "#fff" } },
@@ -2456,17 +2471,17 @@ export const healthcareTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Quick Actions", padding: 16 },
+          props: { title: "Quick Actions", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
               type: "grid",
-              props: { columns: 2, gap: 12 },
+              props: { columns: 2, gap: SPACE.gridGap },
               children: [
-                { id: uid(), type: "card", props: { title: "Book Appointment", icon: "📅", backgroundColor: "#FFF1F2", action: "navigate:book" } },
-                { id: uid(), type: "card", props: { title: "Find Doctor", icon: "👨‍⚕️", backgroundColor: "#FFF1F2", action: "navigate:doctors" } },
-                { id: uid(), type: "card", props: { title: "Lab Results", icon: "🔬", backgroundColor: "#FFF1F2", action: "navigate:results" } },
-                { id: uid(), type: "card", props: { title: "Prescriptions", icon: "💊", backgroundColor: "#FFF1F2", action: "navigate:prescriptions" } },
+                { id: uid(), type: "card", props: { title: "Book Appointment", icon: "calendar", backgroundColor: "#FFF1F2", action: "navigate:book" } },
+                { id: uid(), type: "card", props: { title: "Find Doctor", icon: "doctors", backgroundColor: "#FFF1F2", action: "navigate:doctors" } },
+                { id: uid(), type: "card", props: { title: "Lab Results", icon: "flask", backgroundColor: "#FFF1F2", action: "navigate:results" } },
+                { id: uid(), type: "card", props: { title: "Prescriptions", icon: "pill", backgroundColor: "#FFF1F2", action: "navigate:prescriptions" } },
               ]
             }
           ]
@@ -2474,7 +2489,7 @@ export const healthcareTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Upcoming Appointments", padding: 16 },
+          props: { title: "Upcoming Appointments", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -2483,7 +2498,7 @@ export const healthcareTemplate: IndustryTemplate = {
                 title: "Dr. Sarah Johnson",
                 subtitle: "General Checkup",
                 description: "Tomorrow, 10:00 AM",
-                icon: "👩‍⚕️",
+                icon: "doctors",
                 backgroundColor: "#F5F5F5",
                 action: "navigate:appointment:1"
               }
@@ -2493,7 +2508,7 @@ export const healthcareTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Health Tips", padding: 16 },
+          props: { title: "Health Tips", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -2512,12 +2527,12 @@ export const healthcareTemplate: IndustryTemplate = {
     {
       id: "doctors",
       name: "Doctors",
-      icon: "👨‍⚕️",
+      icon: "doctors",
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 16, backgroundColor: "#f5f5f5" },
+          props: { padding: SPACE.card, backgroundColor: "#f5f5f5" },
           children: [
             { id: uid(), type: "input", props: { placeholder: "Search doctors...", type: "search" } }
           ]
@@ -2525,12 +2540,12 @@ export const healthcareTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "container",
-          props: { padding: 12 },
+          props: { padding: SPACE.card },
           children: [
             {
               id: uid(),
               type: "grid",
-              props: { columns: 4, gap: 8, scrollable: true },
+              props: { columns: 4, gap: SPACE.s8, scrollable: true },
               children: [
                 { id: uid(), type: "button", props: { text: "All", variant: "primary", size: "sm" } },
                 { id: uid(), type: "button", props: { text: "General", variant: "outline", size: "sm" } },
@@ -2543,7 +2558,7 @@ export const healthcareTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Available Doctors", padding: 16 },
+          props: { title: "Available Doctors", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -2564,12 +2579,12 @@ export const healthcareTemplate: IndustryTemplate = {
     {
       id: "book",
       name: "Book",
-      icon: "📅",
+      icon: "calendar",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Book Appointment", padding: 16 },
+          props: { title: "Book Appointment", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -2593,12 +2608,12 @@ export const healthcareTemplate: IndustryTemplate = {
     {
       id: "records",
       name: "Records",
-      icon: "📋",
+      icon: "list",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Medical Records", padding: 16 },
+          props: { title: "Medical Records", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -2606,10 +2621,10 @@ export const healthcareTemplate: IndustryTemplate = {
               props: {
                 variant: "records",
                 items: [
-                  { title: "Blood Test Results", date: "Jan 15, 2026", type: "Lab Report", icon: "🔬" },
-                  { title: "X-Ray Report", date: "Jan 10, 2026", type: "Imaging", icon: "🩻" },
-                  { title: "Prescription", date: "Jan 5, 2026", type: "Medication", icon: "💊" },
-                  { title: "Consultation Notes", date: "Dec 28, 2025", type: "Visit Summary", icon: "📝" },
+                  { title: "Blood Test Results", date: "Jan 15, 2026", type: "Lab Report", icon: "flask" },
+                  { title: "X-Ray Report", date: "Jan 10, 2026", type: "Imaging", icon: "search" },
+                  { title: "Prescription", date: "Jan 5, 2026", type: "Medication", icon: "pill" },
+                  { title: "Consultation Notes", date: "Dec 28, 2025", type: "Visit Summary", icon: "file-text" },
                 ]
               }
             }
@@ -2620,15 +2635,15 @@ export const healthcareTemplate: IndustryTemplate = {
     {
       id: "profile",
       name: "Profile",
-      icon: "👤",
+      icon: "user",
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 24, backgroundColor: "#F43F5E", align: "center" },
+          props: { padding: SPACE.s24, backgroundColor: "#F43F5E", align: "center" },
           children: [
             { id: uid(), type: "image", props: { src: "https://i.pravatar.cc/200?img=3", width: 80, height: 80, borderRadius: 40 } },
-            { id: uid(), type: "spacer", props: { height: 12 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s8 } },
             { id: uid(), type: "heading", props: { text: "John Doe", level: 3, color: "#fff" } },
             { id: uid(), type: "text", props: { text: "Patient ID: #12345", fontSize: 14, color: "#fff", opacity: 0.8 } },
           ]
@@ -2639,12 +2654,12 @@ export const healthcareTemplate: IndustryTemplate = {
           props: {
             variant: "menu",
             items: [
-              { icon: "📅", label: "My Appointments", action: "navigate:appointments" },
-              { icon: "📋", label: "Medical Records", action: "navigate:records" },
-              { icon: "💊", label: "Prescriptions", action: "navigate:prescriptions" },
-              { icon: "👨‍👩‍👧", label: "Family Members", action: "navigate:family" },
-              { icon: "💳", label: "Insurance", action: "navigate:insurance" },
-              { icon: "⚙️", label: "Settings", action: "navigate:settings" },
+              { icon: "calendar", label: "My Appointments", action: "navigate:appointments" },
+              { icon: "list", label: "Medical Records", action: "navigate:records" },
+              { icon: "pill", label: "Prescriptions", action: "navigate:prescriptions" },
+              { icon: "users", label: "Family Members", action: "navigate:family" },
+              { icon: "credit-card", label: "Insurance", action: "navigate:insurance" },
+              { icon: "settings", label: "Settings", action: "navigate:settings" },
             ]
           }
         }
@@ -2662,34 +2677,34 @@ export const realEstateTemplate: IndustryTemplate = {
   description: "Property listings and tours",
   primaryColor: "#64748B",
   secondaryColor: "#94A3B8",
-  icon: "🏠",
+  icon: "realestate",
   features: ["bottomNav", "deepLinking", "whatsappButton"],
   screens: [
     {
       id: "home",
       name: "Home",
-      icon: "🏠",
+      icon: "home",
       isHome: true,
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 16, backgroundColor: "#1E293B" },
+          props: { padding: SPACE.card, backgroundColor: "#1E293B" },
           children: [
             { id: uid(), type: "heading", props: { text: "Find Your Dream Home", level: 2, color: "#fff" } },
-            { id: uid(), type: "spacer", props: { height: 16 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s16 } },
             { id: uid(), type: "input", props: { placeholder: "Search location, city, or ZIP...", type: "search", backgroundColor: "#fff" } },
           ]
         },
         {
           id: uid(),
           type: "container",
-          props: { padding: 12 },
+          props: { padding: SPACE.card },
           children: [
             {
               id: uid(),
               type: "grid",
-              props: { columns: 4, gap: 8, scrollable: true },
+              props: { columns: 4, gap: SPACE.s8, scrollable: true },
               children: [
                 { id: uid(), type: "button", props: { text: "Buy", variant: "primary", size: "sm" } },
                 { id: uid(), type: "button", props: { text: "Rent", variant: "outline", size: "sm" } },
@@ -2702,7 +2717,7 @@ export const realEstateTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Featured Properties", padding: 16 },
+          props: { title: "Featured Properties", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -2719,7 +2734,7 @@ export const realEstateTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Nearby Properties", padding: 16, showMore: true },
+          props: { title: "Nearby Properties", padding: SPACE.sectionY, showMore: true },
           children: [
             {
               id: uid(),
@@ -2739,35 +2754,35 @@ export const realEstateTemplate: IndustryTemplate = {
     {
       id: "search",
       name: "Search",
-      icon: "🔍",
+      icon: "search",
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 16 },
+          props: { padding: SPACE.card },
           children: [
             { id: uid(), type: "input", props: { placeholder: "Location, city, or ZIP", type: "search" } },
-            { id: uid(), type: "spacer", props: { height: 12 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s16 } },
             {
               id: uid(),
               type: "grid",
-              props: { columns: 2, gap: 12 },
+              props: { columns: 2, gap: SPACE.gridGap },
               children: [
                 { id: uid(), type: "input", props: { label: "Min Price", placeholder: "$0", type: "number" } },
                 { id: uid(), type: "input", props: { label: "Max Price", placeholder: "No max", type: "number" } },
               ]
             },
-            { id: uid(), type: "spacer", props: { height: 12 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s16 } },
             {
               id: uid(),
               type: "grid",
-              props: { columns: 2, gap: 12 },
+              props: { columns: 2, gap: SPACE.gridGap },
               children: [
                 { id: uid(), type: "button", props: { text: "Beds: Any", variant: "outline", fullWidth: true } },
                 { id: uid(), type: "button", props: { text: "Baths: Any", variant: "outline", fullWidth: true } },
               ]
             },
-            { id: uid(), type: "spacer", props: { height: 16 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s16 } },
             { id: uid(), type: "button", props: { text: "Search Properties", variant: "primary", fullWidth: true } },
           ]
         }
@@ -2776,12 +2791,12 @@ export const realEstateTemplate: IndustryTemplate = {
     {
       id: "saved",
       name: "Saved",
-      icon: "❤️",
+      icon: "heart",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Saved Properties", subtitle: "3 properties", padding: 16 },
+          props: { title: "Saved Properties", subtitle: "3 properties", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -2801,15 +2816,15 @@ export const realEstateTemplate: IndustryTemplate = {
     {
       id: "contact",
       name: "Contact",
-      icon: "📞",
+      icon: "phone",
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 24, align: "center" },
+          props: { padding: SPACE.s24, align: "center" },
           children: [
             { id: uid(), type: "image", props: { src: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=200", width: 100, height: 100, borderRadius: 50 } },
-            { id: uid(), type: "spacer", props: { height: 16 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s16 } },
             { id: uid(), type: "heading", props: { text: "John Smith", level: 3 } },
             { id: uid(), type: "text", props: { text: "Senior Real Estate Agent", fontSize: 14, color: "#666" } },
             { id: uid(), type: "text", props: { text: "⭐ 4.9 • 150+ properties sold", fontSize: 14, color: "#666" } },
@@ -2818,19 +2833,19 @@ export const realEstateTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "container",
-          props: { padding: 16 },
+          props: { padding: SPACE.card },
           children: [
             { id: uid(), type: "button", props: { text: "📞 Call Now", variant: "primary", fullWidth: true } },
-            { id: uid(), type: "spacer", props: { height: 12 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s16 } },
             { id: uid(), type: "button", props: { text: "💬 WhatsApp", variant: "outline", fullWidth: true } },
-            { id: uid(), type: "spacer", props: { height: 12 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s16 } },
             { id: uid(), type: "button", props: { text: "✉️ Send Email", variant: "outline", fullWidth: true } },
           ]
         },
         {
           id: uid(),
           type: "section",
-          props: { title: "Schedule a Viewing", padding: 16 },
+          props: { title: "Schedule a Viewing", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -2862,13 +2877,13 @@ export const photographyTemplate: IndustryTemplate = {
   description: "Portfolio, booking, and client galleries",
   primaryColor: "#6366F1",
   secondaryColor: "#818CF8",
-  icon: "📷",
+  icon: "camera",
   features: ["bottomNav", "whatsappButton"],
   screens: [
     {
       id: "home",
       name: "Portfolio",
-      icon: "🖼️",
+      icon: "image",
       isHome: true,
       components: [
         {
@@ -2886,7 +2901,7 @@ export const photographyTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Featured Work", padding: 16 },
+          props: { title: "Featured Work", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -2906,17 +2921,17 @@ export const photographyTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Services", padding: 16 },
+          props: { title: "Services", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
               type: "grid",
-              props: { columns: 2, gap: 12 },
+              props: { columns: 2, gap: SPACE.gridGap },
               children: [
-                { id: uid(), type: "card", props: { title: "Weddings", icon: "💒", backgroundColor: "#EEF2FF" } },
-                { id: uid(), type: "card", props: { title: "Portraits", icon: "👤", backgroundColor: "#EEF2FF" } },
-                { id: uid(), type: "card", props: { title: "Events", icon: "🎉", backgroundColor: "#EEF2FF" } },
-                { id: uid(), type: "card", props: { title: "Products", icon: "📦", backgroundColor: "#EEF2FF" } },
+                { id: uid(), type: "card", props: { title: "Weddings", icon: "heart", backgroundColor: "#EEF2FF" } },
+                { id: uid(), type: "card", props: { title: "Portraits", icon: "user", backgroundColor: "#EEF2FF" } },
+                { id: uid(), type: "card", props: { title: "Events", icon: "sparkles", backgroundColor: "#EEF2FF" } },
+                { id: uid(), type: "card", props: { title: "Products", icon: "package", backgroundColor: "#EEF2FF" } },
               ]
             }
           ]
@@ -2926,17 +2941,17 @@ export const photographyTemplate: IndustryTemplate = {
     {
       id: "gallery",
       name: "Gallery",
-      icon: "🖼️",
+      icon: "image",
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 12 },
+          props: { padding: SPACE.card },
           children: [
             {
               id: uid(),
               type: "grid",
-              props: { columns: 4, gap: 8, scrollable: true },
+              props: { columns: 4, gap: SPACE.s8, scrollable: true },
               children: [
                 { id: uid(), type: "button", props: { text: "All", variant: "primary", size: "sm" } },
                 { id: uid(), type: "button", props: { text: "Weddings", variant: "outline", size: "sm" } },
@@ -2966,12 +2981,12 @@ export const photographyTemplate: IndustryTemplate = {
     {
       id: "packages",
       name: "Packages",
-      icon: "📦",
+      icon: "package",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Photography Packages", padding: 16 },
+          props: { title: "Photography Packages", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -2979,9 +2994,9 @@ export const photographyTemplate: IndustryTemplate = {
               props: {
                 variant: "service",
                 items: [
-                  { name: "Basic Package", duration: "2 hours", price: "$299", icon: "📷", description: "50 edited photos" },
-                  { name: "Standard Package", duration: "4 hours", price: "$499", icon: "⭐", description: "100 edited photos + album" },
-                  { name: "Premium Package", duration: "8 hours", price: "$899", icon: "💎", description: "200 photos + album + prints" },
+                  { name: "Basic Package", duration: "2 hours", price: "$299", icon: "camera", description: "50 edited photos" },
+                  { name: "Standard Package", duration: "4 hours", price: "$499", icon: "star", description: "100 edited photos + album" },
+                  { name: "Premium Package", duration: "8 hours", price: "$899", icon: "star", description: "200 photos + album + prints" },
                 ]
               }
             }
@@ -2992,12 +3007,12 @@ export const photographyTemplate: IndustryTemplate = {
     {
       id: "book",
       name: "Book Now",
-      icon: "📅",
+      icon: "calendar",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Book a Session", padding: 16 },
+          props: { title: "Book a Session", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -3022,15 +3037,15 @@ export const photographyTemplate: IndustryTemplate = {
     {
       id: "about",
       name: "About",
-      icon: "👤",
+      icon: "user",
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 24, align: "center" },
+          props: { padding: SPACE.s24, align: "center" },
           children: [
             { id: uid(), type: "image", props: { src: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300", width: 120, height: 120, borderRadius: 60 } },
-            { id: uid(), type: "spacer", props: { height: 16 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s16 } },
             { id: uid(), type: "heading", props: { text: "John Smith", level: 2 } },
             { id: uid(), type: "text", props: { text: "Professional Photographer", fontSize: 14, color: "#666" } },
           ]
@@ -3038,7 +3053,7 @@ export const photographyTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "About Me", padding: 16 },
+          props: { title: "About Me", padding: SPACE.sectionY },
           children: [
             { id: uid(), type: "text", props: { text: "With over 10 years of experience capturing life's most precious moments, I specialize in creating timeless photographs that tell your unique story.", fontSize: 14, color: "#666" } }
           ]
@@ -3067,13 +3082,13 @@ export const musicTemplate: IndustryTemplate = {
   description: "Music, tours, and merchandise",
   primaryColor: "#EC4899",
   secondaryColor: "#F472B6",
-  icon: "🎵",
+  icon: "music",
   features: ["bottomNav", "pushNotifications", "deepLinking"],
   screens: [
     {
       id: "home",
       name: "Home",
-      icon: "🏠",
+      icon: "home",
       isHome: true,
       components: [
         {
@@ -3091,7 +3106,7 @@ export const musicTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Latest Release", padding: 16 },
+          props: { title: "Latest Release", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -3108,7 +3123,7 @@ export const musicTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Upcoming Shows", padding: 16 },
+          props: { title: "Upcoming Shows", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -3129,12 +3144,12 @@ export const musicTemplate: IndustryTemplate = {
     {
       id: "music",
       name: "Music",
-      icon: "🎵",
+      icon: "music",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Discography", padding: 16 },
+          props: { title: "Discography", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -3155,12 +3170,12 @@ export const musicTemplate: IndustryTemplate = {
     {
       id: "tour",
       name: "Tour",
-      icon: "📅",
+      icon: "calendar",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "World Tour 2026", padding: 16 },
+          props: { title: "World Tour 2026", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -3182,7 +3197,7 @@ export const musicTemplate: IndustryTemplate = {
     {
       id: "merch",
       name: "Merch",
-      icon: "🛍️",
+      icon: "shop",
       components: [
         {
           id: uid(),
@@ -3202,22 +3217,22 @@ export const musicTemplate: IndustryTemplate = {
     {
       id: "about",
       name: "About",
-      icon: "ℹ️",
+      icon: "info",
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 24, align: "center" },
+          props: { padding: SPACE.s24, align: "center" },
           children: [
             { id: uid(), type: "image", props: { src: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400", width: 150, height: 150, borderRadius: 16 } },
-            { id: uid(), type: "spacer", props: { height: 16 } },
+            { id: uid(), type: "spacer", props: { height: SPACE.s16 } },
             { id: uid(), type: "heading", props: { text: "The Midnight Echo", level: 2 } },
           ]
         },
         {
           id: uid(),
           type: "section",
-          props: { title: "Bio", padding: 16 },
+          props: { title: "Bio", padding: SPACE.sectionY },
           children: [
             { id: uid(), type: "text", props: { text: "Formed in 2020, The Midnight Echo has been electrifying audiences worldwide with their unique blend of synth-pop and indie rock.", fontSize: 14, color: "#666" } }
           ]
@@ -3247,13 +3262,13 @@ export const businessTemplate: IndustryTemplate = {
   description: "Professional services and consulting",
   primaryColor: "#1E40AF",
   secondaryColor: "#3B82F6",
-  icon: "💼",
+  icon: "briefcase",
   features: ["whatsappButton", "deepLinking"],
   screens: [
     {
       id: "home",
       name: "Home",
-      icon: "🏠",
+      icon: "home",
       isHome: true,
       components: [
         {
@@ -3271,17 +3286,17 @@ export const businessTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Our Services", padding: 16 },
+          props: { title: "Our Services", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
               type: "grid",
-              props: { columns: 2, gap: 12 },
+              props: { columns: 2, gap: SPACE.gridGap },
               children: [
-                { id: uid(), type: "card", props: { title: "Consulting", subtitle: "Strategic planning", icon: "📊", backgroundColor: "#EFF6FF" } },
-                { id: uid(), type: "card", props: { title: "Marketing", subtitle: "Digital solutions", icon: "📣", backgroundColor: "#EFF6FF" } },
-                { id: uid(), type: "card", props: { title: "Development", subtitle: "Custom software", icon: "💻", backgroundColor: "#EFF6FF" } },
-                { id: uid(), type: "card", props: { title: "Support", subtitle: "24/7 assistance", icon: "🤝", backgroundColor: "#EFF6FF" } },
+                { id: uid(), type: "card", props: { title: "Consulting", subtitle: "Strategic planning", icon: "chart", backgroundColor: "#EFF6FF" } },
+                { id: uid(), type: "card", props: { title: "Marketing", subtitle: "Digital solutions", icon: "megaphone", backgroundColor: "#EFF6FF" } },
+                { id: uid(), type: "card", props: { title: "Development", subtitle: "Custom software", icon: "zap", backgroundColor: "#EFF6FF" } },
+                { id: uid(), type: "card", props: { title: "Support", subtitle: "24/7 assistance", icon: "handshake", backgroundColor: "#EFF6FF" } },
               ]
             }
           ]
@@ -3289,16 +3304,16 @@ export const businessTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Why Choose Us", padding: 16 },
+          props: { title: "Why Choose Us", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
               type: "stats",
               props: {
                 items: [
-                  { label: "Clients", value: "500+", icon: "👥" },
-                  { label: "Projects", value: "1.2K", icon: "📁" },
-                  { label: "Years", value: "15+", icon: "🏆" },
+                  { label: "Clients", value: "500+", icon: "users" },
+                  { label: "Projects", value: "1.2K", icon: "folder" },
+                  { label: "Years", value: "15+", icon: "trophy" },
                 ]
               }
             }
@@ -3307,7 +3322,7 @@ export const businessTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Client Testimonials", padding: 16, backgroundColor: "#F3F4F6" },
+          props: { title: "Client Testimonials", padding: SPACE.sectionY, backgroundColor: "#F3F4F6" },
           children: [
             {
               id: uid(),
@@ -3326,12 +3341,12 @@ export const businessTemplate: IndustryTemplate = {
     {
       id: "services",
       name: "Services",
-      icon: "📋",
+      icon: "list",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Our Services", padding: 16 },
+          props: { title: "Our Services", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -3339,10 +3354,10 @@ export const businessTemplate: IndustryTemplate = {
               props: {
                 variant: "service",
                 items: [
-                  { name: "Business Consulting", duration: "Custom", price: "Contact", icon: "📊", description: "Strategic planning and optimization" },
-                  { name: "Digital Marketing", duration: "Monthly", price: "From $1,500", icon: "📣", description: "SEO, PPC, Social Media" },
-                  { name: "Web Development", duration: "Project", price: "From $5,000", icon: "💻", description: "Custom web applications" },
-                  { name: "IT Support", duration: "Monthly", price: "From $500", icon: "🛠️", description: "24/7 technical assistance" },
+                  { name: "Business Consulting", duration: "Custom", price: "Contact", icon: "chart", description: "Strategic planning and optimization" },
+                  { name: "Digital Marketing", duration: "Monthly", price: "From $1,500", icon: "megaphone", description: "SEO, PPC, Social Media" },
+                  { name: "Web Development", duration: "Project", price: "From $5,000", icon: "zap", description: "Custom web applications" },
+                  { name: "IT Support", duration: "Monthly", price: "From $500", icon: "settings", description: "24/7 technical assistance" },
                 ]
               }
             }
@@ -3353,12 +3368,12 @@ export const businessTemplate: IndustryTemplate = {
     {
       id: "team",
       name: "Team",
-      icon: "👥",
+      icon: "users",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Our Team", padding: 16 },
+          props: { title: "Our Team", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -3378,12 +3393,12 @@ export const businessTemplate: IndustryTemplate = {
     {
       id: "contact",
       name: "Contact",
-      icon: "📞",
+      icon: "phone",
       components: [
         {
           id: uid(),
           type: "container",
-          props: { padding: 16 },
+          props: { padding: SPACE.card },
           children: [
             { id: uid(), type: "text", props: { text: "📍 123 Business Ave, Suite 100", fontSize: 14, color: "#666" } },
             { id: uid(), type: "text", props: { text: "📞 +1 (555) 123-4567", fontSize: 14, color: "#666" } },
@@ -3393,7 +3408,7 @@ export const businessTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Get In Touch", padding: 16 },
+          props: { title: "Get In Touch", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -3426,13 +3441,13 @@ export const newsTemplate: IndustryTemplate = {
   description: "Articles, categories, and notifications",
   primaryColor: "#DC2626",
   secondaryColor: "#EF4444",
-  icon: "📰",
+  icon: "newspaper",
   features: ["bottomNav", "pushNotifications", "offlineScreen", "deepLinking"],
   screens: [
     {
       id: "home",
       name: "Feed",
-      icon: "📰",
+      icon: "newspaper",
       isHome: true,
       components: [
         {
@@ -3448,7 +3463,7 @@ export const newsTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Top Stories", padding: 16 },
+          props: { title: "Top Stories", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -3467,12 +3482,12 @@ export const newsTemplate: IndustryTemplate = {
         {
           id: uid(),
           type: "section",
-          props: { title: "Categories", padding: 16 },
+          props: { title: "Categories", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
               type: "grid",
-              props: { columns: 4, gap: 8, scrollable: true },
+              props: { columns: 4, gap: SPACE.s8, scrollable: true },
               children: [
                 { id: uid(), type: "button", props: { text: "🌍 World", variant: "outline", size: "sm" } },
                 { id: uid(), type: "button", props: { text: "💼 Business", variant: "outline", size: "sm" } },
@@ -3487,12 +3502,12 @@ export const newsTemplate: IndustryTemplate = {
     {
       id: "categories",
       name: "Categories",
-      icon: "📁",
+      icon: "folder",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Browse by Category", padding: 16 },
+          props: { title: "Browse by Category", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -3500,13 +3515,13 @@ export const newsTemplate: IndustryTemplate = {
               props: {
                 variant: "menu",
                 items: [
-                  { icon: "🌍", label: "World News", badge: "125" },
-                  { icon: "💼", label: "Business & Finance", badge: "89" },
-                  { icon: "🔬", label: "Science & Technology", badge: "67" },
-                  { icon: "⚽", label: "Sports", badge: "54" },
-                  { icon: "🎬", label: "Entertainment", badge: "43" },
-                  { icon: "🏥", label: "Health", badge: "38" },
-                  { icon: "🌱", label: "Environment", badge: "29" },
+                  { icon: "globe", label: "World News", badge: "125" },
+                  { icon: "briefcase", label: "Business & Finance", badge: "89" },
+                  { icon: "flask", label: "Science & Technology", badge: "67" },
+                  { icon: "trophy", label: "Sports", badge: "54" },
+                  { icon: "film", label: "Entertainment", badge: "43" },
+                  { icon: "healthcare", label: "Health", badge: "38" },
+                  { icon: "leaf", label: "Environment", badge: "29" },
                 ]
               }
             }
@@ -3517,12 +3532,12 @@ export const newsTemplate: IndustryTemplate = {
     {
       id: "saved",
       name: "Saved",
-      icon: "🔖",
+      icon: "bookmark",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Saved Articles", subtitle: "5 articles", padding: 16 },
+          props: { title: "Saved Articles", subtitle: "5 articles", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -3542,12 +3557,12 @@ export const newsTemplate: IndustryTemplate = {
     {
       id: "settings",
       name: "Settings",
-      icon: "⚙️",
+      icon: "settings",
       components: [
         {
           id: uid(),
           type: "section",
-          props: { title: "Preferences", padding: 16 },
+          props: { title: "Preferences", padding: SPACE.sectionY },
           children: [
             {
               id: uid(),
@@ -3555,13 +3570,13 @@ export const newsTemplate: IndustryTemplate = {
               props: {
                 variant: "menu",
                 items: [
-                  { icon: "🔔", label: "Notifications", action: "navigate:notifications" },
-                  { icon: "📱", label: "Display", action: "navigate:display" },
-                  { icon: "📥", label: "Offline Reading", action: "navigate:offline" },
-                  { icon: "🌙", label: "Dark Mode", action: "toggle:darkmode" },
-                  { icon: "📧", label: "Newsletter", action: "navigate:newsletter" },
-                  { icon: "❓", label: "Help & Support", action: "navigate:help" },
-                  { icon: "📄", label: "Terms of Service", action: "navigate:terms" },
+                  { icon: "bell", label: "Notifications", action: "navigate:notifications" },
+                  { icon: "phone", label: "Display", action: "navigate:display" },
+                  { icon: "download", label: "Offline Reading", action: "navigate:offline" },
+                  { icon: "moon", label: "Dark Mode", action: "toggle:darkmode" },
+                  { icon: "mail", label: "Newsletter", action: "navigate:newsletter" },
+                  { icon: "help-circle", label: "Help & Support", action: "navigate:help" },
+                  { icon: "file-text", label: "Terms of Service", action: "navigate:terms" },
                 ]
               }
             }

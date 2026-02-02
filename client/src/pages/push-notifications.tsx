@@ -18,6 +18,7 @@ import { ArrowLeft, Bell, Send, Loader2, Users, CheckCircle, XCircle, Clock, Ima
 import { formatDistanceToNow, format } from "date-fns";
 import { NotificationGenerator } from "@/components/ai-features";
 import { motion } from "framer-motion";
+import { usePlanGate } from "@/lib/plan-gate";
 
 type PushNotification = {
   id: string;
@@ -46,6 +47,7 @@ export default function PushNotifications() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { requirePlan } = usePlanGate();
 
   const [formData, setFormData] = useState({
     title: "",
@@ -78,6 +80,9 @@ export default function PushNotifications() {
     queryKey: ["/api/apps", params.id, "push/tokens"],
     queryFn: async () => {
       const res = await fetch(`/api/apps/${params.id}/push/tokens`, { credentials: "include" });
+      if (res.status === 403 || res.status === 402) {
+        return { count: 0, tokens: [] };
+      }
       if (!res.ok) throw new Error("Failed to fetch tokens");
       return res.json();
     },
@@ -88,6 +93,9 @@ export default function PushNotifications() {
     queryKey: ["/api/apps", params.id, "push/history"],
     queryFn: async () => {
       const res = await fetch(`/api/apps/${params.id}/push/history`, { credentials: "include" });
+      if (res.status === 403 || res.status === 402) {
+        return [];
+      }
       if (!res.ok) throw new Error("Failed to fetch history");
       return res.json();
     },
@@ -135,6 +143,11 @@ export default function PushNotifications() {
       toast({ title: "Title and body are required", variant: "destructive" });
       return;
     }
+
+    if (!requirePlan("push_notifications", { requiredPlan: "standard", reason: "Push notifications require Standard or higher." })) {
+      return;
+    }
+
     sendNotification.mutate(formData);
   };
 

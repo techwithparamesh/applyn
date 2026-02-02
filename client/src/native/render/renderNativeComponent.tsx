@@ -5,18 +5,24 @@ import { ChipButton, PrimaryButton } from "@/native/components/ChipButton";
 import { HeroSection } from "@/native/components/HeroSection";
 import { ProductGrid } from "@/native/components/ProductGrid";
 import { Divider, Heading, Spacer, TextBlock } from "@/native/components/Primitives";
+import { NativeIcon } from "@/native/icons";
 
 const SPACE_PX_TO_VAR: Record<number, string> = {
   0: "0px",
-  8: "var(--space-2)",
-  12: "var(--space-3)",
-  16: "var(--space-4)",
-  20: "var(--space-5)",
-  24: "var(--space-6)",
+  4: "var(--space-4)",
+  8: "var(--space-8)",
+  16: "var(--space-16)",
+  24: "var(--space-24)",
+  32: "var(--space-32)",
+  48: "var(--space-48)",
 };
 
 function paddingClass(padding: unknown): string | null {
-  if (typeof padding === "string" && padding.includes("var(--space-")) {
+  if (padding === 0 || padding === "0" || padding === "0px") return "p-0";
+  if (
+    typeof padding === "string" &&
+    /^var\(--space-(4|8|16|24|32|48|section-y|hero-y|grid-gap|card)\)$/.test(padding)
+  ) {
     return `p-[${padding}]`;
   }
   if (typeof padding === "number" && padding in SPACE_PX_TO_VAR) {
@@ -26,7 +32,11 @@ function paddingClass(padding: unknown): string | null {
 }
 
 function gapStyleClass(gap: unknown): string | null {
-  if (typeof gap === "string" && gap.includes("var(--space-")) {
+  if (gap === 0 || gap === "0" || gap === "0px") return "gap-0";
+  if (
+    typeof gap === "string" &&
+    /^var\(--space-(4|8|16|24|32|48|section-y|hero-y|grid-gap|card)\)$/.test(gap)
+  ) {
     return `gap-[${gap}]`;
   }
   if (typeof gap === "number" && gap in SPACE_PX_TO_VAR) {
@@ -68,11 +78,11 @@ export function renderNativeComponent(
         <SafeImage
           src={component.props.src}
           alt={component.props?.alt || ""}
-          className="w-full rounded-lg"
-          placeholderClassName="w-full h-32 bg-gray-100 rounded-lg"
+          className="w-full rounded-[var(--app-radius-card)]"
+          placeholderClassName="w-full h-32 bg-white/5 rounded-[var(--app-radius-card)]"
         />
       ) : (
-        <div className="w-full h-32 bg-gray-100 rounded-lg" />
+        <div className="w-full h-32 bg-white/5 rounded-[var(--app-radius-card)]" />
       );
     case "button": {
       const text: string = component.props?.text || "Button";
@@ -127,40 +137,60 @@ export function renderNativeComponent(
       if (horizontal) {
         return (
           <div
-            className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-white"
+            className="app-card app-card-hover app-press flex items-center gap-[var(--space-16)] p-[var(--space-card)]"
             style={backgroundColor ? { backgroundColor } : undefined}
           >
             {image ? (
               <SafeImage
                 src={image}
                 alt={title || "Card"}
-                className="w-14 h-14 rounded-lg object-cover"
-                placeholderClassName="w-14 h-14 rounded-lg bg-gray-100"
+                className="w-14 aspect-square rounded-[var(--app-radius-card)] object-cover"
+                placeholderClassName="w-14 aspect-square rounded-[var(--app-radius-card)] bg-white/5"
               />
             ) : (
-              <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center text-xl">{icon || "📦"}</div>
+              <div className="w-14 aspect-square rounded-[var(--app-radius-card)] bg-white/5 flex items-center justify-center">
+                <NativeIcon name={icon || "package"} className="h-5 w-5 text-[color:var(--app-muted-text)]" />
+              </div>
             )}
             <div className="flex-1 min-w-0">
-              {title && <div className="text-sm font-semibold text-gray-900 truncate">{title}</div>}
-              {subtitle && <div className="text-[11px] text-gray-500 truncate">{subtitle}</div>}
+              {title && (
+                <div className="text-[length:var(--font-body)] font-semibold text-[color:var(--app-text)] truncate">{title}</div>
+              )}
+              {subtitle && (
+                <div className="text-[length:var(--font-small)] text-[color:var(--app-muted-text)] truncate mt-[var(--space-4)]">
+                  {subtitle}
+                </div>
+              )}
             </div>
-            <div className="text-gray-400">›</div>
+            <div className="text-[color:var(--app-muted-text)]">›</div>
           </div>
         );
       }
 
       return (
         <div
-          className={"rounded-xl border border-gray-200 bg-white " + (compact ? "p-3" : "p-4")}
+          className={"app-card app-card-hover " + (compact ? "p-[var(--space-16)]" : "p-[var(--space-card)]")}
           style={backgroundColor ? { backgroundColor } : undefined}
         >
-          <div className="flex items-start gap-3">
-            {icon && <div className="text-2xl leading-none">{icon}</div>}
+          <div className="flex items-start gap-[var(--space-16)]">
+            {icon && (
+              <div className="mt-[2px]">
+                <NativeIcon name={icon} className="h-5 w-5 text-[color:var(--app-muted-text)]" />
+              </div>
+            )}
             <div className="flex-1 min-w-0">
-              {title && <div className="text-sm font-semibold text-gray-900 truncate">{title}</div>}
-              {subtitle && <div className="text-[11px] text-gray-500 truncate">{subtitle}</div>}
+              {title && (
+                <div className="text-[length:var(--font-body)] font-semibold text-[color:var(--app-text)] truncate">{title}</div>
+              )}
+              {subtitle && (
+                <div className="text-[length:var(--font-small)] text-[color:var(--app-muted-text)] truncate mt-[var(--space-4)]">
+                  {subtitle}
+                </div>
+              )}
               {description && !compact && (
-                <div className="text-[11px] text-gray-600 mt-1 line-clamp-2">{description}</div>
+                <div className="text-[length:var(--font-small)] text-[color:var(--app-muted-text)] mt-[var(--space-8)] line-clamp-2">
+                  {description}
+                </div>
               )}
             </div>
           </div>
@@ -168,13 +198,13 @@ export function renderNativeComponent(
       );
     }
     case "container": {
-      const padding = component.props?.padding ?? 0;
+      const padding = component.props?.padding ?? "var(--space-card)";
       const backgroundColor = component.props?.backgroundColor;
-      const pClass = paddingClass(padding);
+      const pClass = paddingClass(padding) || "p-[var(--space-card)]";
       return (
         <div
           className={(pClass ? `${pClass} ` : "") + "rounded-[var(--app-radius-card)]"}
-          style={!pClass || backgroundColor ? { ...(pClass ? {} : { padding }), ...(backgroundColor ? { backgroundColor } : {}) } : undefined}
+          style={backgroundColor ? { backgroundColor } : undefined}
         >
           {component.children?.map((child) => (
             <NativeComponentRenderer key={child.id} component={child} ctx={ctx} />
@@ -184,9 +214,9 @@ export function renderNativeComponent(
     }
     case "grid": {
       const cols = component.props?.columns || 2;
-      const gap = component.props?.gap ?? 8;
+      const gap = component.props?.gap ?? "var(--space-grid-gap)";
       const colsClass = gridColsClass(cols);
-      const gapClass = gapStyleClass(gap);
+      const gapClass = gapStyleClass(gap) || "gap-[var(--space-grid-gap)]";
       return (
         <div
           className={
@@ -194,7 +224,7 @@ export function renderNativeComponent(
             (colsClass ? colsClass + " " : "") +
             (gapClass ? gapClass : "")
           }
-          style={!colsClass || !gapClass ? { ...(colsClass ? {} : { gridTemplateColumns: `repeat(${cols}, 1fr)` }), ...(gapClass ? {} : { gap }) } : undefined}
+          style={!colsClass ? { gridTemplateColumns: `repeat(${cols}, 1fr)` } : undefined}
         >
           {component.children?.map((child) => (
             <NativeComponentRenderer key={child.id} component={child} ctx={ctx} />
@@ -203,14 +233,20 @@ export function renderNativeComponent(
       );
     }
     case "section": {
-      const padding = component.props?.padding ?? 0;
-      const pClass = paddingClass(padding);
+      const padding = component.props?.padding;
+      const yClass =
+        typeof padding === "string" && /^var\(--space-(4|8|16|24|32|48|section-y|hero-y|grid-gap|card)\)$/.test(padding)
+          ? `py-[${padding}]`
+          : padding === 0
+            ? "py-0"
+            : "py-[var(--space-section-y)]";
       return (
-        <div
-          className={(pClass ? `${pClass} ` : "") + "rounded-[var(--app-radius-card)]"}
-          style={!pClass ? { padding } : undefined}
-        >
-          {component.props?.title && <div className="text-lg font-semibold mb-2 text-[color:var(--app-text)]">{component.props.title}</div>}
+        <div className={"px-[var(--space-24)] " + yClass}>
+          {component.props?.title && (
+            <div className="text-[length:var(--font-h2)] font-[var(--font-weight-h2)] mb-[var(--space-16)] text-[color:var(--app-text)]">
+              {component.props.title}
+            </div>
+          )}
           {component.children?.map((child) => (
             <NativeComponentRenderer key={child.id} component={child} ctx={ctx} />
           ))}
@@ -223,21 +259,23 @@ export function renderNativeComponent(
 
       if (variant === "menu") {
         return (
-          <div className="bg-white rounded-lg divide-y divide-gray-100 border border-gray-200">
+          <div className="app-card overflow-hidden divide-y divide-white/5">
             {items.map((item, idx) => (
               <button
                 key={idx}
                 type="button"
-                className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50"
+                className="w-full flex items-center gap-[var(--space-16)] px-[var(--space-24)] py-[var(--space-16)] text-left hover:bg-white/5 app-press"
                 onClick={() => {
                   const action = typeof item?.action === "string" ? item.action : "";
                   if (action) ctx.onAction(action, item);
                   else ctx.onAction("navigate:" + String(item?.label || item?.name || "").toLowerCase().replace(/\s+/g, ""), item);
                 }}
               >
-                <span className="text-lg">{item?.icon || "➡️"}</span>
-                <span className="text-sm flex-1 truncate">{item?.label || item?.name || item?.title}</span>
-                <span className="text-gray-400">›</span>
+                <NativeIcon name={item?.icon || "list"} className="h-4 w-4 text-[color:var(--app-muted-text)]" />
+                <span className="text-[length:var(--font-body)] flex-1 truncate text-[color:var(--app-text)]">
+                  {item?.label || item?.name || item?.title}
+                </span>
+                <NativeIcon name="chevron-right" className="h-4 w-4 text-[color:var(--app-muted-text)]" />
               </button>
             ))}
           </div>
@@ -246,24 +284,28 @@ export function renderNativeComponent(
 
       if (variant === "menu-item") {
         return (
-          <div className="space-y-3">
+          <div className="space-y-[var(--space-16)]">
             {items.map((item, idx) => (
-              <div key={idx} className="flex gap-3 p-3 bg-white rounded-lg border border-gray-200">
+              <div key={idx} className="app-card flex gap-[var(--space-16)] p-[var(--space-card)]">
                 <SafeImage
                   src={item?.image || item?.imageUrl || item?.src}
                   alt={item?.name || item?.title || "Item"}
-                  className="w-16 h-16 rounded-md object-cover"
-                  placeholderClassName="w-16 h-16 rounded-md bg-gray-100"
+                  className="w-16 aspect-square rounded-[var(--app-radius-card)] object-cover"
+                  placeholderClassName="w-16 aspect-square rounded-[var(--app-radius-card)] bg-white/5"
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="text-sm font-semibold truncate">{item?.name || item?.title || item?.label || "Untitled"}</div>
+                    <div className="text-[length:var(--font-body)] font-semibold truncate text-[color:var(--app-text)]">
+                      {item?.name || item?.title || item?.label || "Untitled"}
+                    </div>
                     <div className="text-sm font-semibold whitespace-nowrap" style={{ color: ctx.themeColor }}>
                       {item?.price || item?.amount || item?.total || ""}
                     </div>
                   </div>
                   {(item?.description || item?.desc) && (
-                    <div className="text-[11px] text-gray-500 mt-1 line-clamp-2">{item.description || item.desc}</div>
+                    <div className="text-[length:var(--font-small)] text-[color:var(--app-muted-text)] mt-[var(--space-8)] line-clamp-2">
+                      {item.description || item.desc}
+                    </div>
                   )}
                   <div className="flex items-center gap-2 mt-2">
                     {item?.badge && (
@@ -278,7 +320,7 @@ export function renderNativeComponent(
                         {item.badge}
                       </span>
                     )}
-                    <button className="ml-auto text-[11px] px-3 py-1 rounded-full text-white" style={{ backgroundColor: ctx.themeColor }}>
+                    <button className="ml-auto text-[11px] px-3 py-1 rounded-full text-white app-press" style={{ backgroundColor: ctx.themeColor }}>
                       Add
                     </button>
                   </div>
@@ -291,12 +333,12 @@ export function renderNativeComponent(
 
       if (variant === "cart" || variant === "orders") {
         return (
-          <div className="space-y-3">
+          <div className="space-y-[var(--space-16)]">
             {items.map((item, idx) => (
               <button
                 key={idx}
                 type="button"
-                className="w-full flex items-center gap-3 p-2 bg-white rounded-lg border border-gray-200 text-left hover:bg-gray-50"
+                className="app-card app-press w-full flex items-center gap-[var(--space-16)] p-[var(--space-16)] text-left hover:bg-white/5"
                 onClick={() => {
                   if (variant === "orders") {
                     const orderId = String(item?.id || item?.name || item?.label || "");
@@ -310,16 +352,20 @@ export function renderNativeComponent(
                 <SafeImage
                   src={item?.image || item?.imageUrl || item?.src}
                   alt={item?.name || item?.title || "Item"}
-                  className="w-14 h-14 rounded object-cover"
-                  placeholderClassName="w-14 h-14 rounded bg-gray-100"
+                  className="w-14 aspect-square rounded-[var(--app-radius-card)] object-cover"
+                  placeholderClassName="w-14 aspect-square rounded-[var(--app-radius-card)] bg-white/5"
                 />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{item?.name || item?.title || item?.label || "Item"}</div>
-                  <div className="text-[11px] text-gray-500">
+                  <div className="text-[length:var(--font-body)] font-semibold truncate text-[color:var(--app-text)]">
+                    {item?.name || item?.title || item?.label || "Item"}
+                  </div>
+                  <div className="text-[length:var(--font-small)] text-[color:var(--app-muted-text)] mt-[var(--space-4)]">
                     {item?.quantity || item?.qty ? `Qty: ${item.quantity || item.qty}` : item?.status || item?.variant || ""}
                   </div>
                 </div>
-                <div className="text-sm font-semibold whitespace-nowrap">{item?.price || item?.amount || item?.total || ""}</div>
+                <div className="text-[length:var(--font-body)] font-semibold whitespace-nowrap text-[color:var(--app-text)]">
+                  {item?.price || item?.amount || item?.total || ""}
+                </div>
               </button>
             ))}
           </div>
@@ -339,7 +385,7 @@ export function renderNativeComponent(
     case "input":
       return (
         <input
-          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+          className="w-full px-[var(--space-16)] py-[var(--space-16)] border border-[color:var(--app-border)] rounded-[var(--app-radius-card)] text-[length:var(--font-body)] bg-[color:var(--app-surface)] text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted-text)]"
           placeholder={component.props?.placeholder}
           type={component.props?.type || "text"}
         />
@@ -348,24 +394,32 @@ export function renderNativeComponent(
       const items: any[] = Array.isArray(component.props?.items) ? component.props.items : [];
       return (
         <div className="-mx-4 px-4">
-          <div className="flex gap-3 overflow-x-auto pb-2">
+          <div className="flex gap-[var(--space-16)] overflow-x-auto pb-[var(--space-16)]">
             {items.slice(0, 10).map((item, idx) => (
-              <div key={idx} className="flex-shrink-0 w-44 bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div key={idx} className="flex-shrink-0 w-44 app-card overflow-hidden">
                 {item?.image && (
                   <SafeImage
                     src={item.image}
                     alt={item?.title || ""}
                     className="w-full h-24 object-cover"
-                    placeholderClassName="w-full h-24 bg-gray-100"
+                    placeholderClassName="w-full h-24 bg-white/5"
                   />
                 )}
-                <div className="p-3">
-                  <div className="text-xs font-semibold text-gray-900 truncate">{item?.title || item?.name || "Item"}</div>
-                  {item?.subtitle && <div className="text-[11px] text-gray-500 mt-0.5 line-clamp-2">{item.subtitle}</div>}
+                <div className="p-[var(--space-16)]">
+                  <div className="text-[length:var(--font-small)] font-semibold text-[color:var(--app-text)] truncate">
+                    {item?.title || item?.name || "Item"}
+                  </div>
+                  {item?.subtitle && (
+                    <div className="text-[length:var(--font-small)] text-[color:var(--app-muted-text)] mt-[var(--space-4)] line-clamp-2">
+                      {item.subtitle}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
-            {items.length === 0 && <div className="text-xs text-gray-500">No items</div>}
+            {items.length === 0 && (
+              <div className="text-[length:var(--font-small)] text-[color:var(--app-muted-text)]">No items</div>
+            )}
           </div>
         </div>
       );
@@ -373,13 +427,18 @@ export function renderNativeComponent(
     case "testimonial": {
       const items: any[] = Array.isArray(component.props?.items) ? component.props.items : [];
       return (
-        <div className="space-y-3">
+        <div className="space-y-[var(--space-16)]">
           {items.slice(0, 4).map((t, idx) => (
-            <div key={idx} className="bg-white rounded-xl border border-gray-200 p-3">
-              <div className="text-[11px] text-gray-700 leading-relaxed">“{t?.quote || t?.text || "Great experience!"}”</div>
+            <div key={idx} className="app-card p-[var(--space-card)]">
+              <div className="text-[length:var(--font-body)] text-[color:var(--app-text)] leading-relaxed">“{t?.quote || t?.text || "Great experience!"}”</div>
               <div className="mt-2 flex items-center justify-between">
-                <div className="text-[11px] font-semibold text-gray-900 truncate">{t?.name || "Customer"}</div>
-                {t?.rating && <div className="text-[10px] text-amber-600">★ {t.rating}</div>}
+                <div className="text-[length:var(--font-small)] font-semibold text-[color:var(--app-text)] truncate">{t?.name || "Customer"}</div>
+                {t?.rating && (
+                  <div className="text-[length:var(--font-small)] text-[color:var(--app-muted-text)] flex items-center gap-[var(--space-4)]">
+                    <NativeIcon name="star" className="h-4 w-4" />
+                    {t.rating}
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -390,13 +449,15 @@ export function renderNativeComponent(
       const items: any[] = Array.isArray(component.props?.items) ? component.props.items : [];
       const columns = component.props?.columns || 2;
       return (
-        <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
+        <div className="grid gap-[var(--space-16)]" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
           {items.slice(0, 6).map((s, idx) => (
-            <div key={idx} className="bg-white rounded-xl border border-gray-200 p-3">
+            <div key={idx} className="app-card p-[var(--space-card)]">
               <div className="text-lg font-bold text-[color:var(--app-primary)]">
                 {s?.value ?? s?.number ?? "0"}
               </div>
-              <div className="text-[11px] text-gray-500 mt-0.5">{s?.label || s?.title || "Stat"}</div>
+              <div className="text-[length:var(--font-small)] text-[color:var(--app-muted-text)] mt-[var(--space-4)]">
+                {s?.label || s?.title || "Stat"}
+              </div>
             </div>
           ))}
         </div>
@@ -405,22 +466,26 @@ export function renderNativeComponent(
     case "team": {
       const members: any[] = Array.isArray(component.props?.members) ? component.props.members : [];
       return (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-[var(--space-16)]">
           {members.slice(0, 6).map((m, idx) => (
-            <div key={idx} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div key={idx} className="app-card overflow-hidden">
               {m?.image ? (
                 <SafeImage
                   src={m.image}
                   alt={m?.name || "Member"}
                   className="w-full h-20 object-cover"
-                  placeholderClassName="w-full h-20 bg-gray-100"
+                  placeholderClassName="w-full h-20 bg-white/5"
                 />
               ) : (
-                <div className="w-full h-20 bg-gray-100" />
+                <div className="w-full h-20 bg-white/5" />
               )}
-              <div className="p-2">
-                <div className="text-xs font-semibold text-gray-900 truncate">{m?.name || "Team"}</div>
-                {m?.role && <div className="text-[10px] text-gray-500 truncate">{m.role}</div>}
+              <div className="p-[var(--space-16)]">
+                <div className="text-[length:var(--font-small)] font-semibold text-[color:var(--app-text)] truncate">{m?.name || "Team"}</div>
+                {m?.role && (
+                  <div className="text-[length:var(--font-small)] text-[color:var(--app-muted-text)] truncate mt-[var(--space-4)]">
+                    {m.role}
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -430,14 +495,14 @@ export function renderNativeComponent(
     case "socialLinks": {
       const links: any[] = Array.isArray(component.props?.links) ? component.props.links : [];
       return (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-[var(--space-8)]">
           {links.slice(0, 8).map((l, idx) => (
             <button
               key={idx}
-              className="px-3 py-2 rounded-xl border border-gray-200 bg-white text-xs font-medium text-gray-800"
+              className="app-card app-press px-[var(--space-16)] py-[var(--space-16)] text-[length:var(--font-small)] font-semibold text-[color:var(--app-text)] inline-flex items-center gap-[var(--space-8)]"
               style={l?.color ? { borderColor: `${l.color}40` } : undefined}
             >
-              <span className="mr-1">{l?.icon || "🔗"}</span>
+              <NativeIcon name={l?.icon || "link"} className="h-4 w-4 text-[color:var(--app-muted-text)]" />
               {l?.label || l?.name || "Link"}
             </button>
           ))}
@@ -448,14 +513,18 @@ export function renderNativeComponent(
       const fields: any[] = Array.isArray(component.props?.fields) ? component.props.fields : [];
       const buttonText = component.props?.buttonText || "Send";
       return (
-        <div className="bg-white rounded-xl border border-gray-200 p-3 space-y-2">
+        <div className="app-card p-[var(--space-card)] space-y-[var(--space-16)]">
           {fields.slice(0, 6).map((f, idx) => (
-            <input
-              key={idx}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-              placeholder={f?.placeholder || f?.label || "Field"}
-              type={f?.type || "text"}
-            />
+            <label key={idx} className="block">
+              <div className="text-[length:var(--font-small)] font-semibold text-[color:var(--app-muted-text)] mb-[var(--space-8)]">
+                {f?.label || "Field"}
+              </div>
+              <input
+                className="w-full px-[var(--space-16)] py-[var(--space-16)] border border-[color:var(--app-border)] rounded-[var(--app-radius-card)] text-[length:var(--font-body)] bg-[color:var(--app-surface)] text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted-text)]"
+                placeholder={f?.placeholder || ""}
+                type={f?.type || "text"}
+              />
+            </label>
           ))}
           <PrimaryButton text={buttonText} themeColor={ctx.themeColor} action={component.props?.buttonAction} onAction={ctx.onAction} />
         </div>
@@ -467,7 +536,7 @@ export function renderNativeComponent(
       const longitude = component.props?.longitude;
       return (
         <div
-          className="w-full rounded-xl border border-gray-200 bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-xs text-gray-500"
+          className="w-full rounded-[var(--app-radius-card)] border border-[color:var(--app-border)] bg-gradient-to-br from-white/5 to-white/0 flex items-center justify-center text-[length:var(--font-small)] text-[color:var(--app-muted-text)]"
           style={{ height: Number.isFinite(height) ? height : 150 }}
         >
           Map preview {latitude != null && longitude != null ? `(${latitude}, ${longitude})` : ""}
@@ -484,7 +553,6 @@ export function renderNativeComponent(
           themeColor={ctx.themeColor}
           backgroundImage={component.props?.backgroundImage}
           overlayColor={component.props?.overlayColor}
-          height={component.props?.height}
           onAction={ctx.onAction}
         />
       );
@@ -518,5 +586,5 @@ export function NativeComponentRenderer({
 }) {
   const rendered = renderNativeComponent(component, ctx);
   if (!rendered) return null;
-  return <div className="space-y-2">{rendered}</div>;
+  return <div className="app-fade-in">{rendered}</div>;
 }

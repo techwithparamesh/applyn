@@ -49,7 +49,7 @@ export default function EditApp() {
   const [formData, setFormData] = useState({
     name: "",
     url: "",
-    icon: "🚀",
+    icon: "rocket",
     customLogo: null as string | null,
     iconColor: "#2563EB",
     primaryColor: "#2563EB",
@@ -103,7 +103,7 @@ export default function EditApp() {
     const apiData = {
       name: formData.name,
       url: formData.url,
-      icon: formData.icon || "🚀",
+      icon: formData.icon || "rocket",
       iconUrl: formData.customLogo,
       iconColor: formData.iconColor,
       primaryColor: formData.primaryColor,

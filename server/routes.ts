@@ -7,6 +7,13 @@ import rateLimit from "express-rate-limit";
 import sharp from "sharp";
 import PDFDocument from "pdfkit";
 import { z } from "zod";
+import { getEventNamingMode, normalizeEventName } from "./events/naming";
+import { authEvents } from "./events/domains/auth";
+import { fitnessEvents } from "./events/domains/fitness";
+import { coursesEvents } from "./events/domains/courses";
+import { crmEvents } from "./events/domains/crm";
+import { servicesEvents } from "./events/domains/services";
+import { paymentsEvents } from "./events/domains/payments";
 import { google } from "googleapis";
 import {
   insertAppSchema,
@@ -28,9 +35,40 @@ import { storage } from "./storage";
 import { hashPassword, sanitizeUser, verifyPassword } from "./auth";
 import { sendPasswordResetEmail, isEmailConfigured, sendTeamMemberWelcomeEmail, sendEmailVerificationEmail, sendBuildCompleteEmail, sendAccountLockedEmail } from "./email";
 import crypto from "crypto";
-import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lt, ne, sql } from "drizzle-orm";
 import { getMysqlDb, getMysqlPool } from "./db-mysql";
 import { MemoryCache } from "./lib/memory-cache";
+import { ecommerceService } from "./verticals/ecommerce/service";
+import { ecommerceEvents } from "./verticals/ecommerce/events";
+import { restaurantService } from "./verticals/restaurant/service";
+import { realEstateService } from "./verticals/realestate/service";
+import { healthcareService } from "./verticals/healthcare/service";
+import { createReservationSchema } from "./verticals/restaurant/validators";
+import {
+  createMenuCategorySchema,
+  createMenuItemSchema,
+  createRestaurantTableSchema,
+  updateKitchenStatusSchema,
+} from "./verticals/restaurant/validators";
+import { createInquirySchema } from "./verticals/realestate/validators";
+import {
+  assignInquirySchema,
+  createListingSchema,
+  scheduleTourSchema,
+  updateInquiryStatusSchema,
+} from "./verticals/realestate/validators";
+import { createAppointmentSchema } from "./verticals/healthcare/validators";
+import {
+  createAppointmentTypeSchema,
+  createAvailabilitySchema,
+  createInvoicePaymentSchema,
+  transitionAppointmentSchema,
+} from "./verticals/healthcare/validators";
+import {
+  createOrderSchema as ecommerceCreateOrderSchema,
+  createRefundSchema,
+  updateOrderStatusSchema,
+} from "./verticals/ecommerce/validators";
 import {
   apps,
   appCustomers,
@@ -53,6 +91,8 @@ import {
   appSavedItems,
   appDoctors,
   appDoctorAppointments,
+  buildJobs,
+  payments as paymentsTable,
   appRadioStations,
   appPodcastEpisodes,
   appMusicAlbums,
@@ -85,6 +125,9 @@ import type { PlayCredentials, PlayTrack } from "./publishing/playPublisher";
 import { createPlayService } from "./services/play/playService";
 import { validateForPublish } from "./publishing/publishValidator";
 import { scanPolicy } from "./publishing/policyScanner";
+import { assertCanQueueBuild } from "./entitlements";
+import { normalizeAndValidatePermissions, requirePermission } from "./permissions";
+import { logger } from "./logger";
 
 function isGoogleConfigured() {
   return !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
@@ -108,7 +151,10 @@ function getAuthedUser(req: any): User | null {
 type Role = "admin" | "support" | "user";
 function roleOf(user: User | null): Role {
   const raw = (user as any)?.role;
-  return raw === "admin" || raw === "support" ? raw : "user";
+  // Backward/forward compatibility: support and staff are treated as the same staff role.
+  if (raw === "admin") return "admin";
+  if (raw === "support" || raw === "staff") return "support";
+  return "user";
 }
 
 function isStaff(user: User | null) {
@@ -204,32 +250,69 @@ function verifyRuntimeToken(appId: string, token: string): any | null {
   }
 }
 
-async function emitAppEvent(appId: string, customerId: string | null, name: string, properties?: any) {
+function toObjectOrWrap(value: any): Record<string, any> {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value as Record<string, any>;
+  return { value };
+}
+
+async function recordAppEvent(appId: string, customerId: string | null, name: string, properties?: any, createdAt?: Date) {
   try {
     if (!process.env.DATABASE_URL?.startsWith("mysql://")) return;
     const db = getMysqlDb();
     const eventId = crypto.randomUUID();
-    const createdAt = new Date();
+    const ts = createdAt ?? new Date();
     await db.insert(appEvents).values({
       id: eventId,
       appId,
       customerId: customerId ?? null,
       name,
       properties: properties ? JSON.stringify(properties) : null,
-      createdAt,
+      createdAt: ts,
     } as any);
+
+    return { eventId, createdAt: ts };
+  } catch {
+    // Best-effort analytics; never block core flows.
+    return null;
+  }
+}
+
+async function emitAppEvent(appId: string, customerId: string | null, name: string, properties?: any) {
+  try {
+    const mode = getEventNamingMode();
+    const normalized = normalizeEventName(String(name || ""));
+    const canonicalName = mode === "dual" && normalized.isMapped ? normalized.legacyName : String(name || "");
+
+    const recorded = await recordAppEvent(appId, customerId, canonicalName, properties);
+    if (!recorded) return;
 
     // Best-effort webhook fanout (async; never block core flows)
     setImmediate(() => {
       void deliverAppWebhooks(appId, {
-        id: eventId,
+        id: recorded.eventId,
         appId,
         customerId: customerId ?? null,
-        name,
+        name: canonicalName,
         properties: properties ?? null,
-        createdAt: createdAt.toISOString(),
+        createdAt: recorded.createdAt.toISOString(),
       });
     });
+
+    // Dual mode: record alias (internal only) without webhook delivery.
+    // Canonical logicalName remains the legacy name.
+    if (mode === "dual" && normalized.isMapped) {
+      const prefixedName = normalized.prefixedName;
+      if (prefixedName && prefixedName !== canonicalName) {
+        const aliasProps = {
+          ...toObjectOrWrap(properties ?? null),
+          __isAlias: true,
+          __aliasOf: recorded.eventId,
+          __logicalName: normalized.logicalName,
+        };
+        await recordAppEvent(appId, customerId, prefixedName, aliasProps, recorded.createdAt);
+      }
+    }
+
   } catch {
     // Best-effort analytics; never block core flows.
   }
@@ -247,7 +330,15 @@ function safeJsonParse<T>(raw: unknown): T | null {
 function webhookWantsEvent(hook: any, eventName: string) {
   const events = safeJsonParse<string[]>(hook?.events);
   if (!Array.isArray(events) || events.length === 0) return true;
-  return events.includes(eventName);
+
+  const normalized = normalizeEventName(eventName);
+  if (!normalized.isMapped) return events.includes(eventName);
+
+  // In dual mode, allow matching by either legacy or prefixed.
+  // We still deliver only one webhook per logical event (handled in deliverAppWebhooks).
+  if (events.includes(normalized.legacyName)) return true;
+  if (normalized.prefixedName && events.includes(normalized.prefixedName)) return true;
+  return false;
 }
 
 async function deliverAppWebhooks(appId: string, payload: any, onlyWebhookId?: string) {
@@ -260,6 +351,9 @@ async function deliverAppWebhooks(appId: string, payload: any, onlyWebhookId?: s
       .from(appWebhooks)
       .where(and(eq(appWebhooks.appId, appId), eq(appWebhooks.enabled, 1)));
 
+    const normalized = normalizeEventName(String(payload?.name || ""));
+    const mode = getEventNamingMode();
+
     const targets = (hooks as any[])
       .filter((h) => (!onlyWebhookId ? true : String(h.id) === String(onlyWebhookId)))
       .filter((h) => isHttpishUrl(String(h.url || "")))
@@ -267,16 +361,48 @@ async function deliverAppWebhooks(appId: string, payload: any, onlyWebhookId?: s
 
     if (!targets.length) return;
 
-    const body = JSON.stringify(payload);
     await Promise.allSettled(
       targets.map(async (h) => {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 8000);
         try {
+          const configured = safeJsonParse<string[]>(h?.events);
+          const subscribed = Array.isArray(configured) ? configured.filter((x) => typeof x === "string") : [];
+          const wantsAll = subscribed.length === 0;
+
+          // Decide delivery name per webhook:
+          // - Dual mode: default legacy unless webhook explicitly subscribes to prefixed.
+          // - Prefixed mode: deliver prefixed when mapping exists, otherwise original.
+          // - Legacy mode: deliver legacy/original.
+          let outName = String(payload?.name || "");
+          if (normalized.isMapped) {
+            const prefixed = normalized.prefixedName;
+            const legacy = normalized.legacyName;
+
+            const explicitlyPrefixed = !!(prefixed && subscribed.includes(prefixed));
+            const explicitlyLegacy = subscribed.includes(legacy);
+
+            // If a webhook has an explicit event list, require a match to either form.
+            if (!wantsAll && !explicitlyPrefixed && !explicitlyLegacy) {
+              return;
+            }
+
+            if (mode === "prefixed") {
+              outName = prefixed || outName;
+            } else if (mode === "dual") {
+              outName = explicitlyPrefixed ? (prefixed || legacy) : legacy;
+            } else {
+              outName = legacy;
+            }
+          }
+
+          const outPayload = { ...payload, name: outName };
+          const body = JSON.stringify(outPayload);
+
           const headers: Record<string, string> = {
             "content-type": "application/json",
             "x-app-id": String(appId),
-            "x-app-event": String(payload?.name || ""),
+            "x-app-event": String(outName || ""),
             "x-app-delivery-id": String(payload?.id || ""),
           };
 
@@ -469,11 +595,45 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express,
 ): Promise<Server> {
+  const rateLimitJsonHandler = (req: any, res: any) => {
+    res.status(429).json({ message: "Too many requests", requestId: req.requestId });
+  };
+
   const authLimiter = rateLimit({
-    windowMs: 60 * 1000,
+    windowMs: 15 * 60 * 1000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: rateLimitJsonHandler,
+  });
+
+  // Payments & webhooks
+  const paymentsVerifyLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 50,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req: any) => getAuthedUser(req)?.id || req.ip || "unknown",
+    handler: rateLimitJsonHandler,
+  });
+
+  const razorpayWebhookLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 50,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req: any) => req.ip || "unknown",
+    handler: rateLimitJsonHandler,
+  });
+
+  // Build abuse control (per user)
+  const buildLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
     limit: 10,
     standardHeaders: true,
     legacyHeaders: false,
+    keyGenerator: (req: any) => getAuthedUser(req)?.id || req.ip || "unknown",
+    handler: rateLimitJsonHandler,
   });
 
   const unsplashLimiter = rateLimit({
@@ -504,7 +664,27 @@ export async function registerRoutes(
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req: any) => getAuthedUser(req)?.id || req.ip || "unknown",
+    handler: rateLimitJsonHandler,
   });
+
+  // Lightweight per-customer fixed-window abuse limiter for runtime create flows.
+  // Keyed by appId:customerId to avoid IP-only bypass.
+  const runtimeCreateWindows = new Map<string, { count: number; resetAtMs: number }>();
+  function enforceRuntimeCreateLimit(key: string, opts: { windowMs: number; limit: number }) {
+    const now = Date.now();
+    const existing = runtimeCreateWindows.get(key);
+    if (!existing || now >= existing.resetAtMs) {
+      const next = { count: 1, resetAtMs: now + opts.windowMs };
+      runtimeCreateWindows.set(key, next);
+      return { ok: true as const, remaining: Math.max(0, opts.limit - 1) };
+    }
+    if (existing.count >= opts.limit) {
+      const retryAfterSec = Math.max(1, Math.ceil((existing.resetAtMs - now) / 1000));
+      return { ok: false as const, retryAfterSec };
+    }
+    existing.count += 1;
+    return { ok: true as const, remaining: Math.max(0, opts.limit - existing.count) };
+  }
 
   // Small in-memory cache for same-origin image proxies.
   // This avoids repeated upstream downloads while keeping client responses cacheable.
@@ -548,16 +728,21 @@ export async function registerRoutes(
       .object({
         query: z.string().min(1).max(80),
         w: z.coerce.number().int().min(200).max(2000).optional(),
+        orientation: z.enum(["landscape", "portrait", "squarish"]).optional(),
+        variant: z.enum(["hero", "card", "generic"]).optional(),
       })
       .safeParse(req.query);
 
     if (!parsed.success) return res.status(400).json({ message: "Invalid query" });
     const q = parsed.data.query.trim();
     const w = parsed.data.w ?? 1200;
+    const orientation =
+      parsed.data.orientation ??
+      (parsed.data.variant === "hero" ? "landscape" : parsed.data.variant === "card" ? "squarish" : "portrait");
 
     try {
       const upstream = await fetch(
-        `https://api.unsplash.com/search/photos?query=${encodeURIComponent(q)}&per_page=1&orientation=portrait`,
+        `https://api.unsplash.com/search/photos?query=${encodeURIComponent(q)}&per_page=1&orientation=${encodeURIComponent(orientation)}`,
         {
           headers: {
             Authorization: `Client-ID ${key}`,
@@ -804,6 +989,42 @@ export async function registerRoutes(
     const user = getAuthedUser(req);
     if (!user) return res.status(401).json({ message: "Unauthorized" });
     return res.json(sanitizeUser(user));
+  });
+
+  // --- Product analytics (conversion funnel; best-effort) ---
+  app.post("/api/analytics/track", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const schema = z
+        .object({
+          name: z.string().min(1).max(64),
+          properties: z.record(z.any()).optional(),
+        })
+        .strict();
+
+      const { name, properties } = schema.parse(req.body);
+
+      await storage.createAuditLog({
+        userId: user.id,
+        action: name,
+        targetType: "analytics",
+        targetId: null,
+        metadata: properties ?? null,
+        ipAddress: req.ip || null,
+        userAgent: req.get("User-Agent") || null,
+      });
+
+      return res.status(201).json({ ok: true });
+    } catch (err) {
+      // Best-effort: never block user flows on analytics.
+      try {
+        return res.status(201).json({ ok: true });
+      } catch {
+        return next(err);
+      }
+    }
   });
 
   // --- Subscription Status Endpoint ---
@@ -1756,7 +1977,8 @@ export async function registerRoutes(
         updatedAt: now,
       } as any);
 
-      await emitAppEvent(appId, id, "customer.signup", { email: email.toLowerCase() });
+      const ev = authEvents(emitAppEvent);
+      await ev.customerSignup(appId, id, { email: email.toLowerCase() });
 
       const token = signRuntimeToken(appId, { sub: id, role: "customer" });
       return res.status(201).json({
@@ -1799,7 +2021,8 @@ export async function registerRoutes(
       const ok = await verifyPassword(password, row.password);
       if (!ok) return res.status(401).json({ message: "Invalid credentials" });
 
-      await emitAppEvent(appId, row.id, "customer.login", { email: row.email });
+      const ev = authEvents(emitAppEvent);
+      await ev.customerLogin(appId, String(row.id), { email: row.email });
       const token = signRuntimeToken(appId, { sub: row.id, role: row.role || "customer" });
       return res.json({
         token,
@@ -2096,36 +2319,37 @@ export async function registerRoutes(
       const payload = token ? verifyRuntimeToken(appId, token) : null;
       if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
 
-      const schema = z
-        .object({
-          reservedAt: z.string().min(1),
-          partySize: z.number().int().min(1).max(50).optional().default(2),
-          notes: z.string().max(2000).optional(),
-        })
-        .strict();
-      const { reservedAt, partySize, notes } = schema.parse(req.body);
+      const limit = enforceRuntimeCreateLimit(`${appId}:${String(payload.sub)}:reservations`, { windowMs: 60 * 1000, limit: 5 });
+      if (!limit.ok) {
+        res.setHeader("Retry-After", String(limit.retryAfterSec));
+        return res.status(429).json({ message: "Too many requests", requestId: (req as any).requestId });
+      }
 
-      const dt = new Date(reservedAt);
-      if (Number.isNaN(dt.getTime())) return res.status(400).json({ message: "Invalid reservedAt" });
-      if (dt.getTime() < Date.now() - 5 * 60 * 1000) return res.status(400).json({ message: "Reservation must be in the future" });
+      const body = createReservationSchema.parse(req.body);
+      const audit = async (log: { userId: string | null; action: string; targetType?: string | null; targetId?: string | null; metadata?: any }) => {
+        await storage.createAuditLog({
+          userId: log.userId ?? null,
+          action: log.action,
+          targetType: log.targetType ?? null,
+          targetId: log.targetId ?? null,
+          metadata: log.metadata ?? null,
+          ipAddress: (req.ip || null) as any,
+          userAgent: String(req.headers["user-agent"] || "") || null,
+        } as any);
+      };
 
-      const db = getMysqlDb();
-      const id = crypto.randomUUID();
-      const now = new Date();
-      await db.insert(appRestaurantReservations).values({
-        id,
+      const svc = restaurantService({ emit: emitAppEvent, audit });
+      const out = await svc.createReservation({
         appId,
         customerId: String(payload.sub),
-        partySize,
-        reservedAt: dt,
-        notes: notes ?? null,
-        status: "requested",
-        createdAt: now,
-        updatedAt: now,
-      } as any);
+        partySize: body.partySize,
+        reservedAtIso: body.reservedAt,
+        durationMinutes: body.durationMinutes,
+        tableId: body.tableId,
+        notes: body.notes,
+      });
 
-      await emitAppEvent(appId, String(payload.sub), "reservation.created", { reservationId: id, reservedAt: dt.toISOString(), partySize });
-      return res.status(201).json({ id, status: "requested" });
+      return res.status(201).json({ id: out.id, status: out.status });
     } catch (err) {
       return next(err);
     }
@@ -2146,22 +2370,9 @@ export async function registerRoutes(
       const payload = token ? verifyRuntimeToken(appId, token) : null;
       if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
 
-      const db = getMysqlDb();
-      const rows = await db
-        .select()
-        .from(appRestaurantReservations)
-        .where(and(eq(appRestaurantReservations.appId, appId), eq(appRestaurantReservations.customerId, String(payload.sub))))
-        .orderBy(desc(appRestaurantReservations.reservedAt));
-
-      return res.json(
-        rows.map((r: any) => ({
-          id: r.id,
-          status: r.status,
-          partySize: Number(r.partySize || 2),
-          reservedAt: r.reservedAt instanceof Date ? r.reservedAt.toISOString() : String(r.reservedAt),
-          notes: r.notes ?? "",
-        })),
-      );
+      const svc = restaurantService({ emit: emitAppEvent });
+      const rows = await svc.listReservationsForCustomer({ appId, customerId: String(payload.sub) });
+      return res.json(rows);
     } catch (err) {
       return next(err);
     }
@@ -2244,7 +2455,8 @@ export async function registerRoutes(
         createdAt: new Date(),
       } as any);
 
-      await emitAppEvent(appId, String(payload.sub), "class.booked", { bookingId: id, classId });
+      const ev = fitnessEvents(emitAppEvent);
+      await ev.classBooked(appId, String(payload.sub), { bookingId: id, classId });
       return res.status(201).json({ id, status: "booked" });
     } catch (err) {
       return next(err);
@@ -2392,7 +2604,8 @@ export async function registerRoutes(
         createdAt: new Date(),
       } as any);
 
-      await emitAppEvent(appId, String(payload.sub), "course.enrolled", { enrollmentId: id, courseId });
+      const ev = coursesEvents(emitAppEvent);
+      await ev.courseEnrolled(appId, String(payload.sub), { enrollmentId: id, courseId });
       return res.status(201).json({ id, status: "enrolled" });
     } catch (err) {
       return next(err);
@@ -2452,24 +2665,9 @@ export async function registerRoutes(
         return res.status(503).json({ message: "Listings require MySQL storage" });
       }
 
-      const db = getMysqlDb();
-      const rows = await db
-        .select()
-        .from(appRealEstateListings)
-        .where(and(eq(appRealEstateListings.appId, appId), eq(appRealEstateListings.active, 1)))
-        .orderBy(desc(appRealEstateListings.updatedAt));
-
-      return res.json(
-        rows.map((l: any) => ({
-          id: l.id,
-          title: l.title,
-          description: l.description ?? "",
-          address: l.address ?? "",
-          currency: l.currency ?? "INR",
-          priceCents: Number(l.priceCents || 0),
-          imageUrl: l.imageUrl ?? null,
-        })),
-      );
+      const svc = realEstateService({ emit: emitAppEvent });
+      const rows = await svc.listActiveListings({ appId });
+      return res.json(rows);
     } catch (err) {
       return next(err);
     }
@@ -2486,37 +2684,37 @@ export async function registerRoutes(
         return res.status(503).json({ message: "Inquiries require MySQL storage" });
       }
 
-      const schema = z
-        .object({
-          name: z.string().max(200).optional(),
-          email: z.string().email().max(320).optional(),
-          phone: z.string().max(40).optional(),
-          message: z.string().max(5000).optional(),
-        })
-        .strict();
-      const body = schema.parse(req.body ?? {});
+      const body = createInquirySchema.parse(req.body ?? {});
 
       // customer token optional
       const auth = String(req.headers.authorization || "");
       const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
       const payload = token ? verifyRuntimeToken(appId, token) : null;
 
-      const db = getMysqlDb();
-      const id = crypto.randomUUID();
-      await db.insert(appRealEstateInquiries).values({
-        id,
+      const audit = async (log: { userId: string | null; action: string; targetType?: string | null; targetId?: string | null; metadata?: any }) => {
+        await storage.createAuditLog({
+          userId: log.userId ?? null,
+          action: log.action,
+          targetType: log.targetType ?? null,
+          targetId: log.targetId ?? null,
+          metadata: log.metadata ?? null,
+          ipAddress: (req.ip || null) as any,
+          userAgent: String(req.headers["user-agent"] || "") || null,
+        } as any);
+      };
+
+      const svc = realEstateService({ emit: emitAppEvent, audit });
+      const out = await svc.createInquiry({
         appId,
         listingId,
         customerId: payload?.sub ? String(payload.sub) : null,
-        name: body.name ?? null,
-        email: body.email ?? null,
-        phone: body.phone ?? null,
-        message: body.message ?? null,
-        createdAt: new Date(),
-      } as any);
+        name: body.name,
+        email: body.email,
+        phone: body.phone,
+        message: body.message,
+      });
 
-      await emitAppEvent(appId, payload?.sub ? String(payload.sub) : null, "listing.inquiry.created", { inquiryId: id, listingId });
-      return res.status(201).json({ id });
+      return res.status(201).json({ id: out.id });
     } catch (err) {
       return next(err);
     }
@@ -2624,22 +2822,9 @@ export async function registerRoutes(
         return res.status(503).json({ message: "Doctors require MySQL storage" });
       }
 
-      const db = getMysqlDb();
-      const rows = await db
-        .select()
-        .from(appDoctors)
-        .where(and(eq(appDoctors.appId, appId), eq(appDoctors.active, 1)))
-        .orderBy(desc(appDoctors.updatedAt));
-
-      return res.json(
-        rows.map((d: any) => ({
-          id: d.id,
-          name: d.name,
-          specialty: d.specialty ?? "",
-          bio: d.bio ?? "",
-          imageUrl: d.imageUrl ?? null,
-        })),
-      );
+      const svc = healthcareService({ emit: emitAppEvent });
+      const rows = await svc.listDoctors({ appId });
+      return res.json(rows);
     } catch (err) {
       return next(err);
     }
@@ -2660,46 +2845,33 @@ export async function registerRoutes(
       const payload = token ? verifyRuntimeToken(appId, token) : null;
       if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
 
-      const schema = z
-        .object({
-          doctorId: z.string().min(1),
-          startAt: z.string().min(1),
-          notes: z.string().max(2000).optional(),
-        })
-        .strict();
-      const { doctorId, startAt, notes } = schema.parse(req.body);
+      const body = createAppointmentSchema.parse(req.body);
+      const audit = async (log: { userId: string | null; action: string; targetType?: string | null; targetId?: string | null; metadata?: any }) => {
+        await storage.createAuditLog({
+          userId: log.userId ?? null,
+          action: log.action,
+          targetType: log.targetType ?? null,
+          targetId: log.targetId ?? null,
+          metadata: log.metadata ?? null,
+          ipAddress: (req.ip || null) as any,
+          userAgent: String(req.headers["user-agent"] || "") || null,
+        } as any);
+      };
 
-      const start = new Date(startAt);
-      if (Number.isNaN(start.getTime())) return res.status(400).json({ message: "Invalid startAt" });
-      if (start.getTime() < Date.now() - 5 * 60 * 1000) return res.status(400).json({ message: "Start time must be in the future" });
-      const end = new Date(start.getTime() + 30 * 60 * 1000);
-
-      const db = getMysqlDb();
-      const docRows = await db
-        .select()
-        .from(appDoctors)
-        .where(and(eq(appDoctors.appId, appId), eq(appDoctors.id, doctorId)))
-        .limit(1);
-      const doc: any = docRows[0];
-      if (!doc || !(doc.active === 1 || doc.active === true)) return res.status(400).json({ message: "Invalid doctor" });
-
-      const id = crypto.randomUUID();
-      const now = new Date();
-      await db.insert(appDoctorAppointments).values({
-        id,
+      const svc = healthcareService({ emit: emitAppEvent, audit });
+      const out = await svc.requestAppointment({
         appId,
         customerId: String(payload.sub),
-        doctorId,
-        status: "requested",
-        startAt: start,
-        endAt: end,
-        notes: notes ?? null,
-        createdAt: now,
-        updatedAt: now,
-      } as any);
+        doctorId: body.doctorId,
+        startAtIso: body.startAt,
+        appointmentTypeId: body.appointmentTypeId,
+        notes: body.notes,
+        patient: body.patient
+          ? { name: body.patient.name, email: body.patient.email, phone: body.patient.phone, dobIso: body.patient.dob }
+          : undefined,
+      });
 
-      await emitAppEvent(appId, String(payload.sub), "doctor_appointment.created", { appointmentId: id, doctorId, startAt: start.toISOString() });
-      return res.status(201).json({ id, status: "requested" });
+      return res.status(201).json({ id: out.id, status: out.status });
     } catch (err) {
       return next(err);
     }
@@ -2720,33 +2892,9 @@ export async function registerRoutes(
       const payload = token ? verifyRuntimeToken(appId, token) : null;
       if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
 
-      const db = getMysqlDb();
-      const rows = await db
-        .select({
-          id: appDoctorAppointments.id,
-          status: appDoctorAppointments.status,
-          startAt: appDoctorAppointments.startAt,
-          endAt: appDoctorAppointments.endAt,
-          doctorId: appDoctorAppointments.doctorId,
-          doctorName: appDoctors.name,
-          specialty: appDoctors.specialty,
-        })
-        .from(appDoctorAppointments)
-        .leftJoin(appDoctors, and(eq(appDoctors.appId, appId), eq(appDoctors.id, appDoctorAppointments.doctorId)))
-        .where(and(eq(appDoctorAppointments.appId, appId), eq(appDoctorAppointments.customerId, String(payload.sub))))
-        .orderBy(desc(appDoctorAppointments.startAt));
-
-      return res.json(
-        rows.map((a: any) => ({
-          id: a.id,
-          status: a.status,
-          doctorId: a.doctorId,
-          doctorName: a.doctorName ?? null,
-          specialty: a.specialty ?? null,
-          startAt: a.startAt instanceof Date ? a.startAt.toISOString() : String(a.startAt),
-          endAt: a.endAt instanceof Date ? a.endAt.toISOString() : String(a.endAt),
-        })),
-      );
+      const svc = healthcareService({ emit: emitAppEvent });
+      const rows = await svc.listAppointmentsForCustomer({ appId, customerId: String(payload.sub) });
+      return res.json(rows);
     } catch (err) {
       return next(err);
     }
@@ -2913,7 +3061,8 @@ export async function registerRoutes(
         createdAt: new Date(),
       } as any);
 
-      await emitAppEvent(appId, null, "lead.created", { leadId: id });
+      const ev = crmEvents(emitAppEvent);
+      await ev.leadCreated(appId, { leadId: id });
       return res.status(201).json({ id });
     } catch (err) {
       return next(err);
@@ -2935,6 +3084,12 @@ export async function registerRoutes(
       const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
       const payload = token ? verifyRuntimeToken(appId, token) : null;
       if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
+
+      const limit = enforceRuntimeCreateLimit(`${appId}:${String(payload.sub)}:appointments`, { windowMs: 60 * 1000, limit: 5 });
+      if (!limit.ok) {
+        res.setHeader("Retry-After", String(limit.retryAfterSec));
+        return res.status(429).json({ message: "Too many requests", requestId: (req as any).requestId });
+      }
 
       const schema = z
         .object({
@@ -3002,7 +3157,8 @@ export async function registerRoutes(
         updatedAt: now,
       } as any);
 
-      await emitAppEvent(appId, String(payload.sub), "appointment.created", {
+      const ev = servicesEvents(emitAppEvent);
+      await ev.appointmentCreated(appId, String(payload.sub), {
         appointmentId: id,
         serviceId,
         startAt: start.toISOString(),
@@ -3093,83 +3249,38 @@ export async function registerRoutes(
       const payload = token ? verifyRuntimeToken(appId, token) : null;
       if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
 
-      const schema = z
-        .object({
-          items: z
-            .array(
-              z
-                .object({
-                  productId: z.string().min(1),
-                  quantity: z.number().int().min(1).max(999),
-                })
-                .strict(),
-            )
-            .min(1),
-          notes: z.string().max(2000).optional(),
-          paymentProvider: z.enum(["cod", "razorpay", "stripe"]).optional().default("cod"),
-        })
-        .strict();
+      const body = ecommerceCreateOrderSchema.parse(req.body);
+      const audit = async (log: { userId: string | null; action: string; targetType?: string | null; targetId?: string | null; metadata?: any }) => {
+        await storage.createAuditLog({
+          userId: log.userId ?? null,
+          action: log.action,
+          targetType: log.targetType ?? null,
+          targetId: log.targetId ?? null,
+          metadata: log.metadata ?? null,
+          ipAddress: (req.ip || null) as any,
+          userAgent: String(req.headers["user-agent"] || "") || null,
+        } as any);
+      };
 
-      const { items, notes, paymentProvider } = schema.parse(req.body);
-      const db = getMysqlDb();
-
-      const productIds = items
-        .map((i) => i.productId)
-        .filter((id, idx, arr) => arr.indexOf(id) === idx);
-      const products = await db
-        .select()
-        .from(appProducts)
-        .where(and(eq(appProducts.appId, appId), inArray(appProducts.id, productIds)));
-
-      const byId = new Map(products.map((p: any) => [String(p.id), p]));
-      const missing = items.find((i) => !byId.has(String(i.productId)));
-      if (missing) return res.status(400).json({ message: "Invalid product" });
-
-      const orderId = crypto.randomUUID();
-      const now = new Date();
-      let totalCents = 0;
-
-      const lineRows = items.map((i) => {
-        const p: any = byId.get(String(i.productId));
-        const unit = Number(p.priceCents || 0);
-        const line = unit * i.quantity;
-        totalCents += line;
-        return {
-          id: crypto.randomUUID(),
-          orderId,
-          productId: String(p.id),
-          name: String(p.name),
-          quantity: i.quantity,
-          unitPriceCents: unit,
-          lineTotalCents: line,
-          createdAt: now,
-        };
-      });
-
-      await db.insert(appOrders).values({
-        id: orderId,
+      const svc = ecommerceService({ emit: emitAppEvent, audit });
+      const out = await svc.createOrder({
         appId,
         customerId: String(payload.sub),
-        status: "created",
-        currency: "INR",
-        totalCents,
-        paymentProvider,
-        paymentStatus: paymentProvider === "cod" ? "completed" : "pending",
-        notes: notes ?? null,
-        createdAt: now,
-        updatedAt: now,
-      } as any);
-
-      await db.insert(appOrderItems).values(lineRows as any);
-      await emitAppEvent(appId, String(payload.sub), "order.created", { orderId, totalCents, paymentProvider });
+        items: body.items,
+        notes: body.notes,
+        paymentProvider: body.paymentProvider,
+        couponCode: body.couponCode,
+        shippingMethodId: body.shippingMethodId,
+        shippingAddress: body.shippingAddress,
+      });
 
       return res.status(201).json({
-        id: orderId,
-        status: "created",
-        totalCents,
-        currency: "INR",
-        paymentProvider,
-        paymentStatus: paymentProvider === "cod" ? "completed" : "pending",
+        id: out.id,
+        status: out.status,
+        totalCents: out.totalCents,
+        currency: out.currency,
+        paymentProvider: out.paymentProvider,
+        paymentStatus: out.paymentStatus,
       });
     } catch (err) {
       return next(err);
@@ -3254,7 +3365,8 @@ export async function registerRoutes(
         .set({ paymentRef: rzpOrder.id, paymentStatus: "pending", updatedAt: new Date() } as any)
         .where(and(eq(appOrders.appId, appId), eq(appOrders.id, orderId)));
 
-      await emitAppEvent(appId, String(payload.sub), "payment.razorpay.created", { orderId, razorpayOrderId: rzpOrder.id });
+      const ev = paymentsEvents(emitAppEvent);
+      await ev.razorpayOrderCreatedForRuntimeOrder(appId, String(payload.sub), { orderId, razorpayOrderId: rzpOrder.id });
 
       return res.json({
         provider: "razorpay",
@@ -3315,15 +3427,29 @@ export async function registerRoutes(
       const order: any = rows[0];
       if (!order) return res.status(404).json({ message: "Order not found" });
 
-      await db
-        .update(appOrders)
-        .set({ paymentStatus: "completed", paymentRef: razorpay_order_id, updatedAt: new Date() } as any)
-        .where(and(eq(appOrders.appId, appId), eq(appOrders.id, orderId)));
+      const audit = async (log: { userId: string | null; action: string; targetType?: string | null; targetId?: string | null; metadata?: any }) => {
+        await storage.createAuditLog({
+          userId: log.userId ?? null,
+          action: log.action,
+          targetType: log.targetType ?? null,
+          targetId: log.targetId ?? null,
+          metadata: log.metadata ?? null,
+          ipAddress: (req.ip || null) as any,
+          userAgent: String(req.headers["user-agent"] || "") || null,
+        } as any);
+      };
 
-      await emitAppEvent(appId, String(payload.sub), "order.paid", {
+      const svc = ecommerceService({ emit: emitAppEvent, audit });
+      await svc.markOrderPaid({
+        appId,
         orderId,
-        razorpayOrderId: razorpay_order_id,
-        razorpayPaymentId: razorpay_payment_id,
+        customerId: String(payload.sub),
+        provider: "razorpay",
+        ref: razorpay_order_id,
+        eventProperties: {
+          razorpayOrderId: razorpay_order_id,
+          razorpayPaymentId: razorpay_payment_id,
+        },
       });
 
       return res.json({ ok: true });
@@ -3347,25 +3473,9 @@ export async function registerRoutes(
       const payload = token ? verifyRuntimeToken(appId, token) : null;
       if (!payload?.sub) return res.status(401).json({ message: "Unauthorized" });
 
-      const db = getMysqlDb();
-      const rows = await db
-        .select()
-        .from(appOrders)
-        .where(and(eq(appOrders.appId, appId), eq(appOrders.customerId, String(payload.sub))))
-        .orderBy(desc(appOrders.createdAt));
-
-      return res.json(
-        rows.map((o: any) => ({
-          id: o.id,
-          status: o.status,
-          totalCents: Number(o.totalCents || 0),
-          currency: o.currency || "INR",
-          paymentProvider: o.paymentProvider ?? null,
-          paymentStatus: o.paymentStatus,
-          createdAt: o.createdAt,
-          updatedAt: o.updatedAt,
-        })),
-      );
+      const svc = ecommerceService({ emit: emitAppEvent });
+      const rows = await svc.listOrdersForCustomer({ appId, customerId: String(payload.sub) });
+      return res.json(rows);
     } catch (err) {
       return next(err);
     }
@@ -3385,12 +3495,8 @@ export async function registerRoutes(
         return res.status(503).json({ message: "Admin products require MySQL storage" });
       }
 
-      const db = getMysqlDb();
-      const rows = await db
-        .select()
-        .from(appProducts)
-        .where(eq(appProducts.appId, appId))
-        .orderBy(desc(appProducts.updatedAt));
+      const svc = ecommerceService({ emit: emitAppEvent });
+      const rows = await svc.adminListProducts({ appId });
       return res.json(rows);
     } catch (err) {
       return next(err);
@@ -3422,24 +3528,32 @@ export async function registerRoutes(
         .strict();
 
       const payload = schema.parse(req.body);
-      const db = getMysqlDb();
-      const id = crypto.randomUUID();
-      const now = new Date();
 
-      await db.insert(appProducts).values({
-        id,
+      const audit = async (log: { userId: string | null; action: string; targetType?: string | null; targetId?: string | null; metadata?: any }) => {
+        await storage.createAuditLog({
+          userId: log.userId ?? null,
+          action: log.action,
+          targetType: log.targetType ?? null,
+          targetId: log.targetId ?? null,
+          metadata: log.metadata ?? null,
+          ipAddress: (req.ip || null) as any,
+          userAgent: String(req.headers["user-agent"] || "") || null,
+        } as any);
+      };
+
+      const svc = ecommerceService({ emit: emitAppEvent, audit });
+      const out = await svc.adminCreateProduct({
         appId,
+        actorUserId: user.id,
         name: payload.name,
         description: payload.description ?? null,
         imageUrl: payload.imageUrl ?? null,
-        currency: payload.currency,
         priceCents: payload.priceCents,
-        active: payload.active ? 1 : 0,
-        createdAt: now,
-        updatedAt: now,
-      } as any);
+        currency: payload.currency,
+        active: payload.active,
+      });
 
-      return res.status(201).json({ id });
+      return res.status(201).json(out);
     } catch (err) {
       return next(err);
     }
@@ -3470,16 +3584,21 @@ export async function registerRoutes(
         })
         .strict();
       const patch = schema.parse(req.body);
-      const db = getMysqlDb();
 
-      const update: any = { ...patch, updatedAt: new Date() };
-      if (typeof patch.active === "boolean") update.active = patch.active ? 1 : 0;
+      const audit = async (log: { userId: string | null; action: string; targetType?: string | null; targetId?: string | null; metadata?: any }) => {
+        await storage.createAuditLog({
+          userId: log.userId ?? null,
+          action: log.action,
+          targetType: log.targetType ?? null,
+          targetId: log.targetId ?? null,
+          metadata: log.metadata ?? null,
+          ipAddress: (req.ip || null) as any,
+          userAgent: String(req.headers["user-agent"] || "") || null,
+        } as any);
+      };
 
-      await db
-        .update(appProducts)
-        .set(update)
-        .where(and(eq(appProducts.appId, appId), eq(appProducts.id, productId)));
-
+      const svc = ecommerceService({ emit: emitAppEvent, audit });
+      await svc.adminUpdateProduct({ appId, productId, actorUserId: user.id, patch });
       return res.json({ ok: true });
     } catch (err) {
       return next(err);
@@ -3499,13 +3618,8 @@ export async function registerRoutes(
         return res.status(503).json({ message: "Admin orders require MySQL storage" });
       }
 
-      const db = getMysqlDb();
-      const orders = await db
-        .select()
-        .from(appOrders)
-        .where(eq(appOrders.appId, appId))
-        .orderBy(desc(appOrders.createdAt));
-
+      const svc = ecommerceService({ emit: emitAppEvent });
+      const orders = await svc.adminListOrders({ appId });
       return res.json(orders);
     } catch (err) {
       return next(err);
@@ -3526,22 +3640,562 @@ export async function registerRoutes(
         return res.status(503).json({ message: "Admin orders require MySQL storage" });
       }
 
-      const schema = z
+      const rawSchema = z
         .object({
           status: z
-            .enum(["created", "accepted", "preparing", "out_for_delivery", "delivered", "cancelled"])
+            .enum(["created", "pending", "paid", "packed", "shipped", "delivered", "cancelled", "canceled", "refunded"])
             .optional(),
+          carrier: z.string().max(64).optional(),
+          trackingNumber: z.string().max(128).optional(),
         })
         .strict();
-      const patch = schema.parse(req.body);
-      const db = getMysqlDb();
+      const raw = rawSchema.parse(req.body);
 
-      await db
-        .update(appOrders)
-        .set({ ...patch, updatedAt: new Date() } as any)
-        .where(and(eq(appOrders.appId, appId), eq(appOrders.id, orderId)));
+      if (!raw.status) return res.json({ ok: true });
+
+      const mappedStatus = raw.status === "created" ? "pending" : raw.status === "cancelled" ? "canceled" : raw.status;
+      const patch = updateOrderStatusSchema.parse({ status: mappedStatus, carrier: raw.carrier, trackingNumber: raw.trackingNumber });
+
+      const audit = async (log: { userId: string | null; action: string; targetType?: string | null; targetId?: string | null; metadata?: any }) => {
+        await storage.createAuditLog({
+          userId: log.userId ?? null,
+          action: log.action,
+          targetType: log.targetType ?? null,
+          targetId: log.targetId ?? null,
+          metadata: log.metadata ?? null,
+          ipAddress: (req.ip || null) as any,
+          userAgent: String(req.headers["user-agent"] || "") || null,
+        } as any);
+      };
+
+      const svc = ecommerceService({ emit: emitAppEvent, audit });
+      await svc.transitionOrderStatus({
+        appId,
+        orderId,
+        actorUserId: user.id,
+        targetStatus: patch.status,
+        carrier: patch.carrier,
+        trackingNumber: patch.trackingNumber,
+      });
 
       return res.json({ ok: true });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.post("/api/apps/:id/admin/orders/:orderId/refunds", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const orderId = String(req.params.orderId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Admin refunds require MySQL storage" });
+      }
+
+      const body = createRefundSchema.parse(req.body ?? {});
+      const audit = async (log: { userId: string | null; action: string; targetType?: string | null; targetId?: string | null; metadata?: any }) => {
+        await storage.createAuditLog({
+          userId: log.userId ?? null,
+          action: log.action,
+          targetType: log.targetType ?? null,
+          targetId: log.targetId ?? null,
+          metadata: log.metadata ?? null,
+          ipAddress: (req.ip || null) as any,
+          userAgent: String(req.headers["user-agent"] || "") || null,
+        } as any);
+      };
+
+      const svc = ecommerceService({ emit: emitAppEvent, audit });
+      const refund = await svc.createRefund({
+        appId,
+        orderId,
+        actorUserId: user.id,
+        amountCents: body.amountCents,
+        reason: body.reason,
+      });
+
+      return res.status(201).json(refund);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Owner Admin (Vertical Ops) restaurant ---
+  app.get("/api/apps/:id/admin/restaurant/kitchen-tickets", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Restaurant kitchen requires MySQL storage" });
+      }
+
+      const audit = async (log: { userId: string | null; action: string; targetType?: string | null; targetId?: string | null; metadata?: any }) => {
+        await storage.createAuditLog({
+          userId: log.userId ?? null,
+          action: log.action,
+          targetType: log.targetType ?? null,
+          targetId: log.targetId ?? null,
+          metadata: log.metadata ?? null,
+          ipAddress: (req.ip || null) as any,
+          userAgent: String(req.headers["user-agent"] || "") || null,
+        } as any);
+      };
+
+      const svc = restaurantService({ emit: emitAppEvent, audit });
+      const rows = await svc.listKitchenTickets({ appId });
+      return res.json(rows);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.patch("/api/apps/:id/admin/restaurant/orders/:orderId/kitchen", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const orderId = String(req.params.orderId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Restaurant kitchen requires MySQL storage" });
+      }
+
+      const body = updateKitchenStatusSchema.parse(req.body ?? {});
+      const audit = async (log: { userId: string | null; action: string; targetType?: string | null; targetId?: string | null; metadata?: any }) => {
+        await storage.createAuditLog({
+          userId: log.userId ?? null,
+          action: log.action,
+          targetType: log.targetType ?? null,
+          targetId: log.targetId ?? null,
+          metadata: log.metadata ?? null,
+          ipAddress: (req.ip || null) as any,
+          userAgent: String(req.headers["user-agent"] || "") || null,
+        } as any);
+      };
+
+      const svc = restaurantService({ emit: emitAppEvent, audit });
+      const out = await svc.updateKitchenStatus({ appId, orderId, actorUserId: user.id, kitchenStatus: body.kitchenStatus });
+      return res.json(out);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.post("/api/apps/:id/admin/restaurant/tables", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Restaurant tables require MySQL storage" });
+      }
+
+      const body = createRestaurantTableSchema.parse(req.body ?? {});
+      const svc = restaurantService({ emit: emitAppEvent });
+      const out = await svc.createRestaurantTable({ appId, name: body.name, capacity: body.capacity, active: body.active });
+      return res.status(201).json(out);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.post("/api/apps/:id/admin/restaurant/menu-categories", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Restaurant menu requires MySQL storage" });
+      }
+
+      const body = createMenuCategorySchema.parse(req.body ?? {});
+      const svc = restaurantService({ emit: emitAppEvent });
+      const out = await svc.createMenuCategory({ appId, name: body.name, sortOrder: body.sortOrder, active: body.active });
+      return res.status(201).json(out);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.post("/api/apps/:id/admin/restaurant/menu-items", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Restaurant menu requires MySQL storage" });
+      }
+
+      const body = createMenuItemSchema.parse(req.body ?? {});
+      const svc = restaurantService({ emit: emitAppEvent });
+      const out = await svc.createMenuItem({
+        appId,
+        categoryId: body.categoryId,
+        name: body.name,
+        description: body.description,
+        imageUrl: body.imageUrl,
+        currency: body.currency,
+        priceCents: body.priceCents,
+        prepTimeMinutes: body.prepTimeMinutes,
+        active: body.active,
+      });
+      return res.status(201).json(out);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Owner Admin (Vertical Ops) real estate ---
+  app.post("/api/apps/:id/admin/realestate/listings", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Real estate requires MySQL storage" });
+      }
+
+      const body = createListingSchema.parse(req.body ?? {});
+      const audit = async (log: { userId: string | null; action: string; targetType?: string | null; targetId?: string | null; metadata?: any }) => {
+        await storage.createAuditLog({
+          userId: log.userId ?? null,
+          action: log.action,
+          targetType: log.targetType ?? null,
+          targetId: log.targetId ?? null,
+          metadata: log.metadata ?? null,
+          ipAddress: (req.ip || null) as any,
+          userAgent: String(req.headers["user-agent"] || "") || null,
+        } as any);
+      };
+
+      const svc = realEstateService({ emit: emitAppEvent, audit });
+      const out = await svc.createListing({
+        appId,
+        title: body.title,
+        description: body.description,
+        address: body.address,
+        propertyType: body.propertyType,
+        latitude: body.latitude,
+        longitude: body.longitude,
+        amenities: body.amenities,
+        currency: body.currency,
+        priceCents: body.priceCents,
+        availabilityStatus: body.availabilityStatus,
+        bedrooms: body.bedrooms,
+        bathrooms: body.bathrooms,
+        areaSqft: body.areaSqft,
+        imageUrl: body.imageUrl,
+        active: body.active,
+        actorUserId: user.id,
+      });
+      return res.status(201).json(out);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.post("/api/apps/:id/admin/realestate/inquiries/:inquiryId/assign", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const inquiryId = String(req.params.inquiryId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Real estate requires MySQL storage" });
+      }
+
+      const body = assignInquirySchema.parse(req.body ?? {});
+      const audit = async (log: { userId: string | null; action: string; targetType?: string | null; targetId?: string | null; metadata?: any }) => {
+        await storage.createAuditLog({
+          userId: log.userId ?? null,
+          action: log.action,
+          targetType: log.targetType ?? null,
+          targetId: log.targetId ?? null,
+          metadata: log.metadata ?? null,
+          ipAddress: (req.ip || null) as any,
+          userAgent: String(req.headers["user-agent"] || "") || null,
+        } as any);
+      };
+
+      const svc = realEstateService({ emit: emitAppEvent, audit });
+      const out = await svc.assignInquiry({ appId, inquiryId, agentId: body.agentId, actorUserId: user.id });
+      return res.json(out);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.patch("/api/apps/:id/admin/realestate/inquiries/:inquiryId", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const inquiryId = String(req.params.inquiryId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Real estate requires MySQL storage" });
+      }
+
+      const body = updateInquiryStatusSchema.parse(req.body ?? {});
+      const audit = async (log: { userId: string | null; action: string; targetType?: string | null; targetId?: string | null; metadata?: any }) => {
+        await storage.createAuditLog({
+          userId: log.userId ?? null,
+          action: log.action,
+          targetType: log.targetType ?? null,
+          targetId: log.targetId ?? null,
+          metadata: log.metadata ?? null,
+          ipAddress: (req.ip || null) as any,
+          userAgent: String(req.headers["user-agent"] || "") || null,
+        } as any);
+      };
+
+      const svc = realEstateService({ emit: emitAppEvent, audit });
+      const out = await svc.updateInquiryStatus({ appId, inquiryId, status: body.status as any, actorUserId: user.id });
+      return res.json(out);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.post("/api/apps/:id/admin/realestate/listings/:listingId/tours", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const listingId = String(req.params.listingId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Real estate requires MySQL storage" });
+      }
+
+      const body = scheduleTourSchema.parse(req.body ?? {});
+      const audit = async (log: { userId: string | null; action: string; targetType?: string | null; targetId?: string | null; metadata?: any }) => {
+        await storage.createAuditLog({
+          userId: log.userId ?? null,
+          action: log.action,
+          targetType: log.targetType ?? null,
+          targetId: log.targetId ?? null,
+          metadata: log.metadata ?? null,
+          ipAddress: (req.ip || null) as any,
+          userAgent: String(req.headers["user-agent"] || "") || null,
+        } as any);
+      };
+
+      const svc = realEstateService({ emit: emitAppEvent, audit });
+      const out = await svc.scheduleTour({
+        appId,
+        listingId,
+        agentId: body.agentId,
+        startAtIso: body.startAt,
+        endAtIso: body.endAt,
+        inquiryId: body.inquiryId,
+        actorUserId: user.id,
+      });
+      return res.status(201).json(out);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Owner Admin (Vertical Ops) healthcare ---
+  app.post("/api/apps/:id/admin/healthcare/appointment-types", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Healthcare requires MySQL storage" });
+      }
+
+      const body = createAppointmentTypeSchema.parse(req.body ?? {});
+      const audit = async (log: { userId: string | null; action: string; targetType?: string | null; targetId?: string | null; metadata?: any }) => {
+        await storage.createAuditLog({
+          userId: log.userId ?? null,
+          action: log.action,
+          targetType: log.targetType ?? null,
+          targetId: log.targetId ?? null,
+          metadata: log.metadata ?? null,
+          ipAddress: (req.ip || null) as any,
+          userAgent: String(req.headers["user-agent"] || "") || null,
+        } as any);
+      };
+
+      const svc = healthcareService({ emit: emitAppEvent, audit });
+      const out = await svc.createAppointmentType({
+        appId,
+        name: body.name,
+        durationMinutes: body.durationMinutes,
+        bufferBeforeMinutes: body.bufferBeforeMinutes,
+        bufferAfterMinutes: body.bufferAfterMinutes,
+        cancellationPolicyHours: body.cancellationPolicyHours,
+        currency: body.currency,
+        priceCents: body.priceCents,
+        active: body.active,
+        actorUserId: user.id,
+      });
+      return res.status(201).json(out);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.post("/api/apps/:id/admin/healthcare/availability", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Healthcare requires MySQL storage" });
+      }
+
+      const body = createAvailabilitySchema.parse(req.body ?? {});
+      const audit = async (log: { userId: string | null; action: string; targetType?: string | null; targetId?: string | null; metadata?: any }) => {
+        await storage.createAuditLog({
+          userId: log.userId ?? null,
+          action: log.action,
+          targetType: log.targetType ?? null,
+          targetId: log.targetId ?? null,
+          metadata: log.metadata ?? null,
+          ipAddress: (req.ip || null) as any,
+          userAgent: String(req.headers["user-agent"] || "") || null,
+        } as any);
+      };
+
+      const svc = healthcareService({ emit: emitAppEvent, audit });
+      const out = await svc.addAvailability({
+        appId,
+        doctorId: body.doctorId,
+        startAtIso: body.startAt,
+        endAtIso: body.endAt,
+        active: body.active,
+        actorUserId: user.id,
+      });
+      return res.status(201).json(out);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.patch("/api/apps/:id/admin/healthcare/doctor-appointments/:appointmentId", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const appointmentId = String(req.params.appointmentId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Healthcare requires MySQL storage" });
+      }
+
+      const body = transitionAppointmentSchema.parse(req.body ?? {});
+      const audit = async (log: { userId: string | null; action: string; targetType?: string | null; targetId?: string | null; metadata?: any }) => {
+        await storage.createAuditLog({
+          userId: log.userId ?? null,
+          action: log.action,
+          targetType: log.targetType ?? null,
+          targetId: log.targetId ?? null,
+          metadata: log.metadata ?? null,
+          ipAddress: (req.ip || null) as any,
+          userAgent: String(req.headers["user-agent"] || "") || null,
+        } as any);
+      };
+
+      const svc = healthcareService({ emit: emitAppEvent, audit });
+      const out = await svc.transitionAppointment({ appId, appointmentId, status: body.status as any, actorUserId: user.id });
+      return res.json(out);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.post("/api/apps/:id/admin/healthcare/invoices/:invoiceId/payments", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const appId = String(req.params.id || "");
+      const invoiceId = String(req.params.invoiceId || "");
+      const appItem = await storage.getApp(appId);
+      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Healthcare requires MySQL storage" });
+      }
+
+      const body = createInvoicePaymentSchema.parse(req.body ?? {});
+      const audit = async (log: { userId: string | null; action: string; targetType?: string | null; targetId?: string | null; metadata?: any }) => {
+        await storage.createAuditLog({
+          userId: log.userId ?? null,
+          action: log.action,
+          targetType: log.targetType ?? null,
+          targetId: log.targetId ?? null,
+          metadata: log.metadata ?? null,
+          ipAddress: (req.ip || null) as any,
+          userAgent: String(req.headers["user-agent"] || "") || null,
+        } as any);
+      };
+
+      const svc = healthcareService({ emit: emitAppEvent, audit });
+      const out = await svc.markInvoicePaid({
+        appId,
+        invoiceId,
+        provider: body.provider,
+        providerRef: body.providerRef,
+        amountCents: body.amountCents,
+        actorUserId: user.id,
+      });
+      return res.status(201).json(out);
     } catch (err) {
       return next(err);
     }
@@ -3745,6 +4399,12 @@ export async function registerRoutes(
 
       const db = getMysqlDb();
 
+      const mode = getEventNamingMode();
+      const excludeAliasWhere =
+        mode === "dual"
+          ? sql`(${appEvents.properties} is null OR ${appEvents.properties} NOT LIKE '%"__isAlias":true%')`
+          : sql`1=1`;
+
       const [{ count: customersTotal } = { count: 0 }] = await db
         .select({ count: sql<number>`count(*)` })
         .from(appCustomers)
@@ -3761,7 +4421,7 @@ export async function registerRoutes(
       const topEvents = await db
         .select({ name: appEvents.name, count: sql<number>`count(*)` })
         .from(appEvents)
-        .where(and(eq(appEvents.appId, appId), gte(appEvents.createdAt, since)))
+        .where(and(eq(appEvents.appId, appId), gte(appEvents.createdAt, since), excludeAliasWhere))
         .groupBy(appEvents.name)
         .orderBy(desc(sql`count(*)`))
         .limit(20);
@@ -3770,7 +4430,7 @@ export async function registerRoutes(
       const eventsByDay = await db
         .select({ day: dayExpr, count: sql<number>`count(*)` })
         .from(appEvents)
-        .where(and(eq(appEvents.appId, appId), gte(appEvents.createdAt, since)))
+        .where(and(eq(appEvents.appId, appId), gte(appEvents.createdAt, since), excludeAliasWhere))
         .groupBy(dayExpr)
         .orderBy(asc(dayExpr));
 
@@ -4629,7 +5289,7 @@ export async function registerRoutes(
           id: crypto.randomUUID(),
           label: (link.title || new URL(normalized).pathname || normalized).slice(0, 80),
           url: normalized,
-          icon: "🌐",
+          icon: "globe",
         });
       }
 
@@ -4707,25 +5367,24 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/apps/:id/build", requireAuth, async (req, res, next) => {
+  app.post("/api/apps/:id/build", requireAuth, buildLimiter, async (req, res, next) => {
     try {
       const user = getAuthedUser(req);
       if (!user) return res.status(401).json({ message: "Unauthorized" });
 
-      const appItem = await storage.getApp(req.params.id);
+      const appId = String((req as any).params?.id || "");
+
+      const appItem = await storage.getApp(appId);
       if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
         return res.status(404).json({ message: "Not found" });
       }
 
-      // --- Enforce plan-based rebuild limits (staff bypass) ---
+      // --- Enforce plan entitlements (single source of truth; staff bypass) ---
       if (!isStaff(user)) {
-        const rebuildCheck = await checkRebuildAllowed(appItem.id);
-        if (!rebuildCheck.allowed) {
-          return res.status(403).json({
-            message: rebuildCheck.reason,
-            rebuildsUsed: rebuildCheck.used,
-            rebuildsLimit: rebuildCheck.limit,
-          });
+        try {
+          assertCanQueueBuild(user, ((appItem as any).platform || "android") as any);
+        } catch (e: any) {
+          return res.status(403).json({ message: e?.message || "Forbidden" });
         }
       }
 
@@ -4773,12 +5432,14 @@ export async function registerRoutes(
   });
 
   // Retry a failed build
-  app.post("/api/apps/:id/retry-build", requireAuth, async (req, res, next) => {
+  app.post("/api/apps/:id/retry-build", requireAuth, buildLimiter, async (req, res, next) => {
     try {
       const user = getAuthedUser(req);
       if (!user) return res.status(401).json({ message: "Unauthorized" });
 
-      const appItem = await storage.getApp(req.params.id);
+      const appId = String((req as any).params?.id || "");
+
+      const appItem = await storage.getApp(appId);
       if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
         return res.status(404).json({ message: "App not found" });
       }
@@ -4795,16 +5456,12 @@ export async function registerRoutes(
         return res.status(400).json({ message: "A build is already in progress" });
       }
 
-      // Check rebuild limits for paid plans
-      const { plan, paidAt } = await getAppPlanInfo(appItem.id);
-      if (paidAt) {
-        const rebuildCheck = await checkRebuildAllowed(appItem.id);
-        if (!rebuildCheck.allowed) {
-          return res.status(403).json({ 
-            message: `Rebuild limit reached (${rebuildCheck.used}/${rebuildCheck.limit}). Please upgrade your plan or wait for the next billing cycle.`,
-            rebuildsUsed: rebuildCheck.used,
-            rebuildsLimit: rebuildCheck.limit,
-          });
+      // Enforce plan entitlements (single source of truth; staff bypass)
+      if (!isStaff(user)) {
+        try {
+          assertCanQueueBuild(user, ((appItem as any).platform || "android") as any);
+        } catch (e: any) {
+          return res.status(403).json({ message: e?.message || "Forbidden" });
         }
       }
 
@@ -4887,7 +5544,7 @@ export async function registerRoutes(
       try {
         const rows = await storage.listUsers();
         // Only return staff members (admin + support), NOT regular users
-        const staffOnly = rows.filter(u => u.role === "admin" || u.role === "support");
+        const staffOnly = rows.filter((u: any) => u.role === "admin" || u.role === "support" || u.role === "staff");
         return res.json(staffOnly);
       } catch (err) {
         return next(err);
@@ -5024,7 +5681,7 @@ export async function registerRoutes(
         const currentUser = getAuthedUser(req);
         const payload = adminCreateTeamMemberSchema.parse(req.body);
         if (payload.role === "user") {
-          return res.status(400).json({ message: "Team member role must be admin or support" });
+          return res.status(400).json({ message: "Team member role must be admin, staff, or support" });
         }
 
         const existing = await storage.getUserByUsername(payload.email);
@@ -5156,6 +5813,42 @@ export async function registerRoutes(
       return next(err);
     }
   });
+
+  // --- Admin: Set staff permissions (RBAC) ---
+  app.patch(
+    ["/api/admin/users/:id/permissions", "/api/admin/team-members/:id/permissions"],
+    requireAuth,
+    requirePermission("manage_users"),
+    async (req, res, next) => {
+      try {
+        const targetId = String(req.params.id || "");
+        const parsed = z
+          .object({ permissions: z.array(z.string()).max(200) })
+          .strict()
+          .safeParse(req.body);
+        if (!parsed.success) return res.status(400).json({ message: "Invalid request" });
+
+        const target = await storage.getUser(targetId);
+        if (!target) return res.status(404).json({ message: "User not found" });
+
+        const role = (target as any)?.role;
+        if (!(role === "admin" || role === "support" || role === "staff")) {
+          return res.status(400).json({ message: "Permissions can only be set for staff accounts" });
+        }
+
+        const normalized = normalizeAndValidatePermissions(parsed.data.permissions);
+        if (!normalized.ok) return res.status(400).json({ message: normalized.message });
+
+        const updated = await storage.setUserPermissions(targetId, normalized.permissions);
+        if (!updated) return res.status(404).json({ message: "User not found" });
+        const { password: _pw, ...safeUser } = updated as any;
+
+        return res.json({ user: safeUser, permissions: normalized.permissions });
+      } catch (err) {
+        return next(err);
+      }
+    },
+  );
 
   // --- Audit Logs ---
   app.get("/api/admin/audit-logs", requireAuth, requireRole(["admin"]), async (req, res, next) => {
@@ -5560,7 +6253,9 @@ export async function registerRoutes(
         appId: appId || null,
         provider: "razorpay",
         providerOrderId: rzpOrder.id,
-        amountInr: amountInPaise / 100,
+        amountPaise: amountInPaise,
+        // Legacy (rupees) field retained for older rows/clients
+        amountInr: Math.floor(amountInPaise / 100),
         plan: type === "extra_rebuild" ? "extra_rebuild" : plan,
       });
 
@@ -5583,7 +6278,7 @@ export async function registerRoutes(
   // Handles async payment events from Razorpay for reliable payment processing
   const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET;
   
-  app.post("/api/webhooks/razorpay", async (req, res) => {
+  app.post("/api/webhooks/razorpay", razorpayWebhookLimiter, async (req, res) => {
     try {
       if (!RAZORPAY_WEBHOOK_SECRET) {
         console.log("[Razorpay Webhook] Webhook secret not configured, skipping");
@@ -5593,11 +6288,15 @@ export async function registerRoutes(
       // Verify webhook signature
       const signature = req.headers["x-razorpay-signature"] as string;
       if (!signature) {
-        console.log("[Razorpay Webhook] Missing signature header");
+        logger.critical("razorpay.webhook.missing_signature", { requestId: (req as any).requestId, ip: req.ip });
         return res.status(400).json({ message: "Missing signature" });
       }
 
-      const rawBody = JSON.stringify(req.body);
+      const rawBody = (req as any).rawBody;
+      if (!Buffer.isBuffer(rawBody)) {
+        logger.critical("razorpay.webhook.missing_raw_body", { requestId: (req as any).requestId, ip: req.ip });
+        return res.status(400).json({ message: "Invalid request" });
+      }
       const expectedSignature = crypto
         .createHmac("sha256", RAZORPAY_WEBHOOK_SECRET)
         .update(rawBody)
@@ -5607,7 +6306,7 @@ export async function registerRoutes(
       const sigBuffer = Buffer.from(signature, 'utf8');
       const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
       if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
-        console.log("[Razorpay Webhook] Invalid signature");
+        logger.critical("razorpay.webhook.invalid_signature", { requestId: (req as any).requestId, ip: req.ip });
         return res.status(400).json({ message: "Invalid signature" });
       }
 
@@ -5624,30 +6323,37 @@ export async function registerRoutes(
             try {
               if (process.env.DATABASE_URL?.startsWith("mysql://")) {
                 const db = getMysqlDb();
-                await db
+                const result = await db
                   .update(appOrders)
                   .set({ paymentStatus: "completed", updatedAt: new Date() } as any)
-                  .where(and(eq(appOrders.appId, notes.appId), eq(appOrders.id, notes.orderId)));
-                await emitAppEvent(notes.appId, notes.customerId ? String(notes.customerId) : null, "order.paid", {
-                  orderId: notes.orderId,
-                  razorpayOrderId: payment.order_id,
-                  razorpayPaymentId: payment.id,
-                });
+                  .where(and(eq(appOrders.appId, notes.appId), eq(appOrders.id, notes.orderId), ne(appOrders.paymentStatus, "completed")));
+
+                const affected =
+                  (result as any)?.rowsAffected ??
+                  (result as any)?.affectedRows ??
+                  (result as any)?.[0]?.affectedRows ??
+                  0;
+                const ev = ecommerceEvents(emitAppEvent);
+                if (Number(affected) > 0) {
+                  await ev.orderPaid(notes.appId, notes.customerId ? String(notes.customerId) : null, {
+                    orderId: notes.orderId,
+                    razorpayOrderId: payment.order_id,
+                    razorpayPaymentId: payment.id,
+                  });
+                }
               }
             } catch (e) {
               console.error("[Razorpay Webhook] Failed to update runtime order:", e);
             }
           }
 
-          // Find payment by order ID
-          const existingPayments = await storage.listPaymentsByUser("all"); // Get all to find by order
-          const dbPayment = Array.from(existingPayments).find(
-            (p: any) => p.providerOrderId === payment.order_id && p.status === "pending"
-          );
-
-          if (dbPayment) {
-            await storage.updatePaymentStatus(dbPayment.id, "completed", payment.id);
-            console.log(`[Razorpay Webhook] Payment ${dbPayment.id} marked as completed via webhook`);
+          // Subscription/plan payments: lookup by provider order id (reliable; no "all" hacks)
+          const dbPayment = await storage.getPaymentByOrderId(String(payment.order_id));
+          if (dbPayment && dbPayment.status === "pending") {
+            const { updated } = await storage.updatePaymentStatus(dbPayment.id, "completed", String(payment.id));
+            if (updated) {
+              console.log(`[Razorpay Webhook] Payment ${dbPayment.id} marked as completed via webhook`);
+            }
           }
         }
       }
@@ -5662,28 +6368,42 @@ export async function registerRoutes(
             try {
               if (process.env.DATABASE_URL?.startsWith("mysql://")) {
                 const db = getMysqlDb();
-                await db
+                const result = await db
                   .update(appOrders)
                   .set({ paymentStatus: "failed", updatedAt: new Date() } as any)
-                  .where(and(eq(appOrders.appId, notes.appId), eq(appOrders.id, notes.orderId)));
-                await emitAppEvent(notes.appId, notes.customerId ? String(notes.customerId) : null, "order.payment_failed", {
-                  orderId: notes.orderId,
-                  razorpayOrderId: payment.order_id,
-                });
+                  .where(
+                    and(
+                      eq(appOrders.appId, notes.appId),
+                      eq(appOrders.id, notes.orderId),
+                      ne(appOrders.paymentStatus, "failed"),
+                      ne(appOrders.paymentStatus, "completed"),
+                    ),
+                  );
+
+                const affected =
+                  (result as any)?.rowsAffected ??
+                  (result as any)?.affectedRows ??
+                  (result as any)?.[0]?.affectedRows ??
+                  0;
+                const ev = ecommerceEvents(emitAppEvent);
+                if (Number(affected) === 1) {
+                  await ev.orderPaymentFailed(notes.appId, notes.customerId ? String(notes.customerId) : null, {
+                    orderId: notes.orderId,
+                    razorpayOrderId: payment.order_id,
+                  });
+                }
               }
             } catch (e) {
               console.error("[Razorpay Webhook] Failed to update runtime order:", e);
             }
           }
 
-          const existingPayments = await storage.listPaymentsByUser("all");
-          const dbPayment = Array.from(existingPayments).find(
-            (p: any) => p.providerOrderId === payment.order_id && p.status === "pending"
-          );
-
-          if (dbPayment) {
-            await storage.updatePaymentStatus(dbPayment.id, "failed");
-            console.log(`[Razorpay Webhook] Payment ${dbPayment.id} marked as failed via webhook`);
+          const dbPayment = await storage.getPaymentByOrderId(String(payment.order_id));
+          if (dbPayment && dbPayment.status === "pending") {
+            const { updated } = await storage.updatePaymentStatus(dbPayment.id, "failed");
+            if (updated) {
+              console.log(`[Razorpay Webhook] Payment ${dbPayment.id} marked as failed via webhook`);
+            }
           }
         }
       }
@@ -5714,6 +6434,7 @@ export async function registerRoutes(
         appId,
         provider: "razorpay",
         providerOrderId: `admin_bypass_${Date.now()}`,
+        amountPaise: 0,
         amountInr: 0,
         plan,
       });
@@ -5748,7 +6469,7 @@ export async function registerRoutes(
     paymentId: z.string().uuid(),
   }).strict();
 
-  app.post("/api/payments/verify", requireAuth, async (req, res, next) => {
+  app.post("/api/payments/verify", requireAuth, paymentsVerifyLimiter, async (req, res, next) => {
     try {
       const user = getAuthedUser(req);
       if (!user) return res.status(401).json({ message: "Unauthorized" });
@@ -5770,6 +6491,22 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Forbidden" });
       }
 
+      // Bind verify payload to the stored provider order id (prevents cross-binding / replay abuse).
+      if (existingPayment.providerOrderId !== razorpay_order_id) {
+        console.log(
+          `[Payment Verify] providerOrderId mismatch for payment ${paymentId}: expected ${existingPayment.providerOrderId}, got ${razorpay_order_id}`,
+        );
+        return res.status(400).json({ message: "Payment/order mismatch" });
+      }
+
+      // Idempotency: never re-apply entitlements for already-processed payments.
+      if (existingPayment.status === "completed") {
+        return res.json({ ok: true, payment: existingPayment, message: "Already verified" });
+      }
+      if (existingPayment.status === "failed") {
+        return res.status(409).json({ message: "Payment already failed" });
+      }
+
       // Verify signature using timing-safe comparison to prevent timing attacks
       const expectedSignature = crypto
         .createHmac("sha256", razorpayKeySecret)
@@ -5783,14 +6520,20 @@ export async function registerRoutes(
         crypto.timingSafeEqual(signatureBuffer, expectedBuffer);
 
       if (!signaturesMatch) {
+        // Only transition pending -> failed (atomic; safe under replay).
         await storage.updatePaymentStatus(paymentId, "failed");
         return res.status(400).json({ message: "Payment verification failed" });
       }
 
       // Update payment status
-      const payment = await storage.updatePaymentStatus(paymentId, "completed", razorpay_payment_id);
+      const { payment, updated } = await storage.updatePaymentStatus(paymentId, "completed", razorpay_payment_id);
       if (!payment) {
         return res.status(404).json({ message: "Payment record not found" });
+      }
+
+      if (!updated) {
+        // Another request/webhook already processed it.
+        return res.json({ ok: true, payment, message: "Already processed" });
       }
 
       // Handle subscription activation or extra rebuild
@@ -5856,6 +6599,223 @@ export async function registerRoutes(
 
       const payments = await storage.listPaymentsByUser(user.id);
       return res.json(payments);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Admin inspection (read-only) ---
+  // Minimal pagination via limit + cursor (createdAt).
+  app.get(["/api/admin/payments", "/admin/payments"], requireAuth, requirePermission("view_payments"), async (req, res, next) => {
+    try {
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Admin inspection requires MySQL storage" });
+      }
+
+      const limitRaw = typeof req.query.limit === "string" ? Number(req.query.limit) : 50;
+      const limit = Math.max(1, Math.min(200, Number.isFinite(limitRaw) ? Math.trunc(limitRaw) : 50));
+      const cursorRaw = typeof req.query.cursor === "string" ? req.query.cursor : null;
+      const cursor = cursorRaw ? new Date(cursorRaw) : null;
+      if (cursorRaw && (!cursor || Number.isNaN(cursor.getTime()))) {
+        return res.status(400).json({ message: "Invalid cursor" });
+      }
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select({
+          id: paymentsTable.id,
+          userId: paymentsTable.userId,
+          appId: paymentsTable.appId,
+          provider: paymentsTable.provider,
+          providerOrderId: paymentsTable.providerOrderId,
+          providerPaymentId: paymentsTable.providerPaymentId,
+          amountPaise: paymentsTable.amountPaise,
+          amountInr: paymentsTable.amountInr,
+          plan: paymentsTable.plan,
+          status: paymentsTable.status,
+          createdAt: paymentsTable.createdAt,
+          updatedAt: paymentsTable.updatedAt,
+        })
+        .from(paymentsTable)
+        .where(cursor ? lt(paymentsTable.createdAt, cursor) : undefined)
+        .orderBy(desc(paymentsTable.createdAt))
+        .limit(limit + 1);
+
+      const items = rows.slice(0, limit);
+      const nextCursor = items.length === limit ? (items[items.length - 1] as any)?.createdAt : null;
+      return res.json({ items, nextCursor });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.get(["/api/admin/orders", "/admin/orders"], requireAuth, requirePermission("view_orders"), async (req, res, next) => {
+    try {
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Admin inspection requires MySQL storage" });
+      }
+
+      const limitRaw = typeof req.query.limit === "string" ? Number(req.query.limit) : 50;
+      const limit = Math.max(1, Math.min(200, Number.isFinite(limitRaw) ? Math.trunc(limitRaw) : 50));
+      const cursorRaw = typeof req.query.cursor === "string" ? req.query.cursor : null;
+      const cursor = cursorRaw ? new Date(cursorRaw) : null;
+      if (cursorRaw && (!cursor || Number.isNaN(cursor.getTime()))) {
+        return res.status(400).json({ message: "Invalid cursor" });
+      }
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select({
+          id: appOrders.id,
+          appId: appOrders.appId,
+          customerId: appOrders.customerId,
+          status: appOrders.status,
+          paymentProvider: appOrders.paymentProvider,
+          paymentStatus: appOrders.paymentStatus,
+          totalCents: appOrders.totalCents,
+          createdAt: appOrders.createdAt,
+          updatedAt: appOrders.updatedAt,
+        })
+        .from(appOrders)
+        .where(cursor ? lt(appOrders.createdAt, cursor) : undefined)
+        .orderBy(desc(appOrders.createdAt))
+        .limit(limit + 1);
+
+      const items = rows.slice(0, limit);
+      const nextCursor = items.length === limit ? (items[items.length - 1] as any)?.createdAt : null;
+      return res.json({ items, nextCursor });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.get(["/api/admin/reservations", "/admin/reservations"], requireAuth, requirePermission("view_reservations"), async (req, res, next) => {
+    try {
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Admin inspection requires MySQL storage" });
+      }
+
+      const limitRaw = typeof req.query.limit === "string" ? Number(req.query.limit) : 50;
+      const limit = Math.max(1, Math.min(200, Number.isFinite(limitRaw) ? Math.trunc(limitRaw) : 50));
+      const cursorRaw = typeof req.query.cursor === "string" ? req.query.cursor : null;
+      const cursor = cursorRaw ? new Date(cursorRaw) : null;
+      if (cursorRaw && (!cursor || Number.isNaN(cursor.getTime()))) {
+        return res.status(400).json({ message: "Invalid cursor" });
+      }
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select({
+          id: appRestaurantReservations.id,
+          appId: appRestaurantReservations.appId,
+          customerId: appRestaurantReservations.customerId,
+          tableId: appRestaurantReservations.tableId,
+          status: appRestaurantReservations.status,
+          reservedAt: appRestaurantReservations.reservedAt,
+          durationMinutes: appRestaurantReservations.durationMinutes,
+          createdAt: appRestaurantReservations.createdAt,
+          updatedAt: appRestaurantReservations.updatedAt,
+        })
+        .from(appRestaurantReservations)
+        .where(cursor ? lt(appRestaurantReservations.createdAt, cursor) : undefined)
+        .orderBy(desc(appRestaurantReservations.createdAt))
+        .limit(limit + 1);
+
+      const items = rows.slice(0, limit);
+      const nextCursor = items.length === limit ? (items[items.length - 1] as any)?.createdAt : null;
+      return res.json({ items, nextCursor });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.get(["/api/admin/appointments", "/admin/appointments"], requireAuth, requirePermission("view_appointments"), async (req, res, next) => {
+    try {
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Admin inspection requires MySQL storage" });
+      }
+
+      const limitRaw = typeof req.query.limit === "string" ? Number(req.query.limit) : 50;
+      const limit = Math.max(1, Math.min(200, Number.isFinite(limitRaw) ? Math.trunc(limitRaw) : 50));
+      const cursorRaw = typeof req.query.cursor === "string" ? req.query.cursor : null;
+      const cursor = cursorRaw ? new Date(cursorRaw) : null;
+      if (cursorRaw && (!cursor || Number.isNaN(cursor.getTime()))) {
+        return res.status(400).json({ message: "Invalid cursor" });
+      }
+
+      const db = getMysqlDb();
+      const rows = await db
+        .select({
+          id: appDoctorAppointments.id,
+          appId: appDoctorAppointments.appId,
+          customerId: appDoctorAppointments.customerId,
+          doctorId: appDoctorAppointments.doctorId,
+          status: appDoctorAppointments.status,
+          startAt: appDoctorAppointments.startAt,
+          endAt: appDoctorAppointments.endAt,
+          createdAt: appDoctorAppointments.createdAt,
+          updatedAt: appDoctorAppointments.updatedAt,
+        })
+        .from(appDoctorAppointments)
+        .where(cursor ? lt(appDoctorAppointments.createdAt, cursor) : undefined)
+        .orderBy(desc(appDoctorAppointments.createdAt))
+        .limit(limit + 1);
+
+      const items = rows.slice(0, limit);
+      const nextCursor = items.length === limit ? (items[items.length - 1] as any)?.createdAt : null;
+      return res.json({ items, nextCursor });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // --- Admin metrics (minimal) ---
+  app.get("/api/admin/metrics", requireAuth, requirePermission("view_metrics"), async (_req, res, next) => {
+    try {
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Metrics require MySQL storage" });
+      }
+
+      const db = getMysqlDb();
+      const now = new Date();
+      const since1h = new Date(now.getTime() - 60 * 60 * 1000);
+      const since24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+      const payments24h = await Promise.all([
+        db.select({ c: sql<number>`count(*)` }).from(paymentsTable).where(and(gte(paymentsTable.createdAt, since24h), eq(paymentsTable.status, "pending" as any))),
+        db.select({ c: sql<number>`count(*)` }).from(paymentsTable).where(and(gte(paymentsTable.createdAt, since24h), eq(paymentsTable.status, "completed" as any))),
+        db.select({ c: sql<number>`count(*)` }).from(paymentsTable).where(and(gte(paymentsTable.createdAt, since24h), eq(paymentsTable.status, "failed" as any))),
+      ]);
+
+      const builds1h = await Promise.all([
+        db.select({ c: sql<number>`count(*)` }).from(buildJobs).where(and(gte(buildJobs.createdAt, since1h), eq(buildJobs.status, "queued" as any))),
+        db.select({ c: sql<number>`count(*)` }).from(buildJobs).where(and(gte(buildJobs.createdAt, since1h), eq(buildJobs.status, "running" as any))),
+        db.select({ c: sql<number>`count(*)` }).from(buildJobs).where(and(gte(buildJobs.createdAt, since1h), eq(buildJobs.status, "succeeded" as any))),
+        db.select({ c: sql<number>`count(*)` }).from(buildJobs).where(and(gte(buildJobs.createdAt, since1h), eq(buildJobs.status, "failed" as any))),
+      ]);
+
+      return res.json({
+        time: now.toISOString(),
+        windows: {
+          since1h: since1h.toISOString(),
+          since24h: since24h.toISOString(),
+        },
+        payments: {
+          last24h: {
+            pending: Number(payments24h[0]?.[0]?.c ?? 0),
+            completed: Number(payments24h[1]?.[0]?.c ?? 0),
+            failed: Number(payments24h[2]?.[0]?.c ?? 0),
+          },
+        },
+        builds: {
+          last1h: {
+            queued: Number(builds1h[0]?.[0]?.c ?? 0),
+            running: Number(builds1h[1]?.[0]?.c ?? 0),
+            succeeded: Number(builds1h[2]?.[0]?.c ?? 0),
+            failed: Number(builds1h[3]?.[0]?.c ?? 0),
+          },
+        },
+      });
     } catch (err) {
       return next(err);
     }
@@ -5933,7 +6893,8 @@ export async function registerRoutes(
       const description = appItem ? `App: ${appItem.name || 'Unnamed App'}` : 'App Build Credits';
       doc.text(description, 60, rowTop + 10);
       doc.text(payment.plan?.toUpperCase() || 'STANDARD', 280, rowTop + 10);
-      doc.text(`₹${((payment.amountInr || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 450, rowTop + 10, { align: 'right', width: 90 });
+      const amountPaise = (payment as any).amountPaise != null ? Number((payment as any).amountPaise) : Number((payment.amountInr || 0) * 100);
+      doc.text(`₹${(amountPaise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 450, rowTop + 10, { align: 'right', width: 90 });
 
       doc.moveDown(4);
 
@@ -5941,7 +6902,7 @@ export async function registerRoutes(
       const subtotalY = doc.y;
       doc.fontSize(10).fillColor('#666666');
       doc.text('Subtotal:', 350, subtotalY);
-      doc.fillColor('#1a1a1a').text(`₹${((payment.amountInr || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 450, subtotalY, { align: 'right', width: 90 });
+      doc.fillColor('#1a1a1a').text(`₹${(amountPaise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 450, subtotalY, { align: 'right', width: 90 });
       
       doc.moveDown(0.5);
       doc.fillColor('#666666').text('GST (Included):', 350, doc.y);
@@ -5952,7 +6913,7 @@ export async function registerRoutes(
       doc.moveDown(0.5);
       
       doc.fontSize(12).fillColor('#1a1a1a').text('Total:', 350, doc.y, { continued: false });
-      doc.fontSize(12).fillColor('#06b6d4').text(`₹${((payment.amountInr || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 450, doc.y - 14, { align: 'right', width: 90 });
+      doc.fontSize(12).fillColor('#06b6d4').text(`₹${(amountPaise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 450, doc.y - 14, { align: 'right', width: 90 });
 
       doc.moveDown(3);
 
@@ -6650,7 +7611,13 @@ export async function registerRoutes(
       if (!isStaff(user)) {
         const { limits } = await getAppPlanInfo(appItem.id);
         if (!limits.pushEnabled) {
-          return res.status(403).json({ message: "Push notifications are not available on Starter plan. Upgrade to Standard or Pro." });
+          return res.status(402).json({
+            code: "plan_required",
+            requiresUpgrade: true,
+            feature: "push_notifications",
+            requiredPlan: "standard",
+            message: "Push notifications are not available on Starter plan. Upgrade to Standard or Pro.",
+          });
         }
       }
 
@@ -6676,7 +7643,13 @@ export async function registerRoutes(
       if (!isStaff(user)) {
         const { limits } = await getAppPlanInfo(appItem.id);
         if (!limits.pushEnabled) {
-          return res.status(403).json({ message: "Push notifications are not available on Starter plan. Upgrade to Standard or Pro." });
+          return res.status(402).json({
+            code: "plan_required",
+            requiresUpgrade: true,
+            feature: "push_notifications",
+            requiredPlan: "standard",
+            message: "Push notifications are not available on Starter plan. Upgrade to Standard or Pro.",
+          });
         }
       }
 
