@@ -267,7 +267,7 @@ export default function AdminTeam() {
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle">
       <Navbar />
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 md:px-6 py-8">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -445,15 +445,15 @@ export default function AdminTeam() {
                   <div className="grid grid-cols-3 gap-4 text-center">
                     <div>
                       <div className="text-2xl font-bold text-white">{stats.total}</div>
-                      <div className="text-xs text-muted-foreground">Total</div>
+                      <div className="text-xs font-medium text-slate-300/80">Total</div>
                     </div>
                     <div>
                       <div className="text-2xl font-bold text-amber-400">{stats.admins}</div>
-                      <div className="text-xs text-muted-foreground">Admins</div>
+                      <div className="text-xs font-medium text-slate-300/80">Admins</div>
                     </div>
                     <div>
                       <div className="text-2xl font-bold text-cyan-400">{stats.support}</div>
-                      <div className="text-xs text-muted-foreground">Support</div>
+                      <div className="text-xs font-medium text-slate-300/80">Support</div>
                     </div>
                   </div>
                 </CardContent>

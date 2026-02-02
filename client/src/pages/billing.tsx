@@ -90,7 +90,7 @@ export default function Billing() {
     return (
       <div className="min-h-screen bg-background bg-mesh-subtle">
         <Navbar />
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 md:px-6 py-8">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
             Loading...
@@ -103,7 +103,7 @@ export default function Billing() {
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle flex flex-col">
       <Navbar />
-      <main className="flex-1 container mx-auto px-4 py-8 max-w-4xl">
+      <main className="flex-1 container mx-auto px-4 md:px-6 py-8 max-w-4xl">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white">Billing & Payments</h1>
           <p className="text-muted-foreground mt-1">View your payment history and invoices</p>
@@ -118,7 +118,7 @@ export default function Billing() {
                   <IndianRupee className="h-6 w-6 text-cyan-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Spent</p>
+                  <p className="text-sm font-medium text-slate-300/80">Total Spent</p>
                   <p className="text-2xl font-bold text-white">₹{totalSpent.toLocaleString("en-IN")}</p>
                 </div>
               </div>
@@ -131,7 +131,7 @@ export default function Billing() {
                   <CheckCircle2 className="h-6 w-6 text-green-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Successful Payments</p>
+                  <p className="text-sm font-medium text-slate-300/80">Successful Payments</p>
                   <p className="text-2xl font-bold text-white">{completedPayments}</p>
                 </div>
               </div>
@@ -144,7 +144,7 @@ export default function Billing() {
                   <CreditCard className="h-6 w-6 text-purple-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Payment Method</p>
+                  <p className="text-sm font-medium text-slate-300/80">Payment Method</p>
                   <p className="text-lg font-semibold text-white">Razorpay</p>
                 </div>
               </div>

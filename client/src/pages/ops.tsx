@@ -314,7 +314,7 @@ export default function Ops() {
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle">
       <Navbar />
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 md:px-6 py-8">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -355,7 +355,7 @@ export default function Ops() {
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-white">{stats.totalApps}</div>
-                  <div className="text-xs text-muted-foreground">Total Apps</div>
+                  <div className="text-xs font-medium text-slate-300/80">Total Apps</div>
                 </div>
               </div>
             </CardContent>
@@ -369,7 +369,7 @@ export default function Ops() {
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-green-400">{stats.liveApps}</div>
-                  <div className="text-xs text-muted-foreground">Live</div>
+                  <div className="text-xs font-medium text-slate-300/80">Live</div>
                 </div>
               </div>
             </CardContent>
@@ -383,7 +383,7 @@ export default function Ops() {
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-amber-400">{stats.processingApps}</div>
-                  <div className="text-xs text-muted-foreground">Building</div>
+                  <div className="text-xs font-medium text-slate-300/80">Building</div>
                 </div>
               </div>
             </CardContent>
@@ -397,7 +397,7 @@ export default function Ops() {
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-red-400">{stats.failedApps}</div>
-                  <div className="text-xs text-muted-foreground">Failed</div>
+                  <div className="text-xs font-medium text-slate-300/80">Failed</div>
                 </div>
               </div>
             </CardContent>
@@ -411,7 +411,7 @@ export default function Ops() {
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-purple-400">{stats.openTickets}</div>
-                  <div className="text-xs text-muted-foreground">Open Tickets</div>
+                  <div className="text-xs font-medium text-slate-300/80">Open Tickets</div>
                 </div>
               </div>
             </CardContent>
@@ -427,7 +427,7 @@ export default function Ops() {
                     </div>
                     <div>
                       <div className="text-2xl font-bold text-amber-200">{approvalsCountLabel}</div>
-                      <div className="text-xs text-muted-foreground">Play Approvals</div>
+                      <div className="text-xs font-medium text-slate-300/80">Play Approvals</div>
                     </div>
                   </div>
 
@@ -452,7 +452,7 @@ export default function Ops() {
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-gray-400">{stats.closedTickets}</div>
-                  <div className="text-xs text-muted-foreground">Resolved</div>
+                  <div className="text-xs font-medium text-slate-300/80">Resolved</div>
                 </div>
               </div>
             </CardContent>

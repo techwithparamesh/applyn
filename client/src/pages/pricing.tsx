@@ -73,7 +73,7 @@ export default function Pricing() {
           <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[120px] -z-10" />
           <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[120px] -z-10" />
           
-          <div className="container mx-auto px-6">
+          <div className="container mx-auto px-4 md:px-6">
             <div className="max-w-4xl mx-auto space-y-6">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -123,7 +123,7 @@ export default function Pricing() {
 
         {/* Pricing Cards Section */}
         <section className="pb-16">
-          <div className="container mx-auto px-6 max-w-7xl">
+          <div className="container mx-auto px-4 md:px-6 max-w-7xl">
             {/* Free Preview Tier Banner */}
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
@@ -392,7 +392,7 @@ function PricingCard({ plan, delay, onSelect }: PricingCardProps) {
         onClick={onSelect}
         className={`w-full h-10 text-xs font-semibold rounded-lg transition-all ${
           isPopular 
-            ? 'bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white shadow-lg glow-primary hover:scale-[1.02]' 
+            ? 'bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white shadow-lg hover:scale-[1.02]' 
             : isAgency
             ? 'bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-400 hover:to-cyan-400 text-white shadow-lg hover:scale-[1.02]'
             : 'bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-white/20'

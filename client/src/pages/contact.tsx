@@ -60,7 +60,7 @@ export default function Contact() {
     <div className="min-h-screen bg-background selection:bg-cyan-500/30">
       <Navbar />
       
-      <main className="container mx-auto px-6 py-20 relative">
+      <main className="container mx-auto px-4 md:px-6 py-20 relative">
         {/* Background Glow */}
         <div className="absolute top-20 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[120px] -z-10" />
         <div className="absolute bottom-20 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[120px] -z-10" />
@@ -169,7 +169,7 @@ export default function Contact() {
                     />
                   </div>
                   <Button 
-                    className="w-full h-11 font-semibold gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white shadow-lg glow-primary" 
+                    className="w-full h-11 font-semibold gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white shadow-lg" 
                     disabled={loading}
                   >
                     <Send className="h-4 w-4" /> {loading ? "Sending..." : "Send Message"}

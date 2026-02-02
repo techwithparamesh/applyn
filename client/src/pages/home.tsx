@@ -34,7 +34,7 @@ export default function Home() {
       <main id="main-content" role="main" aria-label="Main content">
         {/* Hero Section */}
         <section className="relative pt-20 pb-32 overflow-hidden" aria-labelledby="hero-heading">
-          <div className="container mx-auto px-6">
+          <div className="container mx-auto px-4 md:px-6">
             <div className="grid lg:grid-cols-12 gap-16 items-center">
               <motion.div 
                 initial={{ opacity: 0, y: 30 }}
@@ -71,7 +71,7 @@ export default function Home() {
                   <Button 
                     onClick={handleGetStarted}
                     size="lg" 
-                    className="h-14 px-8 text-lg font-semibold rounded-xl bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 shadow-xl glow-primary transition-all hover:scale-[1.02] active:scale-[0.98]"
+                    className="h-14 px-8 text-lg font-semibold rounded-xl bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
                   >
                     Try Free Preview <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
@@ -126,7 +126,7 @@ export default function Home() {
 
         {/* Features Preview */}
         <section className="py-24 mx-4 mb-4">
-          <div className="container mx-auto px-6">
+          <div className="container mx-auto px-4 md:px-6">
             <div className="max-w-3xl mb-16">
               <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">Why Indian businesses <br /> <span className="text-gradient">love Applyn.</span></h2>
               <p className="text-lg text-muted-foreground">We built this specifically for the Indian market dynamics.</p>
@@ -161,7 +161,7 @@ export default function Home() {
 
       {/* FAQ Section */}
       <section id="faq" className="py-24 relative overflow-hidden">
-        <div className="container mx-auto px-6 max-w-4xl relative z-10">
+        <div className="container mx-auto px-4 md:px-6 max-w-4xl relative z-10">
           <div className="text-center mb-16 space-y-4">
             <h2 className="text-4xl md:text-5xl font-bold text-white">Got <span className="text-gradient">Questions?</span></h2>
             <p className="text-lg text-muted-foreground">Everything you need to know about the transition.</p>

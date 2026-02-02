@@ -14,7 +14,7 @@ export default function Features() {
         <div className="absolute top-20 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[120px] -z-10" />
         <div className="absolute bottom-20 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[120px] -z-10" />
         
-        <div className="container mx-auto px-6">
+        <div className="container mx-auto px-4 md:px-6">
           <div className="flex flex-col lg:flex-row items-center gap-16">
             <motion.div 
               initial={{ opacity: 0, x: -30 }}
@@ -61,7 +61,7 @@ export default function Features() {
       </section>
 
       <section className="py-24 bg-white/[0.02] border-y border-white/[0.05]">
-        <div className="container mx-auto px-6">
+        <div className="container mx-auto px-4 md:px-6">
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             <FeatureItem 
               icon={<Bell className="h-8 w-8" />}

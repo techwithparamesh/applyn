@@ -131,7 +131,7 @@ export default function AppAnalytics() {
     return (
       <div className="min-h-screen bg-background bg-mesh-subtle">
         <Navbar />
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 md:px-6 py-8">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
             Loading analytics...
@@ -150,7 +150,7 @@ export default function AppAnalytics() {
     return (
       <div className="min-h-screen bg-background bg-mesh-subtle">
         <Navbar />
-        <main className="container mx-auto px-4 py-8 text-center">
+        <main className="container mx-auto px-4 md:px-6 py-8 text-center">
           <h2 className="text-2xl font-bold text-white mb-4">App not found</h2>
           <Button onClick={() => setLocation("/dashboard")}>
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
@@ -171,7 +171,7 @@ export default function AppAnalytics() {
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle">
       <Navbar />
-      <main className="container mx-auto px-4 py-8 max-w-6xl">
+      <main className="container mx-auto px-4 md:px-6 py-8 max-w-6xl">
         {/* Header */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
@@ -199,7 +199,7 @@ export default function AppAnalytics() {
                 )}
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white">Analytics</h1>
+                <h1 className="text-3xl font-bold text-white">Analytics</h1>
                 <p className="text-muted-foreground text-sm">{app.name}</p>
               </div>
             </div>
@@ -346,13 +346,13 @@ export default function AppAnalytics() {
                             className="w-full rounded-t-md bg-gradient-to-t from-cyan-500/50 to-cyan-500/20 transition-all duration-500"
                             style={{ height: `${height * 100}%` }}
                           />
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs font-medium text-slate-300/80">
                             {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][i]}
                           </span>
                         </div>
                       ))}
                     </div>
-                    <div className="flex justify-center gap-6 text-xs text-muted-foreground">
+                    <div className="flex justify-center gap-6 text-xs font-medium text-slate-300/80">
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-cyan-500/50" />
                         <span>App Sessions</span>
@@ -489,7 +489,7 @@ export default function AppAnalytics() {
                         </div>
                         <div>
                           <p className="text-white">{totalNotifications} notification(s) sent</p>
-                          <p className="text-xs text-muted-foreground">{deliveredCount} delivered</p>
+                          <p className="text-xs font-medium text-slate-300/80">{deliveredCount} delivered</p>
                         </div>
                       </div>
                     )}
@@ -500,7 +500,7 @@ export default function AppAnalytics() {
                         </div>
                         <div>
                           <p className="text-white">{totalDevices} device(s) registered</p>
-                          <p className="text-xs text-muted-foreground">For push notifications</p>
+                          <p className="text-xs font-medium text-slate-300/80">For push notifications</p>
                         </div>
                       </div>
                     )}
@@ -558,7 +558,7 @@ function StatCard({
         </div>
         <div className="mt-3">
           <p className="text-2xl font-bold text-white">{value}</p>
-          <p className="text-xs text-muted-foreground">{title}</p>
+          <p className="text-xs font-medium text-slate-300/80">{title}</p>
         </div>
       </CardContent>
     </Card>

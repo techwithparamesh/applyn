@@ -136,7 +136,7 @@ export default function Publish() {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
-        <main className="container mx-auto px-4 py-10 max-w-3xl">
+        <main className="container mx-auto px-4 md:px-6 py-8 max-w-3xl">
           <PageState
             icon={<AlertTriangle className="h-5 w-5 text-amber-300" />}
             title="Missing app id"
@@ -351,10 +351,10 @@ export default function Publish() {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="container mx-auto px-4 py-10 max-w-3xl">
+      <main className="container mx-auto px-4 md:px-6 py-8 max-w-3xl">
         <div className="flex items-start justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-white">Publish Checklist</h1>
+            <h1 className="text-3xl font-bold text-white">Publish Checklist</h1>
             <p className="text-muted-foreground">Make the app store-ready (assets, privacy, descriptions).</p>
           </div>
           <div className="hidden md:block">
@@ -461,7 +461,7 @@ export default function Publish() {
                 ) : (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <div className="text-sm text-muted-foreground">Validation</div>
+                      <div className="text-sm font-medium text-slate-300/80">Validation</div>
                       {preflightQuery.data?.validation?.isValid ? (
                         <Badge className="bg-emerald-500/20 text-emerald-200">Pass</Badge>
                       ) : (
@@ -492,7 +492,7 @@ export default function Publish() {
                     ) : null}
 
                     <div className="flex items-center justify-between">
-                      <div className="text-sm text-muted-foreground">Policy Risk</div>
+                      <div className="text-sm font-medium text-slate-300/80">Policy Risk</div>
                       <Badge variant="secondary">{Math.round((preflightQuery.data?.policy?.riskScore || 0) * 100)}%</Badge>
                     </div>
                     {preflightQuery.data?.policyBlocked ? (
@@ -636,7 +636,7 @@ export default function Publish() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-muted-foreground">Progress</span>
+                  <span className="text-sm font-medium text-slate-300/80">Progress</span>
                   <span className="text-sm font-medium text-white">{progress.percent}%</span>
                 </div>
                 <Progress value={progress.percent} className="h-2" />

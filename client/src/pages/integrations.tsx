@@ -114,7 +114,7 @@ export default function Integrations() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
-      <main className="flex-1 container mx-auto px-4 py-8 space-y-6">
+      <main className="flex-1 container mx-auto px-4 md:px-6 py-8 space-y-6">
         <Card className="glass border-white/10">
           <CardHeader>
             <CardTitle>Integrations (Webhooks)</CardTitle>
@@ -142,7 +142,7 @@ export default function Integrations() {
               </div>
               <div className="flex items-center gap-3">
                 <Switch checked={enabled} onCheckedChange={setEnabled} />
-                <div className="text-sm text-muted-foreground">Enabled</div>
+                <div className="text-sm font-medium text-slate-300/80">Enabled</div>
               </div>
               <Button onClick={() => createHook.mutate()} disabled={!name || !url || createHook.isPending}>
                 Create
@@ -169,7 +169,7 @@ export default function Integrations() {
                       <TableRow key={h.id}>
                         <TableCell className="font-medium">{h.name}</TableCell>
                         <TableCell className="max-w-[360px] truncate">{h.url}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
+                        <TableCell className="text-xs font-medium text-slate-300/80">
                           {safeJsonArray(h.events).join(", ") || "(all)"}
                         </TableCell>
                         <TableCell>

@@ -124,7 +124,7 @@ export default function ChangePassword() {
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle">
       {!isForcedChange && <Navbar />}
-      <main className="container mx-auto px-4 py-8 flex items-center justify-center min-h-[calc(100vh-80px)]">
+      <main className="container mx-auto px-4 md:px-6 py-8 flex items-center justify-center min-h-[calc(100vh-80px)]">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

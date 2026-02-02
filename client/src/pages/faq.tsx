@@ -14,7 +14,7 @@ export default function FAQ() {
         <div className="absolute bottom-20 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[120px] -z-10" />
         
         <section className="py-20 relative overflow-hidden">
-          <div className="container mx-auto px-6 max-w-4xl">
+          <div className="container mx-auto px-4 md:px-6 max-w-4xl">
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}

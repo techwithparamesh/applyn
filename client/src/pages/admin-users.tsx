@@ -171,7 +171,7 @@ export default function AdminUsers() {
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle">
       <Navbar />
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 md:px-6 py-8">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -213,7 +213,7 @@ export default function AdminUsers() {
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Users</p>
+                  <p className="text-sm font-medium text-slate-300/80">Total Users</p>
                   <p className="text-2xl font-bold text-white mt-1">{stats.total}</p>
                 </div>
                 <div className="h-10 w-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
@@ -227,7 +227,7 @@ export default function AdminUsers() {
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">With Apps</p>
+                  <p className="text-sm font-medium text-slate-300/80">With Apps</p>
                   <p className="text-2xl font-bold text-white mt-1">{stats.withApps}</p>
                 </div>
                 <div className="h-10 w-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
@@ -241,7 +241,7 @@ export default function AdminUsers() {
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Open Tickets</p>
+                  <p className="text-sm font-medium text-slate-300/80">Open Tickets</p>
                   <p className="text-2xl font-bold text-white mt-1">{stats.withOpenTickets}</p>
                 </div>
                 <div className="h-10 w-10 rounded-xl bg-yellow-500/10 flex items-center justify-center">
@@ -255,7 +255,7 @@ export default function AdminUsers() {
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Paid Users</p>
+                  <p className="text-sm font-medium text-slate-300/80">Paid Users</p>
                   <p className="text-2xl font-bold text-white mt-1">{stats.withPlan}</p>
                 </div>
                 <div className="h-10 w-10 rounded-xl bg-green-500/10 flex items-center justify-center">

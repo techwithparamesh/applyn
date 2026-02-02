@@ -92,7 +92,7 @@ export default function PreviewApp() {
     return (
       <div className="min-h-screen bg-background bg-mesh-subtle">
         <Navbar />
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 md:px-6 py-8">
           <PageLoading label="Loading preview…" />
         </main>
       </div>
@@ -103,7 +103,7 @@ export default function PreviewApp() {
     return (
       <div className="min-h-screen bg-background bg-mesh-subtle">
         <Navbar />
-        <main className="container mx-auto px-4 py-8 max-w-3xl">
+        <main className="container mx-auto px-4 md:px-6 py-8 max-w-3xl">
           <PageState
             icon={<AlertTriangle className="h-5 w-5 text-red-300" />}
             title="Couldn’t load this app"
@@ -126,7 +126,7 @@ export default function PreviewApp() {
     return (
       <div className="min-h-screen bg-background bg-mesh-subtle">
         <Navbar />
-        <main className="container mx-auto px-4 py-8 max-w-3xl">
+        <main className="container mx-auto px-4 md:px-6 py-8 max-w-3xl">
           <PageState
             icon={<AlertTriangle className="h-5 w-5 text-amber-300" />}
             title="App not found"
@@ -599,40 +599,40 @@ export default function PreviewApp() {
                     <div className="space-y-4">
                       <div className="space-y-3">
                         <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Platform</span>
+                          <span className="text-sm font-medium text-slate-300/80">Platform</span>
                           <span className="text-sm text-white capitalize px-2.5 py-1 rounded-full bg-white/5 border border-white/10">{app.platform}</span>
                         </div>
                         <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Status</span>
+                          <span className="text-sm font-medium text-slate-300/80">Status</span>
                           <span className="text-sm text-white capitalize">{app.status}</span>
                         </div>
                         {app.packageName && (
                           <div className="flex justify-between items-center">
-                            <span className="text-sm text-muted-foreground">Package</span>
+                            <span className="text-sm font-medium text-slate-300/80">Package</span>
                             <span className="text-white text-xs truncate max-w-[150px] font-mono bg-white/5 px-2 py-0.5 rounded">{app.packageName}</span>
                           </div>
                         )}
                         {app.versionCode && (
                           <div className="flex justify-between items-center">
-                            <span className="text-sm text-muted-foreground">Version</span>
+                            <span className="text-sm font-medium text-slate-300/80">Version</span>
                             <span className="text-sm text-white">{app.versionCode}</span>
                           </div>
                         )}
                         {app.artifactSize && (
                           <div className="flex justify-between items-center">
-                            <span className="text-sm text-muted-foreground">Size</span>
+                            <span className="text-sm font-medium text-slate-300/80">Size</span>
                             <span className="text-sm text-white">{(app.artifactSize / 1024 / 1024).toFixed(1)} MB</span>
                           </div>
                         )}
                         <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Created</span>
+                          <span className="text-sm font-medium text-slate-300/80">Created</span>
                           <span className="text-sm text-white">{new Date(app.createdAt).toLocaleDateString()}</span>
                         </div>
                       </div>
 
                       <div className="pt-4 border-t border-white/[0.06] space-y-3">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Primary</span>
+                          <span className="text-sm font-medium text-slate-300/80">Primary</span>
                           <div className="flex items-center gap-2">
                             <div
                               className="h-7 w-7 rounded-full border-2 border-white/20 shadow-lg"
@@ -643,7 +643,7 @@ export default function PreviewApp() {
                         </div>
                         {app.splashColor && (
                           <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Splash</span>
+                            <span className="text-sm font-medium text-slate-300/80">Splash</span>
                             <div className="flex items-center gap-2">
                               <div
                                 className="h-7 w-7 rounded-lg border-2 border-white/20 shadow-lg"

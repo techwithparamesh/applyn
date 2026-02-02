@@ -5,7 +5,7 @@ import { Mail, Phone, MapPin, Sparkles } from "lucide-react";
 export function Footer() {
   return (
     <footer className="border-t border-white/[0.08] bg-background/80">
-      <div className="container mx-auto px-6 py-16">
+      <div className="container mx-auto px-4 md:px-6 py-16">
         <div className="grid gap-12 md:grid-cols-4 mb-14">
           <div className="col-span-1 md:col-span-1 space-y-4">
             <Link href="/">

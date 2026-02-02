@@ -868,13 +868,13 @@ export default function CreateApp() {
                                       className="w-3 h-3 rounded-full border border-white/20" 
                                       style={{ backgroundColor: websiteAnalysis.primaryColor }}
                                     />
-                                    <span className="text-xs text-muted-foreground">Color</span>
+                                    <span className="text-xs font-medium text-slate-300/80">Color</span>
                                   </div>
                                 )}
                                 {websiteAnalysis.logoUrl && (
                                   <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/5 border border-white/10">
                                     <Image className="w-3 h-3 text-green-400" />
-                                    <span className="text-xs text-muted-foreground">Logo</span>
+                                    <span className="text-xs font-medium text-slate-300/80">Logo</span>
                                   </div>
                                 )}
                               </div>
@@ -1543,7 +1543,7 @@ export default function CreateApp() {
                 </Button>
                 <Button 
                   onClick={handleNext} 
-                  className="min-w-[160px] bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white shadow-lg glow-primary" 
+                  className="min-w-[160px] bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white shadow-lg" 
                   disabled={loading}
                 >
                   {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

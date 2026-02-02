@@ -334,7 +334,7 @@ export default function AppStructure() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <main className="container mx-auto px-4 py-8 space-y-6">
+      <main className="container mx-auto px-4 md:px-6 py-8 space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>App Structure</CardTitle>

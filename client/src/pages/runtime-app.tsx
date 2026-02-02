@@ -703,7 +703,7 @@ export default function RuntimeApp() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
-      <main className="flex-1 container mx-auto px-4 py-8 space-y-6">
+      <main className="flex-1 container mx-auto px-4 md:px-6 py-8 space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>Runtime App Preview</CardTitle>

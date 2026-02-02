@@ -115,7 +115,7 @@ export default function EditApp() {
     return (
       <div className="min-h-screen bg-background bg-mesh-subtle">
         <Navbar />
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 md:px-6 py-8">
           <div className="flex items-center gap-2 text-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
             Loading...
@@ -129,7 +129,7 @@ export default function EditApp() {
     return (
       <div className="min-h-screen bg-background bg-mesh-subtle">
         <Navbar />
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 md:px-6 py-8">
           <div className="text-center py-12">
             <h2 className="text-2xl font-bold text-foreground mb-2">App not found</h2>
             <p className="text-muted-foreground mb-4">This app doesn't exist or you don't have access to it.</p>
@@ -145,7 +145,7 @@ export default function EditApp() {
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle">
       <Navbar />
-      <main className="container mx-auto px-4 py-8 max-w-6xl">
+      <main className="container mx-auto px-4 md:px-6 py-8 max-w-6xl">
         <div className="flex items-center gap-4 mb-8">
           <Button variant="ghost" size="icon" onClick={() => setLocation("/dashboard")}>
             <ArrowLeft className="h-5 w-5" />

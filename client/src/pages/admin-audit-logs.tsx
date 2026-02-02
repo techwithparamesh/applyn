@@ -131,7 +131,7 @@ export default function AdminAuditLogs() {
     return (
       <div className="min-h-screen bg-background bg-mesh-subtle">
         <Navbar />
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 md:px-6 py-8">
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
           </div>
@@ -145,7 +145,7 @@ export default function AdminAuditLogs() {
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle flex flex-col">
       <Navbar />
-      <main className="flex-1 container mx-auto px-4 py-8">
+      <main className="flex-1 container mx-auto px-4 md:px-6 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white flex items-center gap-3">
             <Shield className="h-8 w-8 text-cyan-400" />
@@ -159,7 +159,7 @@ export default function AdminAuditLogs() {
           <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1">
-                <label className="text-sm text-muted-foreground mb-1 block">User ID</label>
+                <label className="text-sm font-medium text-slate-300/80 mb-1 block">User ID</label>
                 <Input
                   placeholder="Filter by user ID..."
                   value={userIdFilter}
@@ -168,7 +168,7 @@ export default function AdminAuditLogs() {
                 />
               </div>
               <div className="flex-1">
-                <label className="text-sm text-muted-foreground mb-1 block">Action</label>
+                <label className="text-sm font-medium text-slate-300/80 mb-1 block">Action</label>
                 <Select value={actionFilter || "all"} onValueChange={(val) => setActionFilter(val === "all" ? "" : val)}>
                   <SelectTrigger className="bg-white/5 border-white/10">
                     <SelectValue placeholder="All actions" />
@@ -177,7 +177,7 @@ export default function AdminAuditLogs() {
                     <SelectItem value="all">All actions</SelectItem>
                     {Object.entries(actionCategories).map(([category, actions]) => (
                       <div key={category}>
-                        <div className="px-2 py-1 text-xs text-muted-foreground uppercase font-semibold">
+                        <div className="px-2 py-1 text-xs font-semibold text-slate-300/80 uppercase">
                           {category}
                         </div>
                         {actions.map((action) => (

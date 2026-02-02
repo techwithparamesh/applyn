@@ -85,7 +85,7 @@ export default function AdminAnalytics() {
     return (
       <div className="min-h-screen bg-background bg-mesh-subtle">
         <Navbar />
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 md:px-6 py-8">
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
           </div>
@@ -98,7 +98,7 @@ export default function AdminAnalytics() {
     return (
       <div className="min-h-screen bg-background bg-mesh-subtle">
         <Navbar />
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 md:px-6 py-8">
           <p className="text-muted-foreground">Failed to load analytics</p>
         </main>
       </div>
@@ -112,7 +112,7 @@ export default function AdminAnalytics() {
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle flex flex-col">
       <Navbar />
-      <main className="flex-1 container mx-auto px-4 py-8">
+      <main className="flex-1 container mx-auto px-4 md:px-6 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white flex items-center gap-3">
             <BarChart3 className="h-8 w-8 text-cyan-400" />
@@ -130,7 +130,7 @@ export default function AdminAnalytics() {
                   <Users className="h-6 w-6 text-cyan-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Users</p>
+                  <p className="text-sm font-medium text-slate-300/80">Total Users</p>
                   <p className="text-2xl font-bold text-white">{analytics.totalUsers.toLocaleString()}</p>
                   <p className="text-xs text-green-400">+{analytics.usersToday} today</p>
                 </div>
@@ -145,7 +145,7 @@ export default function AdminAnalytics() {
                   <Smartphone className="h-6 w-6 text-purple-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Apps</p>
+                  <p className="text-sm font-medium text-slate-300/80">Total Apps</p>
                   <p className="text-2xl font-bold text-white">{analytics.totalApps.toLocaleString()}</p>
                   <p className="text-xs text-green-400">+{analytics.appsToday} today</p>
                 </div>
@@ -160,7 +160,7 @@ export default function AdminAnalytics() {
                   <CreditCard className="h-6 w-6 text-green-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Payments</p>
+                  <p className="text-sm font-medium text-slate-300/80">Total Payments</p>
                   <p className="text-2xl font-bold text-white">{analytics.totalPayments.toLocaleString()}</p>
                   <p className="text-xs text-green-400">+{analytics.paymentsToday} today</p>
                 </div>
@@ -175,7 +175,7 @@ export default function AdminAnalytics() {
                   <IndianRupee className="h-6 w-6 text-amber-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Revenue</p>
+                  <p className="text-sm font-medium text-slate-300/80">Total Revenue</p>
                   <p className="text-2xl font-bold text-white">{formatCurrency(analytics.totalRevenue)}</p>
                   <p className="text-xs text-green-400">+{formatCurrency(analytics.revenueToday)} today</p>
                 </div>
@@ -188,26 +188,26 @@ export default function AdminAnalytics() {
         <div className="grid md:grid-cols-3 gap-4 mb-8">
           <Card className="glass border-white/10">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <CardTitle className="text-sm font-medium text-slate-300/80 flex items-center gap-2">
                 <Calendar className="h-4 w-4" /> This Week
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">New Users</span>
+                  <span className="text-sm font-medium text-slate-300/80">New Users</span>
                   <span className="font-semibold text-white">{analytics.usersThisWeek}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">New Apps</span>
+                  <span className="text-sm font-medium text-slate-300/80">New Apps</span>
                   <span className="font-semibold text-white">{analytics.appsThisWeek}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Payments</span>
+                  <span className="text-sm font-medium text-slate-300/80">Payments</span>
                   <span className="font-semibold text-white">{analytics.paymentsThisWeek}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Revenue</span>
+                  <span className="text-sm font-medium text-slate-300/80">Revenue</span>
                   <span className="font-semibold text-green-400">{formatCurrency(analytics.revenueThisWeek)}</span>
                 </div>
               </div>
@@ -216,26 +216,26 @@ export default function AdminAnalytics() {
 
           <Card className="glass border-white/10">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <CardTitle className="text-sm font-medium text-slate-300/80 flex items-center gap-2">
                 <Calendar className="h-4 w-4" /> This Month
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">New Users</span>
+                  <span className="text-sm font-medium text-slate-300/80">New Users</span>
                   <span className="font-semibold text-white">{analytics.usersThisMonth}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">New Apps</span>
+                  <span className="text-sm font-medium text-slate-300/80">New Apps</span>
                   <span className="font-semibold text-white">{analytics.appsThisMonth}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Payments</span>
+                  <span className="text-sm font-medium text-slate-300/80">Payments</span>
                   <span className="font-semibold text-white">{analytics.paymentsThisMonth}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Revenue</span>
+                  <span className="text-sm font-medium text-slate-300/80">Revenue</span>
                   <span className="font-semibold text-green-400">{formatCurrency(analytics.revenueThisMonth)}</span>
                 </div>
               </div>
@@ -244,7 +244,7 @@ export default function AdminAnalytics() {
 
           <Card className="glass border-white/10">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <CardTitle className="text-sm font-medium text-slate-300/80 flex items-center gap-2">
                 <TrendingUp className="h-4 w-4" /> Build Stats
               </CardTitle>
             </CardHeader>
@@ -252,7 +252,7 @@ export default function AdminAnalytics() {
               <div className="space-y-4">
                 <div>
                   <div className="flex justify-between mb-1">
-                    <span className="text-sm text-muted-foreground">Success Rate</span>
+                    <span className="text-sm font-medium text-slate-300/80">Success Rate</span>
                     <span className="font-semibold text-white">{analytics.buildSuccessRate.toFixed(1)}%</span>
                   </div>
                   <div className="h-2 bg-white/10 rounded-full overflow-hidden">

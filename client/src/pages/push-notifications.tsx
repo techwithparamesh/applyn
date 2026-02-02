@@ -155,7 +155,7 @@ export default function PushNotifications() {
     return (
       <div className="min-h-screen bg-slate-50">
         <Navbar />
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 md:px-6 py-8">
           <div className="flex items-center gap-2">
             <Loader2 className="h-5 w-5 animate-spin" />
             Loading...
@@ -174,7 +174,7 @@ export default function PushNotifications() {
     return (
       <div className="min-h-screen bg-slate-50">
         <Navbar />
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 md:px-6 py-8">
           <div className="text-center py-12">
             <h2 className="text-2xl font-bold mb-2">App not found</h2>
             <Button onClick={() => setLocation("/dashboard")}>
@@ -189,7 +189,7 @@ export default function PushNotifications() {
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle">
       <Navbar />
-      <main className="container mx-auto px-4 py-8 max-w-5xl">
+      <main className="container mx-auto px-4 md:px-6 py-8 max-w-5xl">
         {/* Header */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
@@ -211,7 +211,7 @@ export default function PushNotifications() {
               )}
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">Push Notifications</h1>
+              <h1 className="text-3xl font-bold text-white">Push Notifications</h1>
               <p className="text-muted-foreground text-sm">Send notifications to {app.name} users</p>
             </div>
           </div>
@@ -231,7 +231,7 @@ export default function PushNotifications() {
                   <Smartphone className="h-5 w-5 text-cyan-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Devices</p>
+                  <p className="text-xs font-medium text-slate-300/80">Devices</p>
                   <p className="text-xl font-bold text-white">{tokensLoading ? "..." : tokens?.count || 0}</p>
                 </div>
               </div>
@@ -244,7 +244,7 @@ export default function PushNotifications() {
                   <Send className="h-5 w-5 text-green-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Sent</p>
+                  <p className="text-xs font-medium text-slate-300/80">Sent</p>
                   <p className="text-xl font-bold text-white">
                     {historyLoading ? "..." : history?.filter((n) => n.status === "sent").length || 0}
                   </p>
@@ -259,7 +259,7 @@ export default function PushNotifications() {
                   <BarChart3 className="h-5 w-5 text-purple-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Delivered</p>
+                  <p className="text-xs font-medium text-slate-300/80">Delivered</p>
                   <p className="text-xl font-bold text-white">
                     {historyLoading ? "..." : history?.reduce((acc, n) => acc + (n.sentCount || 0), 0) || 0}
                   </p>
@@ -274,7 +274,7 @@ export default function PushNotifications() {
                   <Bell className="h-5 w-5 text-amber-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Total</p>
+                  <p className="text-xs font-medium text-slate-300/80">Total</p>
                   <p className="text-xl font-bold text-white">{historyLoading ? "..." : history?.length || 0}</p>
                 </div>
               </div>

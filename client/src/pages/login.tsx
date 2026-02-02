@@ -174,7 +174,7 @@ export default function AuthPage() {
 
                     <Button 
                       type="submit" 
-                      className="w-full h-11 text-base font-semibold bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white rounded-lg shadow-lg glow-primary transition-all hover:scale-[1.02] active:scale-[0.98]" 
+                      className="w-full h-11 text-base font-semibold bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white rounded-lg shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]" 
                       disabled={loading}
                     >
                       {loading ? (isLogin ? "Signing in..." : "Creating account...") : (isLogin ? "Sign in" : "Get Started Free")}

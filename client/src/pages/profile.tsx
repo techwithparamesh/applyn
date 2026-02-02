@@ -96,7 +96,7 @@ export default function Profile() {
     return (
       <div className="min-h-screen bg-background bg-mesh-subtle">
         <Navbar />
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 md:px-6 py-8">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
             Loading...
@@ -111,7 +111,7 @@ export default function Profile() {
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle flex flex-col">
       <Navbar />
-      <main className="flex-1 container mx-auto px-4 py-8 max-w-2xl">
+      <main className="flex-1 container mx-auto px-4 md:px-6 py-8 max-w-2xl">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white">Profile Settings</h1>
           <p className="text-muted-foreground mt-1">Manage your account settings and preferences</p>

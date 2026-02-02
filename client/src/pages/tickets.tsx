@@ -338,10 +338,9 @@ export default function Tickets() {
     return (
       <div className="min-h-screen bg-background bg-mesh-subtle">
         <Navbar />
-        <main className="container mx-auto px-4 py-8">
-          <div className="flex items-center gap-3 text-muted-foreground">
-            <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            Loading...
+        <main className="container mx-auto px-4 md:px-6 py-8">
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
           </div>
         </main>
       </div>
@@ -365,12 +364,12 @@ export default function Tickets() {
     <div className="min-h-screen bg-background bg-mesh-subtle flex flex-col">
       <Navbar />
 
-      <main className="flex-1 container mx-auto px-4 py-8">
+      <main className="flex-1 container mx-auto px-4 md:px-6 py-8">
         <motion.div
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="space-y-8"
+          className="space-y-10"
         >
           {/* Header */}
           <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -386,7 +385,7 @@ export default function Tickets() {
             </div>
             <Button 
               onClick={() => setNewOpen(true)}
-              className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold shadow-lg glow-primary"
+              className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold"
             >
               <Plus className="h-4 w-4" /> Create New Ticket
             </Button>
@@ -398,8 +397,8 @@ export default function Tickets() {
               <CardContent className="p-5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">Total Tickets</p>
-                    <p className="text-3xl font-bold text-white mt-1">{stats.total}</p>
+                    <p className="text-sm font-medium text-slate-300/80">Total Tickets</p>
+                    <p className="text-2xl font-bold text-white mt-1">{stats.total}</p>
                   </div>
                   <div className="h-12 w-12 rounded-xl bg-cyan-500/10 flex items-center justify-center">
                     <MessageSquare className="h-6 w-6 text-cyan-400" />
@@ -412,8 +411,8 @@ export default function Tickets() {
               <CardContent className="p-5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">Open</p>
-                    <p className="text-3xl font-bold text-white mt-1">{stats.open}</p>
+                    <p className="text-sm font-medium text-slate-300/80">Open</p>
+                    <p className="text-2xl font-bold text-white mt-1">{stats.open}</p>
                   </div>
                   <div className="h-12 w-12 rounded-xl bg-yellow-500/10 flex items-center justify-center">
                     <Clock className="h-6 w-6 text-yellow-400" />
@@ -426,8 +425,8 @@ export default function Tickets() {
               <CardContent className="p-5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">Resolved</p>
-                    <p className="text-3xl font-bold text-white mt-1">{stats.closed}</p>
+                    <p className="text-sm font-medium text-slate-300/80">Resolved</p>
+                    <p className="text-2xl font-bold text-white mt-1">{stats.closed}</p>
                   </div>
                   <div className="h-12 w-12 rounded-xl bg-green-500/10 flex items-center justify-center">
                     <CheckCircle2 className="h-6 w-6 text-green-400" />
@@ -489,7 +488,7 @@ export default function Tickets() {
                 <CardContent className="p-0">
                   {ticketsLoading && (
                     <div className="p-6 text-sm text-muted-foreground flex items-center gap-3">
-                      <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
                       Loading tickets...
                     </div>
                   )}

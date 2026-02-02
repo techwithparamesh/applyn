@@ -32,6 +32,7 @@ import {
   AlertTriangle,
   Crown,
   Mail,
+  Loader2,
   X,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -476,10 +477,9 @@ export default function Dashboard() {
     return (
       <div className="min-h-screen bg-background bg-mesh-subtle">
         <Navbar />
-        <main className="container mx-auto px-4 py-8">
-          <div className="flex items-center gap-3 text-muted-foreground">
-            <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            Loading...
+        <main className="container mx-auto px-4 md:px-6 py-8">
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
           </div>
         </main>
       </div>
@@ -503,12 +503,12 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background bg-mesh-subtle flex flex-col">
       <Navbar />
 
-      <main className="flex-1 container mx-auto px-4 py-8">
+      <main className="flex-1 container mx-auto px-4 md:px-6 py-8">
         <motion.div
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="space-y-8"
+          className="space-y-10"
         >
           {/* Header */}
           <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -525,7 +525,7 @@ export default function Dashboard() {
             </div>
             {!isSupport && (
               <Link href="/prompt-create">
-                <Button className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold shadow-lg glow-primary">
+                <Button className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold">
                   <Plus className="h-4 w-4" /> Create New App
                 </Button>
               </Link>
@@ -539,7 +539,7 @@ export default function Dashboard() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                      <div className="h-10 w-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
                         <Mail className="h-5 w-5 text-amber-400" />
                       </div>
                       <div>
@@ -554,7 +554,6 @@ export default function Dashboard() {
                         size="sm"
                         onClick={handleResendVerification}
                         disabled={resendingVerification}
-                        className="bg-amber-500 hover:bg-amber-600 text-black"
                       >
                         {resendingVerification ? (
                           <RefreshCw className="h-4 w-4 animate-spin mr-1" />
@@ -590,8 +589,8 @@ export default function Dashboard() {
                   <CardContent className="p-5">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-muted-foreground">Open Tickets</p>
-                        <p className="text-3xl font-bold text-white mt-1">{stats.openTickets}</p>
+                        <p className="text-sm font-medium text-slate-300/80">Open Tickets</p>
+                        <p className="text-2xl font-bold text-white mt-1">{stats.openTickets}</p>
                       </div>
                       <div className="h-12 w-12 rounded-xl bg-yellow-500/10 flex items-center justify-center">
                         <LifeBuoy className="h-6 w-6 text-yellow-400" />
@@ -604,8 +603,8 @@ export default function Dashboard() {
                   <CardContent className="p-5">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-muted-foreground">Total Apps</p>
-                        <p className="text-3xl font-bold text-white mt-1">{stats.total}</p>
+                        <p className="text-sm font-medium text-slate-300/80">Total Apps</p>
+                        <p className="text-2xl font-bold text-white mt-1">{stats.total}</p>
                       </div>
                       <div className="h-12 w-12 rounded-xl bg-cyan-500/10 flex items-center justify-center">
                         <Package className="h-6 w-6 text-cyan-400" />
@@ -618,8 +617,8 @@ export default function Dashboard() {
                   <CardContent className="p-5">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-muted-foreground">Processing</p>
-                        <p className="text-3xl font-bold text-white mt-1">{stats.processing}</p>
+                        <p className="text-sm font-medium text-slate-300/80">Processing</p>
+                        <p className="text-2xl font-bold text-white mt-1">{stats.processing}</p>
                       </div>
                       <div className="h-12 w-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
                         <Activity className="h-6 w-6 text-purple-400" />
@@ -632,8 +631,8 @@ export default function Dashboard() {
                   <CardContent className="p-5">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-muted-foreground">Failed Builds</p>
-                        <p className="text-3xl font-bold text-white mt-1">{stats.failed}</p>
+                        <p className="text-sm font-medium text-slate-300/80">Failed Builds</p>
+                        <p className="text-2xl font-bold text-white mt-1">{stats.failed}</p>
                       </div>
                       <div className="h-12 w-12 rounded-xl bg-red-500/10 flex items-center justify-center">
                         <AlertCircle className="h-6 w-6 text-red-400" />
@@ -646,14 +645,14 @@ export default function Dashboard() {
               /* Regular User Stats */
               <>
                 <Card 
-                  className={`glass glass-hover border stat-gradient-1 cursor-pointer transition-all ${statusFilter === "all" ? "ring-2 ring-cyan-500" : ""}`}
+                  className={`glass glass-hover border stat-gradient-1 cursor-pointer transition-all ${statusFilter === "all" ? "ring-1 ring-cyan-500/50 bg-white/[0.05]" : ""}`}
                   onClick={() => setStatusFilter("all")}
                 >
                   <CardContent className="p-5">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-muted-foreground">Total Apps</p>
-                        <p className="text-3xl font-bold text-white mt-1">{stats.total}</p>
+                        <p className="text-sm font-medium text-slate-300/80">Total Apps</p>
+                        <p className="text-2xl font-bold text-white mt-1">{stats.total}</p>
                       </div>
                       <div className="h-12 w-12 rounded-xl bg-cyan-500/10 flex items-center justify-center">
                         <Package className="h-6 w-6 text-cyan-400" />
@@ -663,14 +662,14 @@ export default function Dashboard() {
                 </Card>
 
                 <Card 
-                  className={`glass glass-hover border stat-gradient-3 cursor-pointer transition-all ${statusFilter === "live" ? "ring-2 ring-green-500" : ""}`}
+                  className={`glass glass-hover border stat-gradient-3 cursor-pointer transition-all ${statusFilter === "live" ? "ring-1 ring-green-500/50 bg-white/[0.05]" : ""}`}
                   onClick={() => setStatusFilter("live")}
                 >
                   <CardContent className="p-5">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-muted-foreground">Live Apps</p>
-                        <p className="text-3xl font-bold text-white mt-1">{stats.live}</p>
+                        <p className="text-sm font-medium text-slate-300/80">Live Apps</p>
+                        <p className="text-2xl font-bold text-white mt-1">{stats.live}</p>
                       </div>
                       <div className="h-12 w-12 rounded-xl bg-green-500/10 flex items-center justify-center">
                         <CheckCircle className="h-6 w-6 text-green-400" />
@@ -680,14 +679,14 @@ export default function Dashboard() {
                 </Card>
 
                 <Card 
-                  className={`glass glass-hover border stat-gradient-2 cursor-pointer transition-all ${statusFilter === "processing" ? "ring-2 ring-purple-500" : ""}`}
+                  className={`glass glass-hover border stat-gradient-2 cursor-pointer transition-all ${statusFilter === "processing" ? "ring-1 ring-purple-500/50 bg-white/[0.05]" : ""}`}
                   onClick={() => setStatusFilter("processing")}
                 >
                   <CardContent className="p-5">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-muted-foreground">Processing</p>
-                        <p className="text-3xl font-bold text-white mt-1">{stats.processing}</p>
+                        <p className="text-sm font-medium text-slate-300/80">Processing</p>
+                        <p className="text-2xl font-bold text-white mt-1">{stats.processing}</p>
                       </div>
                       <div className="h-12 w-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
                         <Activity className="h-6 w-6 text-purple-400" />
@@ -703,8 +702,8 @@ export default function Dashboard() {
                   <CardContent className="p-5">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-muted-foreground">Open Tickets</p>
-                        <p className="text-3xl font-bold text-white mt-1">{stats.openTickets}</p>
+                        <p className="text-sm font-medium text-slate-300/80">Open Tickets</p>
+                        <p className="text-2xl font-bold text-white mt-1">{stats.openTickets}</p>
                       </div>
                       <div className="h-12 w-12 rounded-xl bg-yellow-500/10 flex items-center justify-center">
                         <LifeBuoy className="h-6 w-6 text-yellow-400" />
@@ -718,14 +717,14 @@ export default function Dashboard() {
 
           {/* Quick Actions - Role-based */}
           <motion.div variants={itemVariants}>
-            <h2 className="text-lg font-semibold text-white mb-4">Quick Actions</h2>
+            <h2 className="text-lg font-semibold text-white mb-3">Quick Actions</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {/* Support-specific actions */}
               {isSupport ? (
                 <>
                   <Link href="/tickets">
                     <Card className="glass glass-hover cursor-pointer group">
-                      <CardContent className="p-5 flex items-center gap-4">
+                      <CardContent className="p-4 flex items-center gap-3">
                         <div className="h-10 w-10 rounded-xl bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
                           <LifeBuoy className="h-5 w-5 text-purple-400" />
                         </div>
@@ -739,7 +738,7 @@ export default function Dashboard() {
 
                   <Link href="/ops">
                     <Card className="glass glass-hover cursor-pointer group">
-                      <CardContent className="p-5 flex items-center gap-4">
+                      <CardContent className="p-4 flex items-center gap-3">
                         <div className="h-10 w-10 rounded-xl bg-cyan-500/10 flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
                           <Activity className="h-5 w-5 text-cyan-400" />
                         </div>
@@ -753,7 +752,7 @@ export default function Dashboard() {
 
                   <Link href="/profile">
                     <Card className="glass glass-hover cursor-pointer group">
-                      <CardContent className="p-5 flex items-center gap-4">
+                      <CardContent className="p-4 flex items-center gap-3">
                         <div className="h-10 w-10 rounded-xl bg-yellow-500/10 flex items-center justify-center group-hover:bg-yellow-500/20 transition-colors">
                           <Settings className="h-5 w-5 text-yellow-400" />
                         </div>
@@ -766,7 +765,7 @@ export default function Dashboard() {
                   </Link>
 
                   <Card className="glass border-dashed border-white/10 opacity-60">
-                    <CardContent className="p-5 flex items-center gap-4">
+                    <CardContent className="p-4 flex items-center gap-3">
                       <div className="h-10 w-10 rounded-xl bg-gray-500/10 flex items-center justify-center">
                         <AlertCircle className="h-5 w-5 text-gray-400" />
                       </div>
@@ -782,7 +781,7 @@ export default function Dashboard() {
                 <>
                   <Link href="/prompt-create">
                     <Card className="glass glass-hover cursor-pointer group">
-                      <CardContent className="p-5 flex items-center gap-4">
+                      <CardContent className="p-4 flex items-center gap-3">
                         <div className="h-10 w-10 rounded-xl bg-cyan-500/10 flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
                           <Sparkles className="h-5 w-5 text-cyan-400" />
                         </div>
@@ -796,7 +795,7 @@ export default function Dashboard() {
 
                   <Link href="/tickets">
                     <Card className="glass glass-hover cursor-pointer group">
-                      <CardContent className="p-5 flex items-center gap-4">
+                      <CardContent className="p-4 flex items-center gap-3">
                         <div className="h-10 w-10 rounded-xl bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
                           <LifeBuoy className="h-5 w-5 text-purple-400" />
                         </div>
@@ -810,7 +809,7 @@ export default function Dashboard() {
 
                   <Link href="/billing">
                     <Card className="glass glass-hover cursor-pointer group">
-                      <CardContent className="p-5 flex items-center gap-4">
+                      <CardContent className="p-4 flex items-center gap-3">
                         <div className="h-10 w-10 rounded-xl bg-green-500/10 flex items-center justify-center group-hover:bg-green-500/20 transition-colors">
                           <CreditCard className="h-5 w-5 text-green-400" />
                         </div>
@@ -824,7 +823,7 @@ export default function Dashboard() {
 
                   <Link href="/profile">
                     <Card className="glass glass-hover cursor-pointer group">
-                      <CardContent className="p-5 flex items-center gap-4">
+                      <CardContent className="p-4 flex items-center gap-3">
                         <div className="h-10 w-10 rounded-xl bg-yellow-500/10 flex items-center justify-center group-hover:bg-yellow-500/20 transition-colors">
                           <Settings className="h-5 w-5 text-yellow-400" />
                         </div>
@@ -895,7 +894,7 @@ export default function Dashboard() {
                         <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-white/5">
                           <RefreshCw className="h-5 w-5 text-purple-400" />
                           <div>
-                            <p className="text-xs text-muted-foreground">Rebuilds Left</p>
+                            <p className="text-xs font-medium text-slate-300/80">Rebuilds Left</p>
                             <p className="text-lg font-bold text-white">
                               {subscription.remainingRebuilds}
                               <span className="text-sm text-muted-foreground font-normal">
@@ -968,7 +967,7 @@ export default function Dashboard() {
               {appsLoading && (
                 <Card className="md:col-span-2 lg:col-span-3 glass">
                   <CardContent className="p-6 text-sm text-muted-foreground flex items-center gap-3">
-                    <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
                     Loading your apps...
                   </CardContent>
                 </Card>
@@ -1144,7 +1143,7 @@ export default function Dashboard() {
 
                     {app.status === "processing" && (
                       <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                        <div className="h-3 w-3 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+                        <Loader2 className="h-3 w-3 animate-spin text-purple-300" />
                         Build in progress...
                       </div>
                     )}
