@@ -112,19 +112,21 @@ export default function AdminAnalytics() {
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle flex flex-col">
       <Navbar />
-      <main className="flex-1 container mx-auto px-4 md:px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+      <main className="flex-1 container mx-auto px-4 md:px-6 py-8 space-y-10">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight text-white flex items-center gap-3">
             <BarChart3 className="h-8 w-8 text-cyan-400" />
             Analytics Dashboard
           </h1>
-          <p className="text-muted-foreground mt-1">Business metrics and insights</p>
+            <p className="mt-1 text-sm text-muted-foreground">Business metrics and insights</p>
+          </div>
         </div>
 
         {/* Overview Stats */}
         <div className="grid md:grid-cols-4 gap-4 mb-8">
           <Card className="glass border-white/10">
-            <CardContent className="pt-6">
+            <CardContent className="p-5">
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
                   <Users className="h-6 w-6 text-cyan-400" />
@@ -139,7 +141,7 @@ export default function AdminAnalytics() {
           </Card>
 
           <Card className="glass border-white/10">
-            <CardContent className="pt-6">
+            <CardContent className="p-5">
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
                   <Smartphone className="h-6 w-6 text-purple-400" />
@@ -154,7 +156,7 @@ export default function AdminAnalytics() {
           </Card>
 
           <Card className="glass border-white/10">
-            <CardContent className="pt-6">
+            <CardContent className="p-5">
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center">
                   <CreditCard className="h-6 w-6 text-green-400" />
@@ -169,7 +171,7 @@ export default function AdminAnalytics() {
           </Card>
 
           <Card className="glass border-white/10">
-            <CardContent className="pt-6">
+            <CardContent className="p-5">
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
                   <IndianRupee className="h-6 w-6 text-amber-400" />

@@ -111,10 +111,12 @@ export default function Profile() {
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle flex flex-col">
       <Navbar />
-      <main className="flex-1 container mx-auto px-4 md:px-6 py-8 max-w-2xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white">Profile Settings</h1>
-          <p className="text-muted-foreground mt-1">Manage your account settings and preferences</p>
+      <main className="flex-1 container mx-auto px-4 md:px-6 py-8 max-w-2xl space-y-10">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight text-white">Profile Settings</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Manage your account settings and preferences</p>
+          </div>
         </div>
 
         {/* Account Info Card */}
@@ -129,7 +131,7 @@ export default function Profile() {
           <CardContent>
             <form onSubmit={handleUpdateName} className="space-y-5">
               <div className="space-y-2">
-                <Label className="text-white">Email</Label>
+                <Label className="text-slate-300/80">Email</Label>
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5 border border-white/10">
                   <Mail className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">{me?.username}</span>
@@ -137,7 +139,7 @@ export default function Profile() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="name" className="text-white">Full Name</Label>
+                <Label htmlFor="name" className="text-slate-300/80">Full Name</Label>
                 <Input
                   id="name"
                   value={name}
@@ -148,7 +150,7 @@ export default function Profile() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-white">Role</Label>
+                <Label className="text-slate-300/80">Role</Label>
                 <div className="flex items-center gap-2">
                   <span className="px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-sm capitalize">
                     {me?.role || "user"}
@@ -228,7 +230,7 @@ export default function Profile() {
           <CardContent>
             <form onSubmit={handleChangePassword} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="currentPassword" className="text-white">Current Password</Label>
+                <Label htmlFor="currentPassword" className="text-slate-300/80">Current Password</Label>
                 <div className="relative">
                   <Input
                     id="currentPassword"
@@ -251,7 +253,7 @@ export default function Profile() {
               <Separator className="bg-white/10" />
 
               <div className="space-y-2">
-                <Label htmlFor="newPassword" className="text-white">New Password</Label>
+                <Label htmlFor="newPassword" className="text-slate-300/80">New Password</Label>
                 <div className="relative">
                   <Input
                     id="newPassword"
@@ -272,7 +274,7 @@ export default function Profile() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword" className="text-white">Confirm New Password</Label>
+                <Label htmlFor="confirmPassword" className="text-slate-300/80">Confirm New Password</Label>
                 <Input
                   id="confirmPassword"
                   type="password"

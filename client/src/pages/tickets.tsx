@@ -374,10 +374,10 @@ export default function Tickets() {
           {/* Header */}
           <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-white">
+              <h1 className="text-3xl font-semibold tracking-tight text-white">
                 {isStaff ? "Support Tickets" : "My Tickets"}
               </h1>
-              <p className="text-muted-foreground mt-1">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {isStaff
                   ? "Manage and respond to customer support requests"
                   : "Track your support requests and get help from our team"}
@@ -754,7 +754,7 @@ export default function Tickets() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         {isStaff && (
-                          <label className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground hover:text-white transition-colors">
+                          <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-300/80 hover:text-white transition-colors">
                             <input
                               type="checkbox"
                               checked={isInternalNote}
@@ -826,7 +826,7 @@ export default function Tickets() {
 
           <div className="space-y-4 pt-2">
             <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">Related App (optional)</Label>
+              <Label className="text-sm font-medium text-slate-300/80">Related App (optional)</Label>
               {userApps && userApps.length > 0 ? (
                 <Select value={newAppId} onValueChange={setNewAppId}>
                   <SelectTrigger className="bg-white/5 border-white/10 focus:border-cyan-500/50 text-white">
@@ -863,7 +863,7 @@ export default function Tickets() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">Subject <span className="text-red-400">*</span></Label>
+              <Label className="text-sm font-medium text-slate-300/80">Subject <span className="text-red-400">*</span></Label>
               <Input
                 value={newSubject}
                 onChange={(e) => setNewSubject(e.target.value)}
@@ -873,7 +873,7 @@ export default function Tickets() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">Message <span className="text-red-400">*</span></Label>
+              <Label className="text-sm font-medium text-slate-300/80">Message <span className="text-red-400">*</span></Label>
               <Textarea
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}

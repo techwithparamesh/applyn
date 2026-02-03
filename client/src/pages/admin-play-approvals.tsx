@@ -125,20 +125,20 @@ export default function AdminPlayApprovals() {
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle">
       <Navbar />
-      <main className="container mx-auto px-4 md:px-6 py-8">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center">
-            <ShieldCheck className="h-6 w-6 text-cyan-300" />
+      <main className="container mx-auto px-4 md:px-6 py-8 space-y-10">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center">
+              <ShieldCheck className="h-6 w-6 text-cyan-300" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight text-white">Play Production Approvals</h1>
+              <p className="mt-1 text-sm text-muted-foreground">Approve/reject production publishing requests (central mode).</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold text-white">Play Production Approvals</h1>
-            <p className="text-muted-foreground">Approve/reject production publishing requests (central mode).</p>
-          </div>
-          <div className="ml-auto">
-            <Badge variant="secondary" className="gap-2">
-              <Clock className="h-3.5 w-3.5" /> Auto-refresh 15s
-            </Badge>
-          </div>
+          <Badge variant="secondary" className="gap-2">
+            <Clock className="h-3.5 w-3.5" /> Auto-refresh 15s
+          </Badge>
         </div>
 
         <Card className="glass border-white/10">

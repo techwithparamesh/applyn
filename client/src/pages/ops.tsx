@@ -314,12 +314,11 @@ export default function Ops() {
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle">
       <Navbar />
-      <main className="container mx-auto px-4 md:px-6 py-8">
+      <main className="container mx-auto px-4 md:px-6 py-8 space-y-10">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
         >
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -327,8 +326,8 @@ export default function Ops() {
                 <Settings className="h-6 w-6 text-cyan-400" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-white">Operations Center</h1>
-                <p className="text-muted-foreground">Staff view across all apps and tickets</p>
+                <h1 className="text-3xl font-semibold tracking-tight text-white">Operations Center</h1>
+                <p className="mt-1 text-sm text-muted-foreground">Staff view across all apps and tickets</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -348,7 +347,7 @@ export default function Ops() {
           className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8"
         >
           <Card className="glass border-white/10">
-            <CardContent className="pt-4 pb-3">
+            <CardContent className="p-5">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
                   <Smartphone className="h-5 w-5 text-blue-400" />
@@ -362,7 +361,7 @@ export default function Ops() {
           </Card>
 
           <Card className="glass border-white/10">
-            <CardContent className="pt-4 pb-3">
+            <CardContent className="p-5">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-green-500/20 flex items-center justify-center">
                   <CheckCircle2 className="h-5 w-5 text-green-400" />
@@ -376,7 +375,7 @@ export default function Ops() {
           </Card>
 
           <Card className="glass border-white/10">
-            <CardContent className="pt-4 pb-3">
+            <CardContent className="p-5">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
                   <Loader2 className="h-5 w-5 text-amber-400 animate-spin" />
@@ -390,7 +389,7 @@ export default function Ops() {
           </Card>
 
           <Card className="glass border-white/10">
-            <CardContent className="pt-4 pb-3">
+            <CardContent className="p-5">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-red-500/20 flex items-center justify-center">
                   <XCircle className="h-5 w-5 text-red-400" />
@@ -404,7 +403,7 @@ export default function Ops() {
           </Card>
 
           <Card className="glass border-white/10">
-            <CardContent className="pt-4 pb-3">
+            <CardContent className="p-5">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
                   <Ticket className="h-5 w-5 text-purple-400" />
@@ -419,7 +418,7 @@ export default function Ops() {
 
           {approvalsCount > 0 && (
             <Card className="glass border-white/10">
-              <CardContent className="pt-4 pb-3">
+              <CardContent className="p-5">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
@@ -445,7 +444,7 @@ export default function Ops() {
           )}
 
           <Card className="glass border-white/10">
-            <CardContent className="pt-4 pb-3">
+            <CardContent className="p-5">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-gray-500/20 flex items-center justify-center">
                   <CheckCircle2 className="h-5 w-5 text-gray-400" />

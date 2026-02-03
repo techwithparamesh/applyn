@@ -831,7 +831,7 @@ export default function CreateApp() {
                   </div>
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="url" className="text-muted-foreground">Website URL</Label>
+                      <Label htmlFor="url" className="text-slate-300/80">Website URL</Label>
                       <Input
                         id="url"
                         value={formData.url}
@@ -884,7 +884,7 @@ export default function CreateApp() {
                       )}
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="appName" className="text-muted-foreground">App Name</Label>
+                      <Label htmlFor="appName" className="text-slate-300/80">App Name</Label>
                       <Input
                         id="appName"
                         value={formData.appName}
@@ -1090,7 +1090,7 @@ export default function CreateApp() {
                             </div>
                             {/* Custom color picker for override */}
                             <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground">Override:</span>
+                              <span className="text-xs font-medium text-slate-300/80">Override:</span>
                               <Input
                                 type="color"
                                 value={formData.primaryColor || websiteAnalysis.primaryColor || "#00E5FF"}
@@ -1397,15 +1397,15 @@ export default function CreateApp() {
                       </div>
                       <div className="p-5 space-y-4">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Website URL:</span>
+                          <span className="text-xs font-medium text-slate-300/80">Website URL:</span>
                           <span className="text-sm font-medium text-white truncate max-w-[220px]">{formData.url}</span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">App Name:</span>
+                          <span className="text-xs font-medium text-slate-300/80">App Name:</span>
                           <span className="text-sm font-medium text-white">{formData.appName}</span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">App Icon:</span>
+                          <span className="text-xs font-medium text-slate-300/80">App Icon:</span>
                           <div className="h-10 w-10 rounded-xl flex items-center justify-center bg-white/5 border border-white/10">
                             {formData.customLogo ? (
                               <img src={formData.customLogo} alt="Logo" className="h-8 w-8 rounded-lg object-contain" />
@@ -1415,7 +1415,7 @@ export default function CreateApp() {
                           </div>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Platform:</span>
+                          <span className="text-xs font-medium text-slate-300/80">Platform:</span>
                           <span className="text-sm font-medium text-white capitalize px-3 py-1 rounded-full bg-white/5 border border-white/10">
                             {formData.platform === "both" ? "Android & iOS" : formData.platform === "android" ? "🤖 Android" : "🍎 iOS"}
                           </span>
@@ -1431,7 +1431,7 @@ export default function CreateApp() {
                       </div>
                       <div className="p-5 space-y-4">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Primary Color:</span>
+                          <span className="text-xs font-medium text-slate-300/80">Primary Color:</span>
                           <div className="flex items-center gap-3">
                             <div 
                               className="w-8 h-8 rounded-full border-2 border-white/20 shadow-lg" 
@@ -1446,7 +1446,7 @@ export default function CreateApp() {
                           </div>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Secondary Color:</span>
+                          <span className="text-xs font-medium text-slate-300/80">Secondary Color:</span>
                           <div className="flex items-center gap-3">
                             <div 
                               className="w-8 h-8 rounded-full border-2 border-white/20 shadow-lg" 
@@ -1461,7 +1461,7 @@ export default function CreateApp() {
                           </div>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Splash Background:</span>
+                          <span className="text-xs font-medium text-slate-300/80">Splash Background:</span>
                           <div className="flex items-center gap-3">
                             <div 
                               className="w-8 h-8 rounded-lg border-2 border-white/20 shadow-lg" 

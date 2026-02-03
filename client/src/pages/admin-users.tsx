@@ -171,12 +171,11 @@ export default function AdminUsers() {
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle">
       <Navbar />
-      <main className="container mx-auto px-4 md:px-6 py-8">
+      <main className="container mx-auto px-4 md:px-6 py-8 space-y-10">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
         >
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -184,8 +183,8 @@ export default function AdminUsers() {
                 <Users className="h-6 w-6 text-purple-400" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-white">User Management</h1>
-                <p className="text-muted-foreground">View and support your platform users</p>
+                <h1 className="text-3xl font-semibold tracking-tight text-white">User Management</h1>
+                <p className="mt-1 text-sm text-muted-foreground">View and support your platform users</p>
               </div>
             </div>
             

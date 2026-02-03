@@ -189,30 +189,32 @@ export default function PushNotifications() {
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle">
       <Navbar />
-      <main className="container mx-auto px-4 md:px-6 py-8 max-w-5xl">
+      <main className="container mx-auto px-4 md:px-6 py-8 max-w-5xl space-y-10">
         {/* Header */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-4 mb-8"
+          className="flex flex-col md:flex-row md:items-center justify-between gap-4"
         >
-          <Button variant="ghost" size="icon" onClick={() => setLocation("/dashboard")} className="text-muted-foreground hover:text-white">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex items-center gap-3">
-            <div 
-              className="h-12 w-12 rounded-xl flex items-center justify-center text-2xl"
-              style={{ backgroundColor: `${app.primaryColor || '#00E5FF'}20` }}
-            >
-              {app.iconUrl ? (
-                <img src={app.iconUrl} alt={app.name} className="h-10 w-10 rounded-lg object-cover" />
-              ) : (
-                app.icon || "📱"
-              )}
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white">Push Notifications</h1>
-              <p className="text-muted-foreground text-sm">Send notifications to {app.name} users</p>
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => setLocation("/dashboard")} className="text-muted-foreground hover:text-white">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex items-center gap-3">
+              <div 
+                className="h-12 w-12 rounded-xl flex items-center justify-center text-2xl"
+                style={{ backgroundColor: `${app.primaryColor || '#00E5FF'}20` }}
+              >
+                {app.iconUrl ? (
+                  <img src={app.iconUrl} alt={app.name} className="h-10 w-10 rounded-lg object-cover" />
+                ) : (
+                  app.icon || "📱"
+                )}
+              </div>
+              <div>
+                <h1 className="text-3xl font-semibold tracking-tight text-white">Push Notifications</h1>
+                <p className="mt-1 text-sm text-muted-foreground">Send notifications to {app.name} users</p>
+              </div>
             </div>
           </div>
         </motion.div>
@@ -225,7 +227,7 @@ export default function PushNotifications() {
           className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"
         >
           <Card className="glass border-white/10">
-            <CardContent className="pt-4 pb-3 px-4">
+            <CardContent className="p-5">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-cyan-500/20 rounded-lg">
                   <Smartphone className="h-5 w-5 text-cyan-400" />
@@ -238,7 +240,7 @@ export default function PushNotifications() {
             </CardContent>
           </Card>
           <Card className="glass border-white/10">
-            <CardContent className="pt-4 pb-3 px-4">
+            <CardContent className="p-5">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-green-500/20 rounded-lg">
                   <Send className="h-5 w-5 text-green-400" />
@@ -253,7 +255,7 @@ export default function PushNotifications() {
             </CardContent>
           </Card>
           <Card className="glass border-white/10">
-            <CardContent className="pt-4 pb-3 px-4">
+            <CardContent className="p-5">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-purple-500/20 rounded-lg">
                   <BarChart3 className="h-5 w-5 text-purple-400" />
@@ -268,7 +270,7 @@ export default function PushNotifications() {
             </CardContent>
           </Card>
           <Card className="glass border-white/10">
-            <CardContent className="pt-4 pb-3 px-4">
+            <CardContent className="p-5">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-amber-500/20 rounded-lg">
                   <Bell className="h-5 w-5 text-amber-400" />
@@ -329,7 +331,7 @@ export default function PushNotifications() {
                     {/* Title & Body */}
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="title" className="text-white">Title *</Label>
+                        <Label htmlFor="title" className="text-slate-300/80">Title *</Label>
                         <Input
                           id="title"
                           value={formData.title}
@@ -341,7 +343,7 @@ export default function PushNotifications() {
                         <p className="text-xs text-muted-foreground">{formData.title.length}/200</p>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="body" className="text-white">Message *</Label>
+                        <Label htmlFor="body" className="text-slate-300/80">Message *</Label>
                         <Textarea
                           id="body"
                           value={formData.body}
@@ -363,7 +365,7 @@ export default function PushNotifications() {
                       
                       <div className="grid md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label className="text-white flex items-center gap-2">
+                          <Label className="text-slate-300/80 flex items-center gap-2">
                             <Image className="h-4 w-4" /> Image URL
                           </Label>
                           <Input
@@ -375,7 +377,7 @@ export default function PushNotifications() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-white flex items-center gap-2">
+                          <Label className="text-slate-300/80 flex items-center gap-2">
                             <LinkIcon className="h-4 w-4" /> Action URL
                           </Label>
                           <Input
@@ -390,7 +392,7 @@ export default function PushNotifications() {
 
                       {/* Platform Targeting */}
                       <div className="space-y-2">
-                        <Label className="text-white flex items-center gap-2">
+                        <Label className="text-slate-300/80 flex items-center gap-2">
                           <Globe className="h-4 w-4" /> Target Platform
                         </Label>
                         <Select 
@@ -425,7 +427,7 @@ export default function PushNotifications() {
 
                       {formData.scheduleEnabled && (
                         <div className="space-y-2">
-                          <Label className="text-white">Scheduled Time</Label>
+                          <Label className="text-slate-300/80">Scheduled Time</Label>
                           <Input
                             type="datetime-local"
                             value={formData.scheduledTime}
@@ -439,7 +441,7 @@ export default function PushNotifications() {
 
                     {/* Preview */}
                     <div className="p-4 rounded-xl bg-slate-800 border border-white/10">
-                      <p className="text-xs text-muted-foreground mb-2">Preview</p>
+                      <p className="text-xs font-medium text-slate-300/80 mb-2">Preview</p>
                       <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-700/50">
                         <div 
                           className="h-10 w-10 rounded-lg flex items-center justify-center text-lg flex-shrink-0"

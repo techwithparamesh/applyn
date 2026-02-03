@@ -145,14 +145,16 @@ export default function EditApp() {
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle">
       <Navbar />
-      <main className="container mx-auto px-4 md:px-6 py-8 max-w-6xl">
-        <div className="flex items-center gap-4 mb-8">
-          <Button variant="ghost" size="icon" onClick={() => setLocation("/dashboard")}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Edit App</h1>
-            <p className="text-muted-foreground">Update your app settings</p>
+      <main className="container mx-auto px-4 md:px-6 py-8 max-w-6xl space-y-10">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => setLocation("/dashboard")}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight text-white">Edit App</h1>
+              <p className="mt-1 text-sm text-muted-foreground">Update your app settings</p>
+            </div>
           </div>
         </div>
 
@@ -170,7 +172,7 @@ export default function EditApp() {
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name">App Name</Label>
+                    <Label htmlFor="name" className="text-slate-300/80">App Name</Label>
                     <Input
                       id="name"
                       value={formData.name}
@@ -180,7 +182,7 @@ export default function EditApp() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="url">Website URL</Label>
+                    <Label htmlFor="url" className="text-slate-300/80">Website URL</Label>
                     <Input
                       id="url"
                       value={formData.url}
@@ -190,7 +192,7 @@ export default function EditApp() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>App Icon</Label>
+                    <Label className="text-slate-300/80">App Icon</Label>
                     
                     {/* Custom Logo Upload */}
                     <div className="mb-4">
@@ -294,7 +296,7 @@ export default function EditApp() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Primary Color</Label>
+                    <Label className="text-slate-300/80">Primary Color</Label>
                     <p className="text-xs text-muted-foreground mb-2">Used for buttons, links, and accent elements in your app</p>
                     <div className="flex gap-2 flex-wrap">
                       {["#2563EB", "#16A34A", "#DC2626", "#9333EA", "#EA580C", "#0891B2", "#CA8A04", "#000000"].map(

@@ -351,18 +351,18 @@ export default function Publish() {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="container mx-auto px-4 md:px-6 py-8 max-w-3xl">
-        <div className="flex items-start justify-between gap-4 mb-6">
+      <main className="container mx-auto px-4 md:px-6 py-8 max-w-3xl space-y-10">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-white">Publish Checklist</h1>
-            <p className="text-muted-foreground">Make the app store-ready (assets, privacy, descriptions).</p>
+            <h1 className="text-3xl font-semibold tracking-tight text-white">Publish Checklist</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Make the app store-ready (assets, privacy, descriptions).</p>
           </div>
           <div className="hidden md:block">
             <AppBuilderStepper appId={id} current="publish" tone="app" />
           </div>
         </div>
 
-        <div className="md:hidden mb-6">
+        <div className="md:hidden">
           <AppBuilderStepper appId={id} current="publish" tone="app" />
         </div>
 
@@ -425,7 +425,7 @@ export default function Publish() {
                   <div className="flex items-start gap-3 rounded-lg border border-white/10 p-3">
                     <RadioGroupItem value="central" id="mode-central" className="mt-1" />
                     <div className="flex-1">
-                      <Label htmlFor="mode-central" className="text-white">
+                      <Label htmlFor="mode-central" className="text-slate-300/80">
                         Managed by Platform (approval required)
                       </Label>
                       <div className="text-sm text-muted-foreground">Central service account publishes after staff approval.</div>
@@ -434,7 +434,7 @@ export default function Publish() {
                   <div className="flex items-start gap-3 rounded-lg border border-white/10 p-3">
                     <RadioGroupItem value="user" id="mode-user" className="mt-1" />
                     <div className="flex-1">
-                      <Label htmlFor="mode-user" className="text-white">Connect Your Play Account (recommended)</Label>
+                      <Label htmlFor="mode-user" className="text-slate-300/80">Connect Your Play Account (recommended)</Label>
                       <div className="text-sm text-muted-foreground">OAuth-based publishing on behalf of your account.</div>
                     </div>
                   </div>
@@ -668,7 +668,7 @@ export default function Publish() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-sm text-white font-medium">Support email</label>
+                  <label className="text-sm font-medium text-slate-300/80">Support email</label>
                   <Input
                     value={supportEmail}
                     onChange={(e) => setSupportEmail(e.target.value)}
@@ -677,7 +677,7 @@ export default function Publish() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm text-white font-medium">Privacy policy URL</label>
+                  <label className="text-sm font-medium text-slate-300/80">Privacy policy URL</label>
                   <Input
                     value={privacyPolicyUrl}
                     onChange={(e) => setPrivacyPolicyUrl(e.target.value)}
@@ -686,7 +686,7 @@ export default function Publish() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm text-white font-medium">Terms URL</label>
+                  <label className="text-sm font-medium text-slate-300/80">Terms URL</label>
                   <Input
                     value={termsUrl}
                     onChange={(e) => setTermsUrl(e.target.value)}
@@ -704,7 +704,7 @@ export default function Publish() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-sm text-white font-medium">Short description</label>
+                  <label className="text-sm font-medium text-slate-300/80">Short description</label>
                   <Textarea
                     value={shortDescription}
                     onChange={(e) => setShortDescription(e.target.value)}
@@ -715,7 +715,7 @@ export default function Publish() {
                   <div className="text-xs text-muted-foreground">Minimum 10 characters (Play Store).</div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm text-white font-medium">Full description</label>
+                  <label className="text-sm font-medium text-slate-300/80">Full description</label>
                   <Textarea
                     value={fullDescription}
                     onChange={(e) => setFullDescription(e.target.value)}

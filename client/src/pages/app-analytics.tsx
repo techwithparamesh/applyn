@@ -171,12 +171,12 @@ export default function AppAnalytics() {
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle">
       <Navbar />
-      <main className="container mx-auto px-4 md:px-6 py-8 max-w-6xl">
+      <main className="container mx-auto px-4 md:px-6 py-8 max-w-6xl space-y-10">
         {/* Header */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8"
+          className="flex flex-col md:flex-row md:items-center justify-between gap-4"
         >
           <div className="flex items-center gap-4">
             <Button 
@@ -199,8 +199,8 @@ export default function AppAnalytics() {
                 )}
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-white">Analytics</h1>
-                <p className="text-muted-foreground text-sm">{app.name}</p>
+                <h1 className="text-3xl font-semibold tracking-tight text-white">Analytics</h1>
+                <p className="mt-1 text-sm text-muted-foreground">{app.name}</p>
               </div>
             </div>
           </div>
@@ -544,7 +544,7 @@ function StatCard({
 
   return (
     <Card className="glass border-white/10">
-      <CardContent className="pt-4 pb-3 px-4">
+      <CardContent className="p-5">
         <div className="flex items-start justify-between">
           <div className={`p-2 rounded-lg ${colors[color]}`}>
             {icon}

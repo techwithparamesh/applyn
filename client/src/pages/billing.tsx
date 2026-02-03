@@ -103,16 +103,18 @@ export default function Billing() {
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle flex flex-col">
       <Navbar />
-      <main className="flex-1 container mx-auto px-4 md:px-6 py-8 max-w-4xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white">Billing & Payments</h1>
-          <p className="text-muted-foreground mt-1">View your payment history and invoices</p>
+      <main className="flex-1 container mx-auto px-4 md:px-6 py-8 max-w-4xl space-y-10">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight text-white">Billing & Payments</h1>
+            <p className="mt-1 text-sm text-muted-foreground">View your payment history and invoices</p>
+          </div>
         </div>
 
         {/* Stats Cards */}
         <div className="grid md:grid-cols-3 gap-4 mb-8">
           <Card className="glass border-white/10">
-            <CardContent className="pt-6">
+            <CardContent className="p-5">
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
                   <IndianRupee className="h-6 w-6 text-cyan-400" />
@@ -125,7 +127,7 @@ export default function Billing() {
             </CardContent>
           </Card>
           <Card className="glass border-white/10">
-            <CardContent className="pt-6">
+            <CardContent className="p-5">
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center">
                   <CheckCircle2 className="h-6 w-6 text-green-400" />
@@ -138,7 +140,7 @@ export default function Billing() {
             </CardContent>
           </Card>
           <Card className="glass border-white/10">
-            <CardContent className="pt-6">
+            <CardContent className="p-5">
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
                   <CreditCard className="h-6 w-6 text-purple-400" />

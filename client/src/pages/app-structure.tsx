@@ -140,11 +140,11 @@ function SortableNavItemRow({ item, screens, modules, onUpdate, onDelete }: Sort
 
         <div className="flex-1 grid gap-2 sm:grid-cols-2">
           <div className="space-y-1">
-            <Label className="text-xs">Label</Label>
+            <Label className="text-xs text-slate-300/80">Label</Label>
             <Input value={item.label ?? ""} onChange={(e) => onUpdate(item.id, { label: e.target.value })} />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Icon</Label>
+            <Label className="text-xs text-slate-300/80">Icon</Label>
             <Select value={String(item.icon || "home")} onValueChange={(v) => onUpdate(item.id, { icon: v })}>
               <SelectTrigger>
                 <SelectValue />
@@ -170,7 +170,7 @@ function SortableNavItemRow({ item, screens, modules, onUpdate, onDelete }: Sort
 
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="space-y-1">
-          <Label className="text-xs">Type</Label>
+          <Label className="text-xs text-slate-300/80">Type</Label>
           <Select
             value={item.kind}
             onValueChange={(v) => {
@@ -197,7 +197,7 @@ function SortableNavItemRow({ item, screens, modules, onUpdate, onDelete }: Sort
 
         {item.kind === "screen" && (
           <div className="space-y-1 sm:col-span-2">
-            <Label className="text-xs">Screen</Label>
+            <Label className="text-xs text-slate-300/80">Screen</Label>
             <Select
               value={item.screenId ?? ""}
               onValueChange={(v) => onUpdate(item.id, { screenId: v })}
@@ -222,7 +222,7 @@ function SortableNavItemRow({ item, screens, modules, onUpdate, onDelete }: Sort
 
         {item.kind === "webview" && (
           <div className="space-y-1 sm:col-span-2">
-            <Label className="text-xs">URL</Label>
+            <Label className="text-xs text-slate-300/80">URL</Label>
             <Input
               value={item.url ?? ""}
               placeholder="https://example.com/page"
@@ -233,7 +233,7 @@ function SortableNavItemRow({ item, screens, modules, onUpdate, onDelete }: Sort
 
         {item.kind === "module" && (
           <div className="space-y-1 sm:col-span-2">
-            <Label className="text-xs">Module</Label>
+            <Label className="text-xs text-slate-300/80">Module</Label>
             <Select
               value={item.moduleId ?? ""}
               onValueChange={(v) => onUpdate(item.id, { moduleId: v })}
@@ -334,7 +334,7 @@ export default function AppStructure() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <main className="container mx-auto px-4 md:px-6 py-8 space-y-6">
+      <main className="container mx-auto px-4 md:px-6 py-8 space-y-10">
         <Card>
           <CardHeader>
             <CardTitle>App Structure</CardTitle>
@@ -358,7 +358,7 @@ export default function AppStructure() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <div className="text-sm text-muted-foreground">{modules.length} modules</div>
+                        <div className="text-xs font-medium text-slate-300/80">{modules.length} modules</div>
                         <Button
                           variant="outline"
                           onClick={() =>
@@ -387,7 +387,7 @@ export default function AppStructure() {
                               </div>
                               <div className="flex items-center gap-3">
                                 <div className="flex items-center gap-2">
-                                  <Label className="text-xs">Enabled</Label>
+                                  <Label className="text-xs text-slate-300/80">Enabled</Label>
                                   <Switch
                                     checked={m.enabled ?? true}
                                     onCheckedChange={(v) =>
@@ -410,7 +410,7 @@ export default function AppStructure() {
 
                             <div className="grid gap-3 sm:grid-cols-2">
                               <div className="space-y-1">
-                                <Label className="text-xs">Name</Label>
+                                <Label className="text-xs text-slate-300/80">Name</Label>
                                 <Input
                                   value={m.name}
                                   onChange={(e) =>
@@ -419,7 +419,7 @@ export default function AppStructure() {
                                 />
                               </div>
                               <div className="space-y-1">
-                                <Label className="text-xs">Type</Label>
+                                <Label className="text-xs text-slate-300/80">Type</Label>
                                 <Select
                                   value={m.type}
                                   onValueChange={(v) =>
@@ -464,7 +464,7 @@ export default function AppStructure() {
                     <CardContent className="space-y-4">
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div className="space-y-1">
-                          <Label>Style</Label>
+                          <Label className="text-slate-300/80">Style</Label>
                           <Select
                             value={navigation.style}
                             onValueChange={(v) => setNavigation((prev) => ({ ...prev, style: v as any }))}
@@ -555,7 +555,7 @@ export default function AppStructure() {
               <TabsContent value="advanced" className="space-y-6">
                 <div className="grid gap-6 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="modules">Modules (JSON)</Label>
+                    <Label htmlFor="modules" className="text-slate-300/80">Modules (JSON)</Label>
                     <Textarea
                       id="modules"
                       className="min-h-[360px] font-mono text-xs"
@@ -585,7 +585,7 @@ export default function AppStructure() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="navigation">Navigation (JSON)</Label>
+                    <Label htmlFor="navigation" className="text-slate-300/80">Navigation (JSON)</Label>
                     <Textarea
                       id="navigation"
                       className="min-h-[360px] font-mono text-xs"
@@ -633,19 +633,19 @@ export default function AppStructure() {
               <div className="text-sm font-medium">Quick actions</div>
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="space-y-2">
-                  <Label>Jump to import wizard</Label>
+                  <Label className="text-slate-300/80">Jump to import wizard</Label>
                   <Button asChild variant="outline" className="w-full">
                     <a href={`/apps/${id}/import`}>Import website links</a>
                   </Button>
                 </div>
                 <div className="space-y-2">
-                  <Label>Jump to editor</Label>
+                  <Label className="text-slate-300/80">Jump to editor</Label>
                   <Button asChild variant="outline" className="w-full">
                     <a href={`/apps/${id}/visual-editor`}>Open builder</a>
                   </Button>
                 </div>
                 <div className="space-y-2">
-                  <Label>Reset from saved</Label>
+                  <Label className="text-slate-300/80">Reset from saved</Label>
                   <Button
                     variant="secondary"
                     className="w-full"
@@ -674,11 +674,11 @@ export default function AppStructure() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="space-y-1">
-                    <Label>Name</Label>
+                    <Label className="text-slate-300/80">Name</Label>
                     <Input value={app?.name ?? ""} readOnly />
                   </div>
                   <div className="space-y-1">
-                    <Label>Industry</Label>
+                    <Label className="text-slate-300/80">Industry</Label>
                     <Input value={app?.industry ?? ""} readOnly />
                   </div>
                 </CardContent>

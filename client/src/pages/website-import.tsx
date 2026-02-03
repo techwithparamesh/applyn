@@ -80,7 +80,7 @@ export default function WebsiteImport() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <main className="container mx-auto px-4 md:px-6 py-8 space-y-6">
+      <main className="container mx-auto px-4 md:px-6 py-8 space-y-10">
         <Card>
           <CardHeader>
             <CardTitle>Website Import</CardTitle>
@@ -91,7 +91,7 @@ export default function WebsiteImport() {
           <CardContent className="space-y-4">
             <div className="grid gap-3 md:grid-cols-[1fr_auto]">
               <div className="space-y-1">
-                <Label htmlFor="url">Website URL</Label>
+                <Label htmlFor="url" className="text-slate-300/80">Website URL</Label>
                 <Input
                   id="url"
                   placeholder="https://example.com"
@@ -110,9 +110,9 @@ export default function WebsiteImport() {
               <>
                 <Separator />
                 <div className="flex items-center justify-between">
-                  <div className="text-sm text-muted-foreground">Base: {result.baseUrl}</div>
+                  <div className="text-xs font-medium text-slate-300/80">Base: {result.baseUrl}</div>
                   <div className="flex items-center gap-2">
-                    <Label htmlFor="createNav" className="text-sm">
+                    <Label htmlFor="createNav" className="text-sm text-slate-300/80">
                       Create navigation
                     </Label>
                     <Switch id="createNav" checked={createNav} onCheckedChange={setCreateNav} />
@@ -138,7 +138,7 @@ export default function WebsiteImport() {
                 </div>
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="text-sm text-muted-foreground">Selected: {chosenLinks.length}</div>
+                  <div className="text-xs font-medium text-slate-300/80">Selected: {chosenLinks.length}</div>
                   <div className="flex gap-2">
                     <Button asChild variant="outline">
                       <a href={`/apps/${id}/structure`}>Open structure</a>

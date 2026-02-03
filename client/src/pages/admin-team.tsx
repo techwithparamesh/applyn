@@ -267,12 +267,11 @@ export default function AdminTeam() {
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle">
       <Navbar />
-      <main className="container mx-auto px-4 md:px-6 py-8">
+      <main className="container mx-auto px-4 md:px-6 py-8 space-y-10">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
         >
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -280,8 +279,8 @@ export default function AdminTeam() {
                 <Users className="h-6 w-6 text-cyan-400" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-white">Team Management</h1>
-                <p className="text-muted-foreground">Manage admin and support team members</p>
+                <h1 className="text-3xl font-semibold tracking-tight text-white">Team Management</h1>
+                <p className="mt-1 text-sm text-muted-foreground">Manage admin and support team members</p>
               </div>
             </div>
             <Link href="/admin/users">
@@ -314,7 +313,7 @@ export default function AdminTeam() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-muted-foreground">Email Address</Label>
+                    <Label className="text-slate-300/80">Email Address</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -327,7 +326,7 @@ export default function AdminTeam() {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label className="text-muted-foreground">Role</Label>
+                    <Label className="text-slate-300/80">Role</Label>
                     <Select value={role} onValueChange={(v) => setRole(v as UserRole)}>
                       <SelectTrigger className="bg-white/5 border-white/10 focus:border-cyan-500/50 text-white">
                         <SelectValue placeholder="Select role" />
@@ -384,7 +383,7 @@ export default function AdminTeam() {
                 animate={{ opacity: 1, scale: 1 }}
               >
                 <Card className={emailSent ? "border-green-500/30 bg-green-500/10" : "border-amber-500/30 bg-amber-500/10"}>
-                  <CardContent className="pt-4">
+                  <CardContent className="p-5">
                     <div className="flex items-start gap-3">
                       <Key className={`h-5 w-5 mt-0.5 ${emailSent ? "text-green-400" : "text-amber-400"}`} />
                       <div className="flex-1 min-w-0">

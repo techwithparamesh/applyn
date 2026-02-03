@@ -114,7 +114,7 @@ export default function Integrations() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
-      <main className="flex-1 container mx-auto px-4 md:px-6 py-8 space-y-6">
+      <main className="flex-1 container mx-auto px-4 md:px-6 py-8 space-y-10">
         <Card className="glass border-white/10">
           <CardHeader>
             <CardTitle>Integrations (Webhooks)</CardTitle>
@@ -124,19 +124,19 @@ export default function Integrations() {
               <div className="font-medium">Create webhook</div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Name</Label>
+                  <Label className="text-slate-300/80">Name</Label>
                   <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Order webhook" />
                 </div>
                 <div className="space-y-2">
-                  <Label>URL</Label>
+                  <Label className="text-slate-300/80">URL</Label>
                   <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/webhook" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Secret (optional)</Label>
+                  <Label className="text-slate-300/80">Secret (optional)</Label>
                   <Input value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="shared secret for HMAC" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Events (comma separated; empty = all)</Label>
+                  <Label className="text-slate-300/80">Events (comma separated; empty = all)</Label>
                   <Input value={events} onChange={(e) => setEvents(e.target.value)} placeholder="order.created, customer.login" />
                 </div>
               </div>
@@ -157,11 +157,11 @@ export default function Integrations() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>URL</TableHead>
-                      <TableHead>Events</TableHead>
-                      <TableHead>Enabled</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead className="text-xs text-slate-300/80">Name</TableHead>
+                      <TableHead className="text-xs text-slate-300/80">URL</TableHead>
+                      <TableHead className="text-xs text-slate-300/80">Events</TableHead>
+                      <TableHead className="text-xs text-slate-300/80">Enabled</TableHead>
+                      <TableHead className="text-xs text-slate-300/80">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

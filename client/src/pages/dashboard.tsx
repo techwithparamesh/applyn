@@ -513,10 +513,10 @@ export default function Dashboard() {
           {/* Header */}
           <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-white">
+              <h1 className="text-3xl font-semibold tracking-tight text-white">
                 Welcome back, <span className="text-gradient">{me?.name || me?.username?.split("@")[0] || "User"}</span>
               </h1>
-              <p className="text-muted-foreground mt-1">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {isSupport 
                   ? "Support Dashboard - Help users and manage tickets"
                   : "Here's what's happening with your apps today"

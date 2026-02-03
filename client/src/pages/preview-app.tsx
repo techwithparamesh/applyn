@@ -491,7 +491,7 @@ export default function PreviewApp() {
               </div>
               <div className="p-4 space-y-3">
                 <div>
-                  <label className="text-xs text-muted-foreground mb-2 block font-medium">Shareable link</label>
+                  <label className="text-xs font-medium text-slate-300/80 mb-2 block">Shareable link</label>
                   <div className="flex items-center gap-2">
                     <div className="flex-1 px-3 py-2.5 rounded-xl bg-white/5 border border-white/[0.06] text-sm text-muted-foreground truncate font-mono">
                       {getPreviewUrl()}
@@ -780,7 +780,7 @@ export default function PreviewApp() {
               {/* Link + Instructions */}
               <div className="space-y-5 min-w-0">
                 <div>
-                  <label className="text-xs text-muted-foreground mb-2 block font-medium">
+                  <label className="text-xs font-medium text-slate-300/80 mb-2 block">
                     {qrMode === "play" ? "Google Play testing link" : "Preview link"}
                   </label>
                   <div className="flex items-center gap-2">

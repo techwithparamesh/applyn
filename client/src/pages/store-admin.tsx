@@ -107,7 +107,7 @@ export default function StoreAdmin() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
-      <main className="flex-1 container mx-auto px-4 md:px-6 py-8 space-y-6">
+      <main className="flex-1 container mx-auto px-4 md:px-6 py-8 space-y-10">
         <Card>
           <CardHeader>
             <CardTitle>Store Admin</CardTitle>
@@ -117,16 +117,16 @@ export default function StoreAdmin() {
               <div className="font-medium">Create product</div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label>Name</Label>
+                  <Label className="text-slate-300/80">Name</Label>
                   <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Chicken Biryani" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Price</Label>
+                  <Label className="text-slate-300/80">Price</Label>
                   <Input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="199" />
                   <div className="text-xs text-muted-foreground">Entered as major units (e.g. 199 = ₹199)</div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Currency</Label>
+                  <Label className="text-slate-300/80">Currency</Label>
                   <Select value={currency} onValueChange={setCurrency}>
                     <SelectTrigger>
                       <SelectValue placeholder="Currency" />
@@ -151,9 +151,9 @@ export default function StoreAdmin() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Price</TableHead>
-                      <TableHead>Active</TableHead>
+                      <TableHead className="text-xs text-slate-300/80">Name</TableHead>
+                      <TableHead className="text-xs text-slate-300/80">Price</TableHead>
+                      <TableHead className="text-xs text-slate-300/80">Active</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -186,10 +186,10 @@ export default function StoreAdmin() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Order</TableHead>
-                      <TableHead>Total</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Payment</TableHead>
+                      <TableHead className="text-xs text-slate-300/80">Order</TableHead>
+                      <TableHead className="text-xs text-slate-300/80">Total</TableHead>
+                      <TableHead className="text-xs text-slate-300/80">Status</TableHead>
+                      <TableHead className="text-xs text-slate-300/80">Payment</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -200,7 +200,7 @@ export default function StoreAdmin() {
                           {(Number(o.totalCents) / 100).toFixed(2)} {o.currency}
                         </TableCell>
                         <TableCell className="space-y-2">
-                          <div className="text-xs text-muted-foreground">Current: {o.status}</div>
+                          <div className="text-xs font-medium text-slate-300/80">Current: {o.status}</div>
                           <Select
                             value={o.status}
                             onValueChange={(status) => updateOrder.mutate({ orderId: o.id, status })}

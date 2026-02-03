@@ -585,7 +585,7 @@ export default function AppEditor() {
                   <CardContent className="space-y-6">
                     {/* App Name */}
                     <div className="space-y-2">
-                      <Label className="text-white">App Name</Label>
+                      <Label className="text-slate-300/80">App Name</Label>
                       <Input
                         value={branding.name}
                         onChange={(e) => setBranding(prev => ({ ...prev, name: e.target.value }))}
@@ -596,7 +596,7 @@ export default function AppEditor() {
 
                     {/* Logo Upload */}
                     <div className="space-y-2">
-                      <Label className="text-white">App Logo</Label>
+                      <Label className="text-slate-300/80">App Logo</Label>
                       <div className="flex items-center gap-4">
                         <div className="h-20 w-20 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
                           {branding.customLogo ? (
@@ -637,7 +637,7 @@ export default function AppEditor() {
                     {/* Colors */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label className="text-white">Primary Color</Label>
+                        <Label className="text-slate-300/80">Primary Color</Label>
                         <div className="flex items-center gap-2">
                           <input
                             type="color"
@@ -653,7 +653,7 @@ export default function AppEditor() {
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-white">Secondary Color</Label>
+                        <Label className="text-slate-300/80">Secondary Color</Label>
                         <div className="flex items-center gap-2">
                           <input
                             type="color"
@@ -672,7 +672,7 @@ export default function AppEditor() {
 
                     {/* Status Bar Style */}
                     <div className="space-y-2">
-                      <Label className="text-white">Status Bar Style</Label>
+                      <Label className="text-slate-300/80">Status Bar Style</Label>
                       <Select 
                         value={features.statusBarStyle} 
                         onValueChange={(v) => setFeatures(prev => ({ ...prev, statusBarStyle: v as "light" | "dark" }))}
@@ -919,7 +919,7 @@ export default function AppEditor() {
                           />
                           {features.whatsappButton && (
                             <div className="ml-6 space-y-2">
-                              <Label className="text-sm text-muted-foreground">WhatsApp Number (with country code)</Label>
+                              <Label className="text-sm font-medium text-slate-300/80">WhatsApp Number (with country code)</Label>
                               <Input
                                 value={features.whatsappNumber}
                                 onChange={(e) => setFeatures(prev => ({ ...prev, whatsappNumber: e.target.value }))}
@@ -974,7 +974,7 @@ export default function AppEditor() {
                     Live Preview
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="flex justify-center pb-6">
+                <CardContent className="p-4 flex justify-center">
                   <MobilePreview
                     url={screens[0]?.url || app.url}
                     primaryColor={branding.primaryColor}

@@ -145,18 +145,20 @@ export default function AdminAuditLogs() {
   return (
     <div className="min-h-screen bg-background bg-mesh-subtle flex flex-col">
       <Navbar />
-      <main className="flex-1 container mx-auto px-4 md:px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+      <main className="flex-1 container mx-auto px-4 md:px-6 py-8 space-y-10">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight text-white flex items-center gap-3">
             <Shield className="h-8 w-8 text-cyan-400" />
             Audit Logs
           </h1>
-          <p className="text-muted-foreground mt-1">Track all system activities and user actions</p>
+            <p className="mt-1 text-sm text-muted-foreground">Track all system activities and user actions</p>
+          </div>
         </div>
 
         {/* Filters */}
-        <Card className="glass border-white/10 mb-6">
-          <CardContent className="pt-6">
+        <Card className="glass border-white/10">
+          <CardContent className="p-5">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1">
                 <label className="text-sm font-medium text-slate-300/80 mb-1 block">User ID</label>
