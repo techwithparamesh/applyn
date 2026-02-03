@@ -6349,10 +6349,9 @@ export async function registerRoutes(
 
           // Subscription/plan payments: lookup by provider order id (reliable; no "all" hacks)
           const dbPayment = await storage.getPaymentByOrderId(String(payment.order_id));
-          if (dbPayment && dbPayment.status === "pending") {
-            const { updated } = await storage.updatePaymentStatus(dbPayment.id, "completed", String(payment.id));
+          if (dbPayment) {
+            const { updated } = await (storage as any).completePaymentAndApplyEntitlements(dbPayment.id);
             if (updated) {
-              await storage.applyEntitlementsIfNeeded(dbPayment.id);
               console.log(`[Razorpay Webhook] Payment ${dbPayment.id} marked as completed via webhook`);
             }
           }
@@ -6502,7 +6501,7 @@ export async function registerRoutes(
 
       // Idempotency: never re-apply entitlements for already-processed payments.
       if (existingPayment.status === "completed") {
-        await storage.applyEntitlementsIfNeeded(existingPayment.id);
+        await (storage as any).completePaymentAndApplyEntitlements(existingPayment.id);
         return res.json({ ok: true, payment: existingPayment, message: "Already verified" });
       }
       if (existingPayment.status === "failed") {
@@ -6527,18 +6526,13 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Payment verification failed" });
       }
 
-      // Update payment status
-      const { payment, updated } = await storage.updatePaymentStatus(paymentId, "completed", razorpay_payment_id);
-      if (!payment) {
-        return res.status(404).json({ message: "Payment record not found" });
-      }
+      const { payment, updated } = await (storage as any).completePaymentAndApplyEntitlements(paymentId);
+      if (!payment) return res.status(404).json({ message: "Payment record not found" });
 
       if (!updated) {
         // Another request/webhook already processed it.
         return res.json({ ok: true, payment, message: "Already processed" });
       }
-
-      await storage.applyEntitlementsIfNeeded(payment.id);
 
       return res.json({ ok: true, payment });
     } catch (err) {

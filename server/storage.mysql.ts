@@ -38,6 +38,58 @@ function jobLockTtlMs() {
 }
 
 export class MysqlStorage {
+  private async applyPaymentEntitlementsInTx(tx: any, payment: Payment): Promise<void> {
+    const userId = payment.userId;
+    const user = await this.getUserWithDb(tx, userId);
+    if (!user) {
+      throw new Error(`Payment ${payment.id} references missing user ${userId}`);
+    }
+
+    const plan = payment.plan as
+      | PlanId
+      | "extra_rebuild"
+      | "extra_rebuild_pack"
+      | "extra_app_slot";
+
+    if (plan === "extra_rebuild") {
+      await this.addRebuildsWithDb(tx, userId, 1);
+      return;
+    }
+
+    if (plan === "extra_rebuild_pack") {
+      await this.addRebuildsWithDb(tx, userId, 10);
+      return;
+    }
+
+    if (plan === "extra_app_slot") {
+      await this.addExtraAppSlotWithDb(tx, userId, 1);
+      return;
+    }
+
+    if (plan === "starter" || plan === "standard" || plan === "pro" || plan === "agency") {
+      const now = new Date();
+      let expiryDate = new Date(now);
+
+      if (user.planExpiryDate && user.planStatus === "active") {
+        const currentExpiry = new Date(user.planExpiryDate);
+        if (currentExpiry > now) {
+          expiryDate = new Date(currentExpiry);
+        }
+      }
+
+      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+
+      await this.activateSubscriptionWithDb(tx, userId, {
+        plan,
+        planStatus: "active",
+        planStartDate: now,
+        planExpiryDate: expiryDate,
+        remainingRebuilds: getRebuildsForPlan(plan),
+        maxAppsAllowed: getMaxAppsForPlan(plan),
+      });
+    }
+  }
+
   private async getUserWithDb(db: any, id: string): Promise<User | undefined> {
     const rows = await db.select().from(users).where(eq(users.id, id)).limit(1);
     return rows[0] as unknown as User;
@@ -320,49 +372,7 @@ export class MysqlStorage {
       if (payment.status !== "completed") return;
       if (payment.entitlementsAppliedAt) return;
 
-      const userId = payment.userId;
-      const user = await this.getUserWithDb(tx, userId);
-      if (!user) {
-        throw new Error(`Payment ${paymentId} references missing user ${userId}`);
-      }
-
-      const plan = payment.plan as
-        | PlanId
-        | "extra_rebuild"
-        | "extra_rebuild_pack"
-        | "extra_app_slot";
-
-      if (plan === "extra_rebuild") {
-        await this.addRebuildsWithDb(tx, userId, 1);
-      } else if (plan === "extra_rebuild_pack") {
-        await this.addRebuildsWithDb(tx, userId, 10);
-      } else if (plan === "extra_app_slot") {
-        await this.addExtraAppSlotWithDb(tx, userId, 1);
-      } else if (plan === "starter" || plan === "standard" || plan === "pro" || plan === "agency") {
-        const now = new Date();
-        let expiryDate = new Date(now);
-
-        if (user.planExpiryDate && user.planStatus === "active") {
-          const currentExpiry = new Date(user.planExpiryDate);
-          if (currentExpiry > now) {
-            expiryDate = new Date(currentExpiry);
-          }
-        }
-
-        expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-
-        await this.activateSubscriptionWithDb(tx, userId, {
-          plan,
-          planStatus: "active",
-          planStartDate: now,
-          planExpiryDate: expiryDate,
-          remainingRebuilds: getRebuildsForPlan(plan),
-          maxAppsAllowed: getMaxAppsForPlan(plan),
-        });
-      } else {
-        // Unknown plan types intentionally result in no entitlements mutation.
-        // Still mark entitlements as applied to prevent repeated processing.
-      }
+      await this.applyPaymentEntitlementsInTx(tx, payment);
 
       await tx
         .update(payments)
@@ -370,6 +380,63 @@ export class MysqlStorage {
           entitlementsAppliedAt: sql`NOW()`,
         })
         .where(eq(payments.id, paymentId));
+    });
+  }
+
+  async completePaymentAndApplyEntitlements(
+    paymentId: string,
+  ): Promise<{ updated: boolean; payment: Payment | null }> {
+    const db = getMysqlDb();
+
+    return await db.transaction(async (tx) => {
+      const lockedRows = await tx
+        .select()
+        .from(payments)
+        .where(eq(payments.id, paymentId))
+        .limit(1)
+        .for("update");
+
+      const payment = (lockedRows[0] as unknown as Payment | undefined) ?? null;
+      if (!payment) return { updated: false, payment: null };
+
+      if (payment.status === "pending") {
+        await tx
+          .update(payments)
+          .set({
+            status: "completed",
+            updatedAt: new Date(),
+          })
+          .where(eq(payments.id, paymentId));
+
+        await this.applyPaymentEntitlementsInTx(tx, payment);
+
+        await tx
+          .update(payments)
+          .set({
+            entitlementsAppliedAt: sql`NOW()`,
+          })
+          .where(eq(payments.id, paymentId));
+
+        const refreshed = await tx.select().from(payments).where(eq(payments.id, paymentId)).limit(1);
+        return { updated: true, payment: (refreshed[0] as unknown as Payment) ?? null };
+      }
+
+      // Idempotent healing path: if a legacy row is completed but entitlements were never applied,
+      // apply them once under the same lock and mark entitlements_applied_at.
+      if (payment.status === "completed" && !payment.entitlementsAppliedAt) {
+        await this.applyPaymentEntitlementsInTx(tx, payment);
+        await tx
+          .update(payments)
+          .set({
+            entitlementsAppliedAt: sql`NOW()`,
+          })
+          .where(eq(payments.id, paymentId));
+
+        const refreshed = await tx.select().from(payments).where(eq(payments.id, paymentId)).limit(1);
+        return { updated: false, payment: (refreshed[0] as unknown as Payment) ?? null };
+      }
+
+      return { updated: false, payment };
     });
   }
 
