@@ -30,7 +30,7 @@ import { PageLoading, PageState } from "@/components/page-state";
 import { usePlanGate } from "@/lib/plan-gate";
 import { requiredPlanForFeature, formatPlanLabel } from "@/lib/plan-gate";
 import { track } from "@/lib/analytics";
-import { Lock } from "lucide-react";
+import { Lock, Shield } from "lucide-react";
 import { AlertTriangle, ArrowLeft, RefreshCw } from "lucide-react";
 import { PlaySetupWizard } from "@/components/play-setup-wizard";
 
@@ -540,13 +540,17 @@ export default function Publish() {
                       </div>
                     ) : null}
 
-                    <div className="text-xs text-muted-foreground">You can update and republish anytime.</div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Shield className="h-3.5 w-3.5" aria-hidden="true" />
+                      <span>Secure payments powered by Razorpay. You can update and republish anytime.</span>
+                    </div>
 
                     <div className="flex gap-2 pt-2">
                       <Button
                         variant="outline"
                         className="border-white/10"
                         title="Testing (Google Play – limited users)"
+                        loading={publishInternalMutation.isPending}
                         onClick={() => {
                           void (async () => {
                             const ok = await runPublishGate();
@@ -554,19 +558,15 @@ export default function Publish() {
                             await publishInternalMutation.mutateAsync();
                           })();
                         }}
-                        disabled={publishInternalMutation.isPending}
                       >
-                        {publishInternalMutation.isPending
-                          ? "Publishing…"
-                          : publishGateMomentum === "publish_play"
-                            ? "Preparing release…"
-                            : "Publish for Testing"}
+                        {publishGateMomentum === "publish_play" ? "Preparing release…" : "Publish for Testing"}
                       </Button>
 
                       {publishingMode === "central" ? (
                         <Button
                           variant="outline"
                           className="border-white/10"
+                          loading={requestProdMutation.isPending}
                           onClick={() => {
                             void (async () => {
                               const ok = await runPublishGate();
@@ -574,13 +574,8 @@ export default function Publish() {
                               await requestProdMutation.mutateAsync();
                             })();
                           }}
-                          disabled={requestProdMutation.isPending}
                         >
-                          {requestProdMutation.isPending
-                            ? "Requesting…"
-                            : publishGateMomentum === "publish_play"
-                              ? "Preparing release…"
-                              : "Prepare for Public Release"}
+                          {publishGateMomentum === "publish_play" ? "Preparing release…" : "Prepare for Public Release"}
                         </Button>
                       ) : null}
 
@@ -687,10 +682,10 @@ export default function Publish() {
             <div className="flex items-center gap-2 mb-6">
               <Button
                 onClick={() => saveMutation.mutate()}
-                disabled={saveMutation.isPending}
+                loading={saveMutation.isPending}
                 className="bg-cyan-600 hover:bg-cyan-500 text-white"
               >
-                {saveMutation.isPending ? "Saving…" : "Save"}
+                Save
               </Button>
               <Button variant="outline" className="border-white/10" onClick={() => void downloadPublishPack()}>
                 Export

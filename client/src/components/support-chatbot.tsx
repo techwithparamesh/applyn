@@ -107,7 +107,7 @@ export function SupportChatbot() {
         className={cn(
           "fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-50",
           "bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-600 hover:to-purple-600",
-          "transition-all duration-300 hover:scale-110",
+          "transition-colors duration-150 ease-out",
           isOpen && "hidden"
         )}
       >
@@ -116,7 +116,7 @@ export function SupportChatbot() {
 
       {/* Chat Window */}
       {isOpen && (
-        <Card className="fixed bottom-6 right-6 w-[380px] h-[500px] shadow-2xl z-50 flex flex-col border-cyan-500/20 bg-background/95 backdrop-blur">
+        <Card className="fixed bottom-6 right-6 w-[380px] h-[500px] shadow-lg z-50 flex flex-col border-cyan-500/20 bg-background/95 backdrop-blur">
           {/* Header */}
           <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between py-3 px-4 border-b bg-gradient-to-r from-cyan-500/10 to-purple-500/10">
             <div className="flex items-center gap-2">

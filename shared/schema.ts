@@ -304,6 +304,7 @@ export type Payment = {
   amountInr?: number;
   plan: string;
   status: PaymentStatus;
+  entitlementsAppliedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };

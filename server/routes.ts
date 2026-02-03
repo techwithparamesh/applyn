@@ -125,7 +125,7 @@ import type { PlayCredentials, PlayTrack } from "./publishing/playPublisher";
 import { createPlayService } from "./services/play/playService";
 import { validateForPublish } from "./publishing/publishValidator";
 import { scanPolicy } from "./publishing/policyScanner";
-import { assertCanQueueBuild } from "./entitlements";
+import { assertCanQueueBuild, getEntitlements } from "./entitlements";
 import { normalizeAndValidatePermissions, requirePermission } from "./permissions";
 import { logger } from "./logger";
 
@@ -6352,6 +6352,7 @@ export async function registerRoutes(
           if (dbPayment && dbPayment.status === "pending") {
             const { updated } = await storage.updatePaymentStatus(dbPayment.id, "completed", String(payment.id));
             if (updated) {
+              await storage.applyEntitlementsIfNeeded(dbPayment.id);
               console.log(`[Razorpay Webhook] Payment ${dbPayment.id} marked as completed via webhook`);
             }
           }
@@ -6501,6 +6502,7 @@ export async function registerRoutes(
 
       // Idempotency: never re-apply entitlements for already-processed payments.
       if (existingPayment.status === "completed") {
+        await storage.applyEntitlementsIfNeeded(existingPayment.id);
         return res.json({ ok: true, payment: existingPayment, message: "Already verified" });
       }
       if (existingPayment.status === "failed") {
@@ -6536,54 +6538,7 @@ export async function registerRoutes(
         return res.json({ ok: true, payment, message: "Already processed" });
       }
 
-      // Handle subscription activation or extra rebuild
-      const plan = payment.plan as PlanId | "extra_rebuild" | "extra_rebuild_pack" | "extra_app_slot";
-      
-      if (plan === "extra_rebuild") {
-        // Add 1 rebuild to user's remaining rebuilds
-        await storage.addRebuilds(user.id, 1);
-        console.log(`[Payment Verify] Added 1 extra rebuild for user ${user.id}`);
-      } else if (plan === "extra_rebuild_pack") {
-        // Add 10 rebuilds to user's remaining rebuilds
-        await storage.addRebuilds(user.id, 10);
-        console.log(`[Payment Verify] Added 10 extra rebuilds for user ${user.id}`);
-      } else if (plan === "extra_app_slot") {
-        // Add 1 extra app slot to user
-        await storage.addExtraAppSlot(user.id, 1);
-        const freshUser = await storage.getUser(user.id);
-        const currentSlots = (freshUser as any)?.extraAppSlots || 0;
-        console.log(`[Payment Verify] Added 1 extra app slot for user ${user.id}, now has ${currentSlots} extra slots`);
-      } else if (plan === "starter" || plan === "standard" || plan === "pro" || plan === "agency") {
-        // Activate or extend subscription
-        const now = new Date();
-        
-        // If user already has an active subscription that hasn't expired yet,
-        // extend from the current expiry date, otherwise start from now
-        const freshUser = await storage.getUser(user.id);
-        let startDate = now;
-        let expiryDate = new Date(now);
-        
-        if (freshUser?.planExpiryDate && freshUser.planStatus === "active") {
-          const currentExpiry = new Date(freshUser.planExpiryDate);
-          if (currentExpiry > now) {
-            // Extend from current expiry
-            expiryDate = new Date(currentExpiry);
-          }
-        }
-        
-        expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-        
-        await storage.activateSubscription(user.id, {
-          plan,
-          planStatus: "active",
-          planStartDate: startDate,
-          planExpiryDate: expiryDate,
-          remainingRebuilds: PLAN_REBUILDS[plan] || 1,
-          maxAppsAllowed: PLAN_MAX_APPS[plan] || 1,
-        });
-        
-        console.log(`[Payment Verify] Activated ${plan} subscription for user ${user.id} until ${expiryDate.toISOString()}`);
-      }
+      await storage.applyEntitlementsIfNeeded(payment.id);
 
       return res.json({ ok: true, payment });
     } catch (err) {
@@ -7012,10 +6967,16 @@ export async function registerRoutes(
         return res.status(404).json({ message: "App not found" });
       }
 
-      // Get plan info to check if Play Store is even available
-      const { plan, limits } = await getAppPlanInfo(appItem.id);
-      
-      if (!limits.playStoreReady) {
+      const baseEntitlements = getEntitlements(user);
+      const entitlements = {
+        ...baseEntitlements,
+        canPublishPlay:
+          baseEntitlements.isActive &&
+          (baseEntitlements.plan === "standard" || baseEntitlements.plan === "pro" || baseEntitlements.plan === "agency"),
+      };
+      const plan = (entitlements.plan || "starter") as any;
+
+      if (!entitlements.canPublishPlay) {
         return res.status(403).json({
           ready: false,
           message: "Play Store submission is not available on Starter plan",
@@ -7032,7 +6993,7 @@ export async function registerRoutes(
       // In production, these would come from the actual build artifacts
       const buildInfo = {
         isReleaseSigned: appItem.status === "live", // Assume live builds are signed
-        hasAabOutput: limits.aabEnabled && appItem.status === "live",
+        hasAabOutput: entitlements.canPublishPlay && appItem.status === "live",
         targetSdk: 34,
         hasDebugFlags: false,
         hasInternetPermission: true,
@@ -7044,7 +7005,7 @@ export async function registerRoutes(
       return res.json({
         ...result,
         plan,
-        canSubmit: result.ready && limits.playStoreReady,
+        canSubmit: result.ready && entitlements.canPublishPlay,
       });
     } catch (err) {
       return next(err);
@@ -7112,10 +7073,17 @@ export async function registerRoutes(
         return res.status(404).json({ message: "App not found" });
       }
 
-      const { plan, limits } = await getAppPlanInfo(appItem.id);
+      const baseEntitlements = getEntitlements(user);
+      const entitlements = {
+        ...baseEntitlements,
+        canPublishPlay:
+          baseEntitlements.isActive &&
+          (baseEntitlements.plan === "standard" || baseEntitlements.plan === "pro" || baseEntitlements.plan === "agency"),
+      };
+      const plan = (entitlements.plan || "starter") as any;
 
       // Check if AAB is allowed for this plan
-      if (!limits.aabEnabled) {
+      if (!entitlements.canPublishPlay) {
         return res.status(403).json({
           allowed: false,
           reason: "AAB format (Play Store) is not available on Starter plan. Preview builds are not eligible for Play Store submission.",
@@ -7155,8 +7123,16 @@ export async function registerRoutes(
         return res.status(404).json({ message: "App not found" });
       }
 
-      const { plan, limits } = await getAppPlanInfo(appItem.id);
-      if (!limits.playStoreReady || !limits.aabEnabled) {
+      const baseEntitlements = getEntitlements(user);
+      const entitlements = {
+        ...baseEntitlements,
+        canPublishPlay:
+          baseEntitlements.isActive &&
+          (baseEntitlements.plan === "standard" || baseEntitlements.plan === "pro" || baseEntitlements.plan === "agency"),
+      };
+      const plan = (entitlements.plan || "starter") as any;
+
+      if (!entitlements.canPublishPlay) {
         return res.status(403).json({
           message: "Google Play publishing requires Standard plan or above.",
           requiresUpgrade: true,
@@ -7354,8 +7330,16 @@ export async function registerRoutes(
         return res.status(404).json({ message: "App not found" });
       }
 
-      const { plan, limits } = await getAppPlanInfo(appItem.id);
-      if (!limits.playStoreReady || !limits.aabEnabled) {
+      const baseEntitlements = getEntitlements(user);
+      const entitlements = {
+        ...baseEntitlements,
+        canPublishPlay:
+          baseEntitlements.isActive &&
+          (baseEntitlements.plan === "standard" || baseEntitlements.plan === "pro" || baseEntitlements.plan === "agency"),
+      };
+      const plan = (entitlements.plan || "starter") as any;
+
+      if (!entitlements.canPublishPlay) {
         return res.status(403).json({
           message: "Google Play publishing requires Standard plan or above.",
           requiresUpgrade: true,

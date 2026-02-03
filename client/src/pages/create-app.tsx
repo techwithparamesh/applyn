@@ -1166,9 +1166,9 @@ export default function CreateApp() {
                                     key={preset.color}
                                     type="button"
                                     onClick={() => setFormData({ ...formData, primaryColor: preset.color })}
-                                    className={`h-8 w-8 rounded-lg border-2 transition-all hover:scale-110 ${
+                                    className={`h-8 w-8 rounded-lg border-2 transition-colors duration-150 ease-out ${
                                       formData.primaryColor?.toUpperCase() === preset.color.toUpperCase() 
-                                        ? "border-white scale-110 ring-2 ring-cyan-500/50" 
+                                        ? "border-white ring-1 ring-cyan-500/50" 
                                         : "border-white/20 hover:border-white/40"
                                     }`}
                                     style={{ backgroundColor: preset.color }}
@@ -1196,8 +1196,8 @@ export default function CreateApp() {
                               <div
                                 key={color}
                                 onClick={() => setFormData({ ...formData, splashBgColor: color })}
-                                className={`h-7 w-7 rounded-lg cursor-pointer border-2 transition-all ${
-                                  formData.splashBgColor === color ? "border-cyan-500 scale-110" : "border-white/20 hover:scale-105"
+                                className={`h-7 w-7 rounded-lg cursor-pointer border-2 transition-colors duration-150 ease-out ${
+                                  formData.splashBgColor === color ? "border-cyan-500" : "border-white/20 hover:border-white/40"
                                 }`}
                                 style={{ backgroundColor: color }}
                               />

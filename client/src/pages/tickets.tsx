@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { EmptyState } from "@/components/empty-state";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -440,22 +441,19 @@ export default function Tickets() {
           {(tickets || []).length === 0 && !ticketsLoading && (
             <motion.div variants={itemVariants}>
               <Card className="glass border-dashed border-white/10">
-                <CardContent className="p-12 text-center">
-                  <div className="mx-auto h-16 w-16 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center mb-4">
-                    <LifeBuoy className="h-8 w-8 text-cyan-400" />
-                  </div>
-                  <h3 className="font-semibold text-white text-lg">No tickets yet</h3>
-                  <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">
-                    Need help with your app? Create a support ticket and our team will get back to you within 24 hours.
-                  </p>
-                  <div className="mt-6">
-                    <Button 
+                <CardContent className="p-0">
+                  <EmptyState
+                    icon={LifeBuoy}
+                    title="No tickets yet"
+                    description="Need help with your app? Create a support ticket and our team will get back to you within 24 hours."
+                  >
+                    <Button
                       onClick={() => setNewOpen(true)}
                       className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold"
                     >
                       <Plus className="h-4 w-4" /> Create Your First Ticket
                     </Button>
-                  </div>
+                  </EmptyState>
                 </CardContent>
               </Card>
             </motion.div>

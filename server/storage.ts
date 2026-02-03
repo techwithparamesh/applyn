@@ -149,6 +149,7 @@ export interface IStorage {
     status: PaymentStatus,
     providerPaymentId?: string | null,
   ): Promise<{ payment?: Payment; updated: boolean }>;
+  applyEntitlementsIfNeeded(paymentId: string): Promise<void>;
   listPaymentsByUser(userId: string): Promise<Payment[]>;
   getCompletedPaymentForApp(appId: string): Promise<Payment | undefined>;
   countCompletedBuildsForApp(appId: string, sinceDate?: Date): Promise<number>;
@@ -888,6 +889,64 @@ export class MemStorage implements IStorage {
     };
     this.payments.set(id, updatedPayment);
     return { payment: updatedPayment, updated: true };
+  }
+
+  async applyEntitlementsIfNeeded(paymentId: string): Promise<void> {
+    const payment = this.payments.get(paymentId);
+    if (!payment) return;
+    if (payment.status !== "completed") return;
+    if (payment.entitlementsAppliedAt) return;
+
+    const user = await this.getUser(payment.userId);
+    if (!user) return;
+
+    const plan = payment.plan as "starter" | "standard" | "pro" | "agency" | "extra_rebuild" | "extra_rebuild_pack" | "extra_app_slot";
+
+    if (plan === "extra_rebuild") {
+      await this.addRebuilds(user.id, 1);
+    } else if (plan === "extra_rebuild_pack") {
+      await this.addRebuilds(user.id, 10);
+    } else if (plan === "extra_app_slot") {
+      await this.addExtraAppSlot(user.id, 1);
+    } else if (plan === "starter" || plan === "standard" || plan === "pro" || plan === "agency") {
+      const now = new Date();
+      let expiryDate = new Date(now);
+
+      const freshUser = await this.getUser(user.id);
+      if (freshUser?.planExpiryDate && freshUser.planStatus === "active") {
+        const currentExpiry = new Date(freshUser.planExpiryDate);
+        if (currentExpiry > now) {
+          expiryDate = new Date(currentExpiry);
+        }
+      }
+
+      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+
+      const PLAN_REBUILDS: Record<string, number> = {
+        starter: 1,
+        standard: 2,
+        pro: 3,
+        agency: 20,
+      };
+      const PLAN_MAX_APPS: Record<string, number> = {
+        starter: 1,
+        standard: 1,
+        pro: 2,
+        agency: 10,
+      };
+
+      await this.activateSubscription(user.id, {
+        plan,
+        planStatus: "active",
+        planStartDate: now,
+        planExpiryDate: expiryDate,
+        remainingRebuilds: PLAN_REBUILDS[plan] || 1,
+        maxAppsAllowed: PLAN_MAX_APPS[plan] || 1,
+      });
+    }
+
+    const updated: Payment = { ...payment, entitlementsAppliedAt: new Date() };
+    this.payments.set(paymentId, updated);
   }
 
   async listPaymentsByUser(userId: string): Promise<Payment[]> {

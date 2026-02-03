@@ -25,6 +25,7 @@ import type {
   InsertAuditLog,
 } from "@shared/schema";
 import { apps, buildJobs, contactSubmissions, supportTickets, ticketMessages, users, payments, pushTokens, pushNotifications, auditLogs } from "@shared/db.mysql";
+import { type PlanId, getMaxAppsForPlan, getRebuildsForPlan } from "@shared/pricing";
 import { getMysqlDb } from "./db-mysql";
 import type { AppBuildPatch, BuildJob, BuildJobStatus } from "./storage";
 
@@ -37,6 +38,65 @@ function jobLockTtlMs() {
 }
 
 export class MysqlStorage {
+  private async getUserWithDb(db: any, id: string): Promise<User | undefined> {
+    const rows = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    return rows[0] as unknown as User;
+  }
+
+  private async activateSubscriptionWithDb(
+    db: any,
+    userId: string,
+    data: {
+      plan: string;
+      planStatus: string;
+      planStartDate: Date;
+      planExpiryDate: Date;
+      remainingRebuilds: number;
+      subscriptionId?: string;
+      maxAppsAllowed?: number;
+      maxTeamMembers?: number;
+    },
+  ): Promise<void> {
+    const updateData: any = {
+      plan: data.plan,
+      planStatus: data.planStatus,
+      planStartDate: data.planStartDate,
+      planExpiryDate: data.planExpiryDate,
+      remainingRebuilds: data.remainingRebuilds,
+      subscriptionId: data.subscriptionId ?? null,
+      updatedAt: new Date(),
+    };
+
+    if (data.maxAppsAllowed !== undefined) {
+      updateData.maxAppsAllowed = data.maxAppsAllowed;
+    }
+    if (data.maxTeamMembers !== undefined) {
+      updateData.maxTeamMembers = data.maxTeamMembers;
+    }
+
+    await db.update(users).set(updateData).where(eq(users.id, userId));
+  }
+
+  private async addRebuildsWithDb(db: any, userId: string, countToAdd: number): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        remainingRebuilds: sql`remaining_rebuilds + ${countToAdd}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
+
+  private async addExtraAppSlotWithDb(db: any, userId: string, countToAdd: number): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        extraAppSlots: sql`COALESCE(extra_app_slots, 0) + ${countToAdd}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
+
   async getUser(id: string): Promise<User | undefined> {
     const rows = await getMysqlDb().select().from(users).where(eq(users.id, id)).limit(1);
     return rows[0] as unknown as User;
@@ -193,28 +253,7 @@ export class MysqlStorage {
       maxTeamMembers?: number;
     }
   ): Promise<User | undefined> {
-    const updateData: any = {
-      plan: data.plan,
-      planStatus: data.planStatus,
-      planStartDate: data.planStartDate,
-      planExpiryDate: data.planExpiryDate,
-      remainingRebuilds: data.remainingRebuilds,
-      subscriptionId: data.subscriptionId ?? null,
-      updatedAt: new Date(),
-    };
-    
-    // Only update maxAppsAllowed and maxTeamMembers if provided
-    if (data.maxAppsAllowed !== undefined) {
-      updateData.maxAppsAllowed = data.maxAppsAllowed;
-    }
-    if (data.maxTeamMembers !== undefined) {
-      updateData.maxTeamMembers = data.maxTeamMembers;
-    }
-    
-    await getMysqlDb()
-      .update(users)
-      .set(updateData)
-      .where(eq(users.id, userId));
+    await this.activateSubscriptionWithDb(getMysqlDb(), userId, data);
     return await this.getUser(userId);
   }
 
@@ -250,13 +289,7 @@ export class MysqlStorage {
    * Add extra rebuilds (for purchased rebuilds)
    */
   async addRebuilds(userId: string, count: number): Promise<User | undefined> {
-    await getMysqlDb()
-      .update(users)
-      .set({
-        remainingRebuilds: sql`remaining_rebuilds + ${count}`,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, userId));
+    await this.addRebuildsWithDb(getMysqlDb(), userId, count);
     return await this.getUser(userId);
   }
 
@@ -264,14 +297,80 @@ export class MysqlStorage {
    * Add extra app slots (for purchased slots)
    */
   async addExtraAppSlot(userId: string, count: number): Promise<User | undefined> {
-    await getMysqlDb()
-      .update(users)
-      .set({
-        extraAppSlots: sql`COALESCE(extra_app_slots, 0) + ${count}`,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, userId));
+    await this.addExtraAppSlotWithDb(getMysqlDb(), userId, count);
     return await this.getUser(userId);
+  }
+
+  async applyEntitlementsIfNeeded(paymentId: string): Promise<void> {
+    const db = getMysqlDb();
+
+    await db.transaction(async (tx) => {
+      const lockedRows = await tx
+        .select()
+        .from(payments)
+        .where(eq(payments.id, paymentId))
+        .limit(1)
+        // Drizzle emits SELECT ... FOR UPDATE for transactional row locking.
+        // This prevents concurrent calls from double-applying entitlements.
+        .for("update");
+
+      const payment = lockedRows[0] as unknown as Payment | undefined;
+      if (!payment) return;
+
+      if (payment.status !== "completed") return;
+      if (payment.entitlementsAppliedAt) return;
+
+      const userId = payment.userId;
+      const user = await this.getUserWithDb(tx, userId);
+      if (!user) {
+        throw new Error(`Payment ${paymentId} references missing user ${userId}`);
+      }
+
+      const plan = payment.plan as
+        | PlanId
+        | "extra_rebuild"
+        | "extra_rebuild_pack"
+        | "extra_app_slot";
+
+      if (plan === "extra_rebuild") {
+        await this.addRebuildsWithDb(tx, userId, 1);
+      } else if (plan === "extra_rebuild_pack") {
+        await this.addRebuildsWithDb(tx, userId, 10);
+      } else if (plan === "extra_app_slot") {
+        await this.addExtraAppSlotWithDb(tx, userId, 1);
+      } else if (plan === "starter" || plan === "standard" || plan === "pro" || plan === "agency") {
+        const now = new Date();
+        let expiryDate = new Date(now);
+
+        if (user.planExpiryDate && user.planStatus === "active") {
+          const currentExpiry = new Date(user.planExpiryDate);
+          if (currentExpiry > now) {
+            expiryDate = new Date(currentExpiry);
+          }
+        }
+
+        expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+
+        await this.activateSubscriptionWithDb(tx, userId, {
+          plan,
+          planStatus: "active",
+          planStartDate: now,
+          planExpiryDate: expiryDate,
+          remainingRebuilds: getRebuildsForPlan(plan),
+          maxAppsAllowed: getMaxAppsForPlan(plan),
+        });
+      } else {
+        // Unknown plan types intentionally result in no entitlements mutation.
+        // Still mark entitlements as applied to prevent repeated processing.
+      }
+
+      await tx
+        .update(payments)
+        .set({
+          entitlementsAppliedAt: sql`NOW()`,
+        })
+        .where(eq(payments.id, paymentId));
+    });
   }
 
   /**

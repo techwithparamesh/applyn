@@ -1,6 +1,6 @@
 import { Navbar } from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Download, RefreshCw, ExternalLink, QrCode, Share2, Copy, CheckCircle2, Wand2, AlertTriangle, MoreHorizontal, UploadCloud, Edit, Crown, Sparkles, Smartphone } from "lucide-react";
+import { ArrowLeft, Download, RefreshCw, ExternalLink, QrCode, Share2, Copy, CheckCircle2, Wand2, AlertTriangle, MoreHorizontal, UploadCloud, Edit, Crown, Sparkles, Smartphone, Lock } from "lucide-react";
 import { useLocation, useParams, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
@@ -16,7 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { getAppUrlDisplay, isHttpUrl } from "@/lib/utils";
 import { AppBuilderStepper } from "@/components/app-builder-stepper";
 import { PageLoading, PageState } from "@/components/page-state";
-import { usePlanGate } from "@/lib/plan-gate";
+import { formatPlanLabel, requiredPlanForFeature, usePlanGate } from "@/lib/plan-gate";
 
 type AppItem = {
   id: string;
@@ -51,7 +51,7 @@ export default function PreviewApp() {
   const [, setLocation] = useLocation();
   const search = useSearch();
   const { toast } = useToast();
-  const { requirePlan } = usePlanGate();
+  const { requirePlan, isAllowed, subscriptionLoading } = usePlanGate();
   
   // QR Code modal state
   const [showQRModal, setShowQRModal] = useState(false);
@@ -64,6 +64,9 @@ export default function PreviewApp() {
   const params = new URLSearchParams(search);
   const appIdFromQuery = params.get("appId");
   const appId = id || appIdFromQuery;
+
+  const requiredPublishPlan = requiredPlanForFeature("publish_play");
+  const showPublishPlanHint = !subscriptionLoading && !isAllowed("publish_play");
 
   useEffect(() => {
     // Track that the Preview hub was opened at least once (client-only).
@@ -331,18 +334,19 @@ export default function PreviewApp() {
 
   // Status badge helper
   const getStatusBadge = () => {
+    const base = "rounded-full px-2 py-0.5 text-xs font-medium border-0";
     if (isPreviewOnly) {
-      return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Preview</Badge>;
+      return <Badge className={`${base} bg-slate-800/60 text-slate-300`}>Preview</Badge>;
     }
     switch (app.status) {
       case "live":
-        return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Live</Badge>;
+        return <Badge className={`${base} bg-green-900/30 text-green-300`}>Live</Badge>;
       case "processing":
-        return <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">Building</Badge>;
+        return <Badge className={`${base} bg-amber-900/30 text-amber-300`}>Processing</Badge>;
       case "failed":
-        return <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Failed</Badge>;
+        return <Badge className={`${base} bg-red-900/30 text-red-300`}>Failed</Badge>;
       default:
-        return <Badge className="bg-slate-500/20 text-slate-400 border-slate-500/30">Draft</Badge>;
+        return <Badge className={`${base} bg-slate-800/60 text-slate-300`}>Draft</Badge>;
     }
   };
 
@@ -416,6 +420,12 @@ export default function PreviewApp() {
             >
               <UploadCloud className="mr-2 h-4 w-4" /> Continue to Publish
             </Button>
+
+            {showPublishPlanHint ? (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-400">
+                <Lock className="h-3.5 w-3.5" /> Requires {formatPlanLabel(requiredPublishPlan)} plan
+              </span>
+            ) : null}
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

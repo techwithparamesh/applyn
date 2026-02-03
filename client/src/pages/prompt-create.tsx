@@ -1374,11 +1374,11 @@ export default function PromptCreate() {
               <div className="grid md:grid-cols-2 gap-6">
                 {/* Option 1: I have a website */}
                 <Card 
-                  className="glass border-white/10 cursor-pointer transition-all hover:scale-[1.02] hover:border-cyan-500/50 group"
+                  className="glass border-white/10 cursor-pointer transition-colors duration-150 ease-out hover:border-cyan-500/50 group"
                   onClick={() => handleModeSelect("website")}
                 >
                   <CardContent className="p-8 text-center">
-                    <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
                       <Smartphone className="h-10 w-10 text-white" />
                     </div>
                     <h3 className="text-xl font-bold text-white mb-2">I have a website</h3>
@@ -1398,11 +1398,11 @@ export default function PromptCreate() {
 
                 {/* Option 2: Build from scratch */}
                 <Card 
-                  className="glass border-white/10 cursor-pointer transition-all hover:scale-[1.02] hover:border-purple-500/50 group"
+                  className="glass border-white/10 cursor-pointer transition-colors duration-150 ease-out hover:border-purple-500/50 group"
                   onClick={() => handleModeSelect("scratch")}
                 >
                   <CardContent className="p-8 text-center">
-                    <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
                       <Layout className="h-10 w-10 text-white" />
                     </div>
                     <h3 className="text-xl font-bold text-white mb-2">Build from scratch</h3>
@@ -1451,7 +1451,7 @@ export default function PromptCreate() {
                   return (
                     <Card
                       key={template.id}
-                      className={`glass border-white/10 cursor-pointer transition-all hover:scale-105 hover:border-cyan-500/50 ${
+                      className={`glass border-white/10 cursor-pointer transition-colors duration-150 ease-out hover:border-cyan-500/50 ${
                         selectedTemplate?.id === template.id ? "border-cyan-500 bg-cyan-500/10" : ""
                       }`}
                       onClick={() => handleTemplateSelect(template)}

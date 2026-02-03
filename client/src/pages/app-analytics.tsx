@@ -10,6 +10,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
@@ -31,7 +32,8 @@ import {
   ChevronUp,
   ChevronDown,
   Loader2,
-  Crown
+  Crown,
+  AlertTriangle
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -150,11 +152,12 @@ export default function AppAnalytics() {
     return (
       <div className="min-h-screen bg-background bg-mesh-subtle">
         <Navbar />
-        <main className="container mx-auto px-4 md:px-6 py-8 text-center">
-          <h2 className="text-2xl font-bold text-white mb-4">App not found</h2>
-          <Button onClick={() => setLocation("/dashboard")}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
-          </Button>
+        <main className="container mx-auto px-4 md:px-6 py-8">
+          <EmptyState icon={AlertTriangle} title="App not found">
+            <Button onClick={() => setLocation("/dashboard")} className="gap-2">
+              <ArrowLeft className="h-4 w-4" /> Back to Dashboard
+            </Button>
+          </EmptyState>
         </main>
       </div>
     );
@@ -360,11 +363,11 @@ export default function AppAnalytics() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <BarChart3 className="h-12 w-12 text-muted-foreground mb-4" />
-                    <p className="text-muted-foreground mb-2">No data yet</p>
-                    <p className="text-xs text-muted-foreground">Analytics will appear once users start using your app</p>
-                  </div>
+                  <EmptyState
+                    icon={BarChart3}
+                    title="No data yet"
+                    description="Analytics will appear once users start using your app"
+                  />
                 )}
               </CardContent>
             </Card>

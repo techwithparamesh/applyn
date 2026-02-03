@@ -965,7 +965,7 @@ function NativeScreensPreview({
                   onScreenChange(i);
                 }}
                 className={
-                  "relative flex flex-col items-center justify-center gap-1 min-w-0 w-full h-full px-2 transition-colors duration-150 active:scale-[0.97] " +
+                  "relative flex flex-col items-center justify-center gap-1 min-w-0 w-full h-full px-2 transition-colors duration-150 ease-out active:opacity-90 " +
                   (isActive ? "text-[color:var(--app-text)]" : "text-[color:var(--app-muted-text)]")
                 }
               >
@@ -1000,7 +1000,7 @@ function NativeScreensPreview({
                   key="__more"
                   onClick={() => setMoreOpen((v) => !v)}
                   className={
-                    "relative flex flex-col items-center justify-center gap-1 min-w-0 w-full h-full px-2 transition-colors duration-150 active:scale-[0.97] " +
+                    "relative flex flex-col items-center justify-center gap-1 min-w-0 w-full h-full px-2 transition-colors duration-150 ease-out active:opacity-90 " +
                     (isMoreActive ? "text-[color:var(--app-text)]" : "text-[color:var(--app-muted-text)]")
                   }
                   aria-haspopup="menu"

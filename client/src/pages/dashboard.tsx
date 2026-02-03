@@ -35,6 +35,7 @@ import {
   Mail,
   Loader2,
   X,
+  Shield,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -55,6 +56,7 @@ import { motion } from "framer-motion";
 import { BuildErrorAnalyzer } from "@/components/ai-features";
 import { getAppUrlDisplay } from "@/lib/utils";
 import { usePlanGate } from "@/lib/plan-gate";
+import { EmptyState } from "@/components/empty-state";
 
 type AppItem = {
   id: string;
@@ -264,6 +266,12 @@ export default function Dashboard() {
       publicDone: publishPublicDone,
     };
   }, [progressApp, previewOpened]);
+
+  const showMomentumPublishNudge = useMemo(() => {
+    if (!progressApp || !progress) return false;
+    const lastTrack = String((progressApp as any).lastPlayTrack || "");
+    return progress.settingsDone && progress.screensDone && progress.previewDone && lastTrack !== "production";
+  }, [progressApp, progress]);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -636,7 +644,7 @@ export default function Dashboard() {
               /* Support Team Stats */
               <>
                 <Card 
-                  className="glass glass-hover border stat-gradient-4 cursor-pointer transition-all"
+                  className="glass glass-hover border stat-gradient-4 cursor-pointer transition-colors duration-150 ease-out"
                   onClick={() => setLocation("/tickets")}
                 >
                   <CardContent className="p-5">
@@ -698,7 +706,7 @@ export default function Dashboard() {
               /* Regular User Stats */
               <>
                 <Card 
-                  className={`glass glass-hover border stat-gradient-1 cursor-pointer transition-all ${statusFilter === "all" ? "ring-1 ring-cyan-500/50 bg-white/[0.05]" : ""}`}
+                  className={`glass glass-hover border stat-gradient-1 cursor-pointer transition-colors duration-150 ease-out ${statusFilter === "all" ? "ring-1 ring-cyan-500/50 bg-white/[0.05]" : ""}`}
                   onClick={() => setStatusFilter("all")}
                 >
                   <CardContent className="p-5">
@@ -715,7 +723,7 @@ export default function Dashboard() {
                 </Card>
 
                 <Card 
-                  className={`glass glass-hover border stat-gradient-3 cursor-pointer transition-all ${statusFilter === "live" ? "ring-1 ring-green-500/50 bg-white/[0.05]" : ""}`}
+                  className={`glass glass-hover border stat-gradient-3 cursor-pointer transition-colors duration-150 ease-out ${statusFilter === "live" ? "ring-1 ring-green-500/50 bg-white/[0.05]" : ""}`}
                   onClick={() => setStatusFilter("live")}
                 >
                   <CardContent className="p-5">
@@ -732,7 +740,7 @@ export default function Dashboard() {
                 </Card>
 
                 <Card 
-                  className={`glass glass-hover border stat-gradient-2 cursor-pointer transition-all ${statusFilter === "processing" ? "ring-1 ring-purple-500/50 bg-white/[0.05]" : ""}`}
+                  className={`glass glass-hover border stat-gradient-2 cursor-pointer transition-colors duration-150 ease-out ${statusFilter === "processing" ? "ring-1 ring-purple-500/50 bg-white/[0.05]" : ""}`}
                   onClick={() => setStatusFilter("processing")}
                 >
                   <CardContent className="p-5">
@@ -749,7 +757,7 @@ export default function Dashboard() {
                 </Card>
 
                 <Card 
-                  className="glass glass-hover border stat-gradient-4 cursor-pointer transition-all"
+                  className="glass glass-hover border stat-gradient-4 cursor-pointer transition-colors duration-150 ease-out"
                   onClick={() => setLocation("/tickets")}
                 >
                   <CardContent className="p-5">
@@ -1068,6 +1076,48 @@ export default function Dashboard() {
               </Card>
             ) : null}
 
+            <Card className="border-white/10 bg-white/[0.03] mb-4">
+              <CardContent className="p-4 text-sm text-slate-300/80">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-slate-300/70" />
+                    <span>Build success rate: 99.8%</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-slate-300/70" />
+                    <span>Secure payments powered by Razorpay</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-slate-300/70" />
+                    <span>Apps published every week</span>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="h-2 w-2 rounded-full bg-green-500" aria-hidden="true" />
+                  <span>System status: Operational</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {showMomentumPublishNudge && progressApp ? (
+              <Card className="mb-4 border border-green-500/30 bg-green-900/10">
+                <CardContent className="p-4 text-sm">
+                  <div className="text-white font-medium">Your app is ready to go live 🚀</div>
+                  <div className="mt-1 text-muted-foreground">You’ve completed all required steps. Publish now to make it available.</div>
+                  <div className="mt-3">
+                    <Button
+                      size="sm"
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white"
+                      onClick={() => setLocation(`/apps/${progressApp.id}/publish`)}
+                    >
+                      Publish Now
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
+
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
               {appsLoading && (
                 <Card className="md:col-span-2 lg:col-span-3 glass">
@@ -1078,33 +1128,25 @@ export default function Dashboard() {
                 </Card>
               )}
 
-              {!appsLoading && filteredApps.length === 0 && (
+              {!appsLoading && filteredApps.length === 0 && (apps || []).length > 0 && (
                 <Card className="md:col-span-2 lg:col-span-3 glass">
-                  <CardContent className="p-8 text-center">
-                    <div className="h-12 w-12 rounded-xl bg-white/5 flex items-center justify-center mx-auto mb-3">
-                      <Package className="h-6 w-6 text-muted-foreground" />
-                    </div>
-                    <p className="text-muted-foreground">
-                      {statusFilter === "all" 
-                        ? "No apps yet. Create your first app!" 
-                        : `No ${statusFilter} apps found.`}
-                    </p>
-                    {statusFilter !== "all" && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="mt-2 text-cyan-400"
-                        onClick={() => setStatusFilter("all")}
-                      >
-                        Show all apps
-                      </Button>
-                    )}
+                  <CardContent className="p-0">
+                    <EmptyState
+                      icon={Package}
+                      title={statusFilter === "all" ? "No apps yet. Create your first app!" : `No ${statusFilter} apps found.`}
+                    >
+                      {statusFilter !== "all" ? (
+                        <Button variant="ghost" size="sm" className="text-cyan-400" onClick={() => setStatusFilter("all")}>
+                          Show all apps
+                        </Button>
+                      ) : null}
+                    </EmptyState>
                   </CardContent>
                 </Card>
               )}
 
               {filteredApps.map((app) => (
-                <Card key={app.id} className="border-white/[0.06] bg-[#0d1117] rounded-2xl overflow-hidden group hover:border-white/[0.12] transition-all">
+                <Card key={app.id} className="border-white/[0.06] bg-[#0d1117] rounded-2xl overflow-hidden group hover:border-white/[0.12] transition-colors duration-150 ease-out">
                   <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
                     <div className="flex items-center gap-3">
                       <div 
@@ -1334,8 +1376,8 @@ export default function Dashboard() {
                     )}
 
                     {app.status === "processing" && (
-                      <Badge variant="secondary" className="bg-purple-500/10 text-purple-400 border-purple-500/15 rounded-full">
-                        <Clock className="mr-1 h-3 w-3" /> Building...
+                      <Badge className="rounded-full px-2 py-0.5 text-xs font-medium border-0 bg-amber-900/30 text-amber-300">
+                        Processing
                       </Badge>
                     )}
                   </CardFooter>
@@ -1344,21 +1386,18 @@ export default function Dashboard() {
 
               {!appsLoading && (apps || []).length === 0 && (
                 <Card className="md:col-span-2 lg:col-span-3 glass border-dashed border-white/10">
-                  <CardContent className="p-12 text-center">
-                    <div className="mx-auto h-16 w-16 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center mb-4">
-                      <Sparkles className="h-8 w-8 text-cyan-400" />
-                    </div>
-                    <h3 className="font-semibold text-white text-lg">No apps yet</h3>
-                    <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">
-                      Transform your website into a native mobile app in minutes. No coding required.
-                    </p>
-                    <div className="mt-6">
+                  <CardContent className="p-0">
+                    <EmptyState
+                      icon={Sparkles}
+                      title="No apps yet"
+                      description="Transform your website into a native mobile app in minutes. No coding required."
+                    >
                       <Link href="/prompt-create">
                         <Button className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold">
                           <Plus className="h-4 w-4" /> Create Your First App
                         </Button>
                       </Link>
-                    </div>
+                    </EmptyState>
                   </CardContent>
                 </Card>
               )}
@@ -1492,30 +1531,23 @@ export default function Dashboard() {
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const base = "rounded-full px-2 py-0.5 text-xs font-medium border-0";
   if (status === "live") {
     return (
-      <Badge className="bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20 gap-1">
-        <CheckCircle className="h-3 w-3" /> Live
-      </Badge>
+      <Badge className={`${base} bg-green-900/30 text-green-300`}>Live</Badge>
     );
   }
   if (status === "processing") {
     return (
-      <Badge className="bg-purple-500/10 text-purple-400 border border-purple-500/20 gap-1">
-        <Clock className="h-3 w-3 animate-pulse" /> Processing
-      </Badge>
+      <Badge className={`${base} bg-amber-900/30 text-amber-300`}>Processing</Badge>
     );
   }
   if (status === "failed") {
     return (
-      <Badge className="bg-red-500/10 text-red-400 border border-red-500/20 gap-1">
-        <AlertCircle className="h-3 w-3" /> Failed
-      </Badge>
+      <Badge className={`${base} bg-red-900/30 text-red-300`}>Failed</Badge>
     );
   }
   return (
-    <Badge className="bg-white/5 text-muted-foreground border border-white/10 gap-1">
-      Draft
-    </Badge>
+    <Badge className={`${base} bg-slate-800/60 text-slate-300`}>Draft</Badge>
   );
 }

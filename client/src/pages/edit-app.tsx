@@ -311,8 +311,8 @@ export default function EditApp() {
                                 setFormData({ ...formData, primaryColor: color });
                               }
                             }}
-                            className={`h-10 w-10 rounded-full cursor-pointer border-2 transition-all ${
-                              formData.primaryColor === color ? "border-slate-900 scale-110 ring-2 ring-primary/50" : "border-transparent hover:scale-105"
+                            className={`h-10 w-10 rounded-full cursor-pointer border-2 transition-colors duration-150 ease-out ${
+                              formData.primaryColor === color ? "border-slate-300 ring-1 ring-primary/50" : "border-transparent hover:border-white/20"
                             }`}
                             style={{ backgroundColor: color }}
                           />
@@ -328,16 +328,8 @@ export default function EditApp() {
                   </div>
 
                   <div className="pt-4 flex gap-4">
-                    <Button type="submit" disabled={updateApp.isPending}>
-                      {updateApp.isPending ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="mr-2 h-4 w-4" /> Save Changes
-                        </>
-                      )}
+                    <Button type="submit" loading={updateApp.isPending}>
+                      <Save className="mr-2 h-4 w-4" /> Save Changes
                     </Button>
                     <Button type="button" variant="outline" onClick={() => setLocation("/dashboard")}>
                       Cancel

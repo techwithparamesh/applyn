@@ -13,6 +13,7 @@ import { getPlan, PlanId } from "@shared/pricing";
 import { getAllowedFeatures } from "./subscription-middleware";
 import { User } from "@shared/schema";
 import { sendBuildCompleteEmail } from "./email";
+import { getEntitlements } from "./entitlements";
 
 function artifactsRoot() {
   return process.env.ARTIFACTS_DIR || path.resolve(process.cwd(), "artifacts");
@@ -170,6 +171,34 @@ export async function handleOneJob(workerId: string) {
     console.log(`[Worker] Owner plan: ${owner?.plan || 'none'}`);
 
     const platform = (app as any).platform || "android";
+
+    // Enforce subscription + plan eligibility before executing any build.
+    const entitlements = getEntitlements(owner || null);
+    if (entitlements.canBuild !== true) {
+      const failureReason = "Subscription inactive or plan not eligible";
+      console.warn(`[Worker] Blocking build job ${job.id} for app ${app.id}: ${failureReason}`);
+
+      await storage.updateAppBuild(app.id, {
+        status: "failed",
+        buildError: failureReason,
+        lastBuildAt: new Date(),
+      });
+      await storage.completeBuildJob(job.id, "failed", failureReason);
+      return;
+    }
+
+    if ((platform === "ios" || platform === "both") && entitlements.canBuildIos !== true) {
+      const failureReason = "iOS builds require eligible plan";
+      console.warn(`[Worker] Blocking iOS build job ${job.id} for app ${app.id}: ${failureReason}`);
+
+      await storage.updateAppBuild(app.id, {
+        status: "failed",
+        buildError: failureReason,
+        lastBuildAt: new Date(),
+      });
+      await storage.completeBuildJob(job.id, "failed", failureReason);
+      return;
+    }
     const pkg = app.packageName || safePackageName(app.id);
     const versionCode = (app.versionCode ?? 0) + 1;
 
@@ -178,21 +207,6 @@ export async function handleOneJob(workerId: string) {
     
     console.log(`[Worker] Platform: ${platform}, Package: ${pkg}, Version: ${versionCode}`);
     console.log(`[Worker] Features:`, features);
-
-    // Check iOS build permission for Pro plan only
-    if ((platform === "ios" || platform === "both") && owner) {
-      const planDef = getPlan((owner.plan as PlanId) || "starter");
-      if (!planDef.outputs.iosIpa) {
-        console.log(`[Worker] iOS build not allowed for plan: ${owner.plan}`);
-        await storage.updateAppBuild(app.id, {
-          status: "failed",
-          buildError: "iOS builds require Pro plan. Please upgrade to access iOS builds.",
-          lastBuildAt: new Date(),
-        });
-        await storage.completeBuildJob(job.id, "failed", "iOS builds require Pro plan");
-        return;
-      }
-    }
 
     await storage.updateAppBuild(app.id, {
       status: "processing",

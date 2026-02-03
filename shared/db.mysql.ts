@@ -1233,6 +1233,7 @@ export const payments = mysqlTable("payments", {
   amountInr: int("amount_inr").notNull(),
   plan: varchar("plan", { length: 50 }).notNull().default("starter"),
   status: varchar("status", { length: 16 }).notNull().default("pending"),
+  entitlementsAppliedAt: timestamp("entitlements_applied_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 }, (table) => ({

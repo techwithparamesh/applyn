@@ -110,16 +110,10 @@ export default function ForgotPassword() {
 
                     <Button
                       type="submit"
-                      className="w-full h-12 text-base font-bold bg-primary hover:bg-primary/90 text-black rounded-xl shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                      disabled={loading}
+                      loading={loading}
+                      className="w-full h-12 text-base font-bold bg-primary hover:bg-primary/90 text-black rounded-xl shadow-lg shadow-primary/20 transition-colors duration-150 ease-out"
                     >
-                      {loading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...
-                        </>
-                      ) : (
-                        "Send reset link"
-                      )}
+                      Send reset link
                     </Button>
                   </form>
                 )}
