@@ -172,9 +172,11 @@ function UpgradeModal({ state, onOpenChange }: { state: UpgradeModalState; onOpe
     <Dialog open={state.open} onOpenChange={onOpenChange}>
       <DialogContent className="glass border-white/10">
         <DialogHeader>
-          <DialogTitle className="text-white">Your app is ready to go live 🚀</DialogTitle>
+          <DialogTitle className="text-white">{showPublishCta ? "You’re ready to publish." : "Your app is ready to go live 🚀"}</DialogTitle>
           <DialogDescription>
-            {feature ? (
+            {showPublishCta ? (
+              "Choose a plan to go live and publish your app."
+            ) : feature ? (
               <span>
                 To use <span className="text-white font-medium">{labelForFeature(feature)}</span>, upgrade to{" "}
                 <span className="text-white font-medium">{formatPlanLabel(requiredPlan)}</span> or higher.
@@ -310,7 +312,7 @@ function UpgradeModal({ state, onOpenChange }: { state: UpgradeModalState; onOpe
               setLocation("/pricing");
             }}
           >
-            {showPublishCta ? "Upgrade & Publish" : "View Plans"}
+            {showPublishCta ? "Choose Plan & Publish" : "View Plans"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -322,6 +322,13 @@ export default function AppEditor() {
       ? nativeTemplates.find(t => t.id === screen.nativeTemplate) 
       : null;
 
+    const badgeLabel =
+      screen.type === "native"
+        ? templateInfo?.name || "Built-in"
+        : screen.type === "webview"
+          ? "Website"
+          : "Custom";
+
     return (
       <div
         ref={setNodeRef}
@@ -355,7 +362,7 @@ export default function AppEditor() {
                 : "border-cyan-500/50 text-cyan-400"
             }`}
           >
-            {screen.type === "native" && templateInfo ? templateInfo.name : screen.type}
+            {badgeLabel}
           </Badge>
           {canDelete && (
             <Button
@@ -518,7 +525,10 @@ export default function AppEditor() {
                     {currentPlan}
                   </Badge>
                 </h1>
-                <p className="text-sm text-muted-foreground">App Settings & Branding</p>
+                <p className="text-sm text-muted-foreground">Settings</p>
+                <p className="text-sm text-muted-foreground">
+                  Configure your app here. Next, open Builder to design your screens.
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -536,7 +546,7 @@ export default function AppEditor() {
                 onClick={() => setLocation(`/apps/${params.id}/preview`)}
                 className="border-white/10"
               >
-                <Eye className="mr-2 h-4 w-4" /> Preview
+                <Eye className="mr-2 h-4 w-4" /> Open Preview
               </Button>
               <Button
                 onClick={() => saveMutation.mutate()}
@@ -565,7 +575,7 @@ export default function AppEditor() {
                   <Paintbrush className="mr-2 h-4 w-4" /> Branding
                 </TabsTrigger>
                 <TabsTrigger value="screens" className="data-[state=active]:bg-cyan-500/20">
-                  <Layers className="mr-2 h-4 w-4" /> Screens
+                  <Layers className="mr-2 h-4 w-4" /> Navigation
                 </TabsTrigger>
                 <TabsTrigger value="features" className="data-[state=active]:bg-cyan-500/20">
                   <Settings className="mr-2 h-4 w-4" /> Features
@@ -704,10 +714,10 @@ export default function AppEditor() {
                       </div>
                       <div className="flex gap-2">
                         <Button onClick={() => setShowTemplateDialog(true)} size="sm" variant="outline" className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10">
-                          <Sparkles className="mr-2 h-4 w-4" /> Add Native
+                          <Sparkles className="mr-2 h-4 w-4" /> Add Built-in Page
                         </Button>
                         <Button onClick={() => addScreen("webview")} size="sm" variant="outline" className="border-white/10">
-                          <Plus className="mr-2 h-4 w-4" /> Add WebView
+                          <Plus className="mr-2 h-4 w-4" /> Add Website Page
                         </Button>
                       </div>
                     </div>
@@ -750,10 +760,10 @@ export default function AppEditor() {
                     <DialogHeader>
                       <DialogTitle className="text-white flex items-center gap-2">
                         <Sparkles className="h-5 w-5 text-purple-400" />
-                        Add Native Screen
+                        Add Built-in Page
                       </DialogTitle>
                       <DialogDescription>
-                        Pre-built screens that work offline and feel truly native
+                        Pre-built pages that work offline and feel built-in
                       </DialogDescription>
                     </DialogHeader>
                     <div className="grid grid-cols-2 gap-3 py-4">
@@ -971,7 +981,7 @@ export default function AppEditor() {
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
                     <Smartphone className="h-4 w-4 text-cyan-400" />
-                    Live Preview
+                    Preview Panel
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 flex justify-center">
@@ -998,13 +1008,6 @@ export default function AppEditor() {
               {/* Quick Actions */}
               <Card className="glass border-white/10 mt-4">
                 <CardContent className="p-4 space-y-2">
-                  <Button 
-                    variant="ghost" 
-                    className="w-full justify-start text-muted-foreground hover:text-white"
-                    onClick={() => setLocation(`/apps/${params.id}/preview`)}
-                  >
-                    <Eye className="mr-2 h-4 w-4" /> Full Preview
-                  </Button>
                   <Button 
                     variant="ghost" 
                     className="w-full justify-start text-muted-foreground hover:text-white"

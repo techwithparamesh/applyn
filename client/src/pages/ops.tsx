@@ -675,7 +675,7 @@ export default function Ops() {
                                   onClick={() => handleDownload(app.id)}
                                   className="text-white focus:bg-white/10 cursor-pointer"
                                 >
-                                  <Download className="mr-2 h-4 w-4" /> Download APK
+                                  <Download className="mr-2 h-4 w-4" /> Download Android App (APK)
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuItem 

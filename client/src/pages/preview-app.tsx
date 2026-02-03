@@ -8,7 +8,7 @@ import { DevicePreview } from "@/components/device-preview";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -64,6 +64,21 @@ export default function PreviewApp() {
   const params = new URLSearchParams(search);
   const appIdFromQuery = params.get("appId");
   const appId = id || appIdFromQuery;
+
+  useEffect(() => {
+    // Track that the Preview hub was opened at least once (client-only).
+    // TODO: Replace with server-side tracking if/when analytics/events are persisted.
+    if (!appId) return;
+    try {
+      const atKey = `app:${appId}:previewOpenedAt`;
+      const countKey = `app:${appId}:previewOpenedCount`;
+      localStorage.setItem(atKey, new Date().toISOString());
+      const nextCount = Number(localStorage.getItem(countKey) || "0") + 1;
+      localStorage.setItem(countKey, String(nextCount));
+    } catch {
+      // Ignore storage errors (private mode, disabled storage, etc.)
+    }
+  }, [appId]);
 
   const { data: me, isLoading: meLoading } = useQuery<Me | null>({
     queryKey: ["/api/me"],
@@ -211,7 +226,7 @@ export default function PreviewApp() {
       const res = await apiRequest("POST", `/api/apps/${app.id}/publish/play/internal`);
       const payload = await res.json().catch(() => null);
       toast({
-        title: "Published to Play (Internal testing)",
+        title: "Published for Google Play testing",
         description: payload?.testingUrl ? "Tester install link is ready." : "Done.",
       });
       setQrMode("play");
@@ -394,6 +409,14 @@ export default function PreviewApp() {
               <Wand2 className="mr-2 h-4 w-4" /> Open Builder
             </Button>
 
+            <Button
+              size="sm"
+              onClick={() => setLocation(`/apps/${app.id}/publish`)}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl"
+            >
+              <UploadCloud className="mr-2 h-4 w-4" /> Continue to Publish
+            </Button>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -406,21 +429,12 @@ export default function PreviewApp() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={() => void shareOrCopyUrl(getPreviewUrl())}>
-                  <Share2 className="mr-2 h-4 w-4" /> Share / Copy link
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setShowQRModal(true)}>
-                  <QrCode className="mr-2 h-4 w-4" /> QR Code
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => window.open(getPreviewUrl(), "_blank", "noopener,noreferrer")}>
-                  <ExternalLink className="mr-2 h-4 w-4" /> Open preview
-                </DropdownMenuItem>
                 {app.packageName && app.status === "live" && (
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => void publishToPlayInternal()} disabled={publishingPlay}>
                       <UploadCloud className="mr-2 h-4 w-4" />
-                      {publishingPlay ? "Publishing to Play…" : "Publish to Play (Internal)"}
+                      {publishingPlay ? "Publishing…" : "Publish for testing (Google Play)"}
                     </DropdownMenuItem>
                   </>
                 )}
@@ -428,21 +442,6 @@ export default function PreviewApp() {
                   <DropdownMenuItem onClick={() => window.open(app.url, "_blank", "noopener,noreferrer")}>
                     <ExternalLink className="mr-2 h-4 w-4" /> Visit website
                   </DropdownMenuItem>
-                )}
-                {!isPreviewOnly && app.status === "live" && (
-                  <>
-                    <DropdownMenuSeparator />
-                    {(app.platform === "android" || app.platform === "both") && (
-                      <DropdownMenuItem onClick={() => handleDownload("android")}>
-                        <Download className="mr-2 h-4 w-4" /> Download APK
-                      </DropdownMenuItem>
-                    )}
-                    {(app.platform === "ios" || app.platform === "both") && (
-                      <DropdownMenuItem onClick={() => handleDownload("ios")}>
-                        <Download className="mr-2 h-4 w-4" /> Download iOS
-                      </DropdownMenuItem>
-                    )}
-                  </>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
@@ -486,7 +485,7 @@ export default function PreviewApp() {
               <div className="px-5 py-3 border-b border-white/[0.06]">
                 <div>
                   <h3 className="text-sm font-semibold text-white">Preview</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">Share, scan, or open on any device.</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Test and share your app before publishing.</p>
                 </div>
               </div>
               <div className="p-4 space-y-3">
@@ -539,9 +538,9 @@ export default function PreviewApp() {
                 <Button 
                   variant="ghost" 
                   className="w-full justify-start text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl"
-                  onClick={() => setLocation(`/apps/${app.id}/edit`)}
+                  onClick={() => setLocation(`/apps/${app.id}/editor`)}
                 >
-                  <Edit className="mr-3 h-4 w-4" /> App Settings
+                  <Edit className="mr-3 h-4 w-4" /> Open Settings
                 </Button>
                 <Button 
                   variant="ghost" 
@@ -568,7 +567,7 @@ export default function PreviewApp() {
                         onClick={() => handleDownload("android")}
                         className="w-full bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl"
                       >
-                        <Download className="mr-2 h-4 w-4" /> Download APK
+                        <Download className="mr-2 h-4 w-4" /> Download Android App (APK)
                       </Button>
                     )}
                     {(app.platform === "ios" || app.platform === "both") && (

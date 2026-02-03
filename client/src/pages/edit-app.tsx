@@ -152,8 +152,8 @@ export default function EditApp() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-3xl font-semibold tracking-tight text-white">Edit App</h1>
-              <p className="mt-1 text-sm text-muted-foreground">Update your app settings</p>
+              <h1 className="text-3xl font-semibold tracking-tight text-white">Basic Settings</h1>
+              <p className="mt-1 text-sm text-muted-foreground">Update your app details</p>
             </div>
           </div>
         </div>

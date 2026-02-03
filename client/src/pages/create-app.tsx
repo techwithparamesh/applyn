@@ -200,7 +200,7 @@ const PLANS = [
     features: [
       "Build & preview your app FREE",
       "Live preview on phone via QR",
-      "Test WebView experience",
+      "Test website experience",
       "Basic customization",
       "Unlimited previews",
     ],
@@ -218,7 +218,7 @@ const PLANS = [
     features: [
       "Android Play Store ready",
       "Signed AAB build",
-      "WebView + Basic Native Shell",
+      "Website + basic app shell",
       "Native header with theme color",
       "Pull-to-refresh",
       "Offline screen",
@@ -240,7 +240,7 @@ const PLANS = [
     features: [
       "Android APK + AAB (signed)",
       "✅ Play Store ready",
-      "WebView + Smart Hybrid Native Layer",
+      "Website + smart hybrid features",
       "Native bottom navigation",
       "Push notifications (FCM)",
       "Deep linking support",
@@ -1148,7 +1148,7 @@ export default function CreateApp() {
                             
                             {/* Quick color presets - show when no color or allow changing */}
                             <div className="pt-2 border-t border-white/10">
-                              <p className="text-xs text-muted-foreground mb-2">
+                              <p className="text-xs font-medium text-slate-300/80 mb-2">
                                 {formData.primaryColor ? "Change color:" : "Quick picks:"}
                               </p>
                               <div className="flex gap-2 flex-wrap">
@@ -1190,7 +1190,7 @@ export default function CreateApp() {
                       </Label>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <p className="text-xs text-muted-foreground mb-2">Background Color</p>
+                          <p className="text-xs font-medium text-slate-300/80 mb-2">Background Color</p>
                           <div className="flex gap-2 flex-wrap">
                             {["#0a0a0a", "#1a1a2e", "#16213e", "#0f3460", "#ffffff"].map((color) => (
                               <div
@@ -1205,7 +1205,7 @@ export default function CreateApp() {
                           </div>
                         </div>
                         <div>
-                          <p className="text-xs text-muted-foreground mb-2">Custom Image</p>
+                          <p className="text-xs font-medium text-slate-300/80 mb-2">Custom Image</p>
                           <input
                             ref={splashInputRef}
                             type="file"
@@ -1720,7 +1720,7 @@ export default function CreateApp() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Check className="h-3 w-3 text-green-400" />
-                <span>WebView App</span>
+                <span>Website App</span>
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Check className="h-3 w-3 text-green-400" />

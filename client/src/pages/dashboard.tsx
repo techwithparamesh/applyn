@@ -17,6 +17,7 @@ import {
   Smartphone,
   Clock,
   CheckCircle,
+  Circle,
   RefreshCw,
   Settings,
   ArrowRight,
@@ -40,6 +41,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -64,6 +66,7 @@ type AppItem = {
   plan?: "preview" | "starter" | "standard" | "pro" | "agency" | string;
   icon: string;
   iconUrl?: string | null;
+  editorScreens?: any[] | null;
   primaryColor: string;
   packageName?: string | null;
   versionCode?: number | null;
@@ -71,6 +74,8 @@ type AppItem = {
   buildLogs?: string | null;
   buildError?: string | null;
   lastBuildAt?: string | Date | null;
+  lastPlayTrack?: string | null;
+  lastPlayPublishedAt?: string | Date | null;
   createdAt: string | Date;
   updatedAt: string | Date;
 };
@@ -211,6 +216,54 @@ export default function Dashboard() {
     if (statusFilter === "all") return apps || [];
     return (apps || []).filter((a) => a.status === statusFilter);
   }, [apps, statusFilter]);
+
+  const progressApp = useMemo(() => {
+    const list = apps || [];
+    if (!list.length) return null;
+    const toTime = (v: any) => {
+      const t = new Date(v as any).getTime();
+      return Number.isFinite(t) ? t : 0;
+    };
+    return [...list].sort((a, b) => toTime(b.updatedAt) - toTime(a.updatedAt))[0] || null;
+  }, [apps]);
+
+  const previewOpened = useMemo(() => {
+    // Real-ish logic (client-only). If storage isn't available, default to false.
+    // TODO: Replace with server-side tracking if/when preview opens are persisted.
+    if (!progressApp?.id) return false;
+    try {
+      const key = `app:${progressApp.id}:previewOpenedAt`;
+      return typeof window !== "undefined" && !!localStorage.getItem(key);
+    } catch {
+      return false;
+    }
+  }, [progressApp?.id]);
+
+  const progress = useMemo(() => {
+    if (!progressApp) return null;
+    const hasName = Boolean(String(progressApp.name || "").trim());
+    const hasLogo = Boolean(progressApp.iconUrl) || (Boolean(String(progressApp.icon || "").trim()) && progressApp.icon !== "rocket");
+    const settingsDone = hasName && hasLogo;
+
+    const screens = Array.isArray(progressApp.editorScreens) ? progressApp.editorScreens : [];
+    const screensDone = screens.length >= 1;
+
+    const lastTrack = String((progressApp as any).lastPlayTrack || "");
+    const lastPublishedAt = (progressApp as any).lastPlayPublishedAt;
+    const hasPublishedAtLeastOnce = Boolean(lastPublishedAt);
+
+    const publishPublicDone = hasPublishedAtLeastOnce && lastTrack === "production";
+    const publishTestingDone = publishPublicDone || (hasPublishedAtLeastOnce && lastTrack === "internal");
+
+    return {
+      appName: progressApp.name,
+      settingsDone,
+      screensDone,
+      previewDone: previewOpened,
+      testingDone: publishTestingDone,
+      publicDone: publishPublicDone,
+    };
+  }, [progressApp, previewOpened]);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -963,6 +1016,58 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {progress ? (
+              <Card className="glass border-white/10 mb-4">
+                <CardContent className="p-5">
+                  <div className="text-sm font-medium text-slate-300/80">Your App Setup Progress</div>
+                  <div className="mt-1 text-xs text-muted-foreground truncate">{progress.appName}</div>
+
+                  <div className="mt-4 space-y-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      {progress.settingsDone ? (
+                        <CheckCircle className="h-4 w-4 text-emerald-400" />
+                      ) : (
+                        <Circle className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <span>Configure Settings</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      {progress.screensDone ? (
+                        <CheckCircle className="h-4 w-4 text-emerald-400" />
+                      ) : (
+                        <Circle className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <span>Design Screens</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      {progress.previewDone ? (
+                        <CheckCircle className="h-4 w-4 text-emerald-400" />
+                      ) : (
+                        <Circle className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <span>Preview App</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      {progress.testingDone ? (
+                        <CheckCircle className="h-4 w-4 text-emerald-400" />
+                      ) : (
+                        <Circle className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <span>Publish for Testing</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      {progress.publicDone ? (
+                        <CheckCircle className="h-4 w-4 text-emerald-400" />
+                      ) : (
+                        <Circle className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <span>Publish Publicly</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
+
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
               {appsLoading && (
                 <Card className="md:col-span-2 lg:col-span-3 glass">
@@ -1029,7 +1134,7 @@ export default function Dashboard() {
                       <DropdownMenuContent align="end" className="bg-[#0d1117] border-white/[0.06] rounded-xl">
                         {app.status === "live" && (app.platform === "android" || app.platform === "both") && (
                           <DropdownMenuItem onClick={() => handleDownload(app.id, "android")}>
-                            <Download className="mr-2 h-4 w-4" /> Download APK
+                            <Download className="mr-2 h-4 w-4" /> Download Android App (APK)
                           </DropdownMenuItem>
                         )}
                         {app.status === "live" && (app.platform === "ios" || app.platform === "both") && (
@@ -1072,18 +1177,20 @@ export default function Dashboard() {
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuSeparator className="bg-white/[0.06]" />
-                        <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/preview`)}>
-                          <Eye className="mr-2 h-4 w-4" /> Preview App
+                        <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/editor`)}>
+                          <Settings className="mr-2 h-4 w-4" /> Open Settings
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/visual-editor`)}>
                           <Wand2 className="mr-2 h-4 w-4" /> Open Builder
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/edit`)}>
-                          <Settings className="mr-2 h-4 w-4" /> App Settings
+                        <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/preview`)}>
+                          <Eye className="mr-2 h-4 w-4" /> Preview App
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/publish`)}>
-                          <Package className="mr-2 h-4 w-4" /> Publish Checklist
+                          <Package className="mr-2 h-4 w-4" /> Continue to Publish
                         </DropdownMenuItem>
+                        <DropdownMenuSeparator className="bg-white/[0.06]" />
+                        <DropdownMenuLabel>Advanced &amp; Tools</DropdownMenuLabel>
                         <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/store-admin`)}>
                           <Package className="mr-2 h-4 w-4" /> Store Admin
                         </DropdownMenuItem>

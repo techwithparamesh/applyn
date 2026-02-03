@@ -8,9 +8,21 @@ type Step = "builder" | "preview" | "publish";
 
 type Tone = "app" | "editor";
 
-const STEP_META: Array<{ key: Step; label: string; icon: any; href: (appId: string) => string }> = [
+const STEP_META: Array<{
+  key: Step;
+  label: string;
+  icon: any;
+  href: (appId: string) => string;
+  title?: string;
+}> = [
   { key: "builder", label: "Builder", icon: Wand2, href: (id) => `/apps/${id}/visual-editor` },
-  { key: "preview", label: "Preview", icon: Eye, href: (id) => `/apps/${id}/preview` },
+  {
+    key: "preview",
+    label: "Preview",
+    icon: Eye,
+    href: (id) => `/apps/${id}/preview`,
+    title: "Test & share your app",
+  },
   { key: "publish", label: "Publish", icon: Download, href: (id) => `/apps/${id}/publish` },
 ];
 
@@ -48,7 +60,7 @@ export function AppBuilderStepper({
               size="sm"
               className={cn("rounded-xl", baseButton, isActive && activeButton)}
             >
-              <a aria-current={isActive ? "page" : undefined}>
+              <a aria-current={isActive ? "page" : undefined} title={s.title}>
                 <Icon
                   className={cn(
                     "mr-2 h-4 w-4",

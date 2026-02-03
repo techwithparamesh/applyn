@@ -443,9 +443,9 @@ export default function AppAnalytics() {
                 <Button 
                   variant="ghost" 
                   className="w-full justify-start text-muted-foreground hover:text-white"
-                  onClick={() => setLocation(`/apps/${params.id}/edit`)}
+                  onClick={() => setLocation(`/apps/${params.id}/editor`)}
                 >
-                  <TrendingUp className="mr-2 h-4 w-4" /> Edit Settings
+                  <TrendingUp className="mr-2 h-4 w-4" /> Open Settings
                 </Button>
               </CardContent>
             </Card>

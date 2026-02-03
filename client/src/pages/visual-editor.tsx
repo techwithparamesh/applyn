@@ -3458,11 +3458,12 @@ export default function VisualEditor() {
         <div className="flex items-center gap-3 min-w-0">
           <Button 
             variant="ghost" 
-            size="icon" 
+            size="sm" 
             onClick={() => confirmIfUnsaved(() => setLocation(`/apps/${id}/preview`))}
             className="text-slate-300 hover:text-white hover:bg-slate-800/60"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-5 w-5 mr-2" />
+            Back to Preview
           </Button>
           
           {/* App Name & Info */}
@@ -3639,7 +3640,7 @@ export default function VisualEditor() {
             onClick={() => confirmIfUnsaved(() => window.open(`/live-preview/${id}`, "_blank"))}
             className="border-slate-800 bg-slate-950/40 text-slate-200 hover:bg-slate-800/50 hover:text-white"
           >
-            <Eye className="h-4 w-4 mr-2" /> Preview
+            <Eye className="h-4 w-4 mr-2" /> Open App Preview
           </Button>
 
           <Badge

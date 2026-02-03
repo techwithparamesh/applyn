@@ -226,6 +226,31 @@ export default function Publish() {
     return { requiredTotal: required.length, requiredDone: requiredDone.length, percent };
   }, [initialConfig]);
 
+  const previewOpened = useMemo(() => {
+    // Client-only signal: preview hub was opened at least once.
+    // TODO: Replace with server-side tracking if/when persisted.
+    if (!id) return false;
+    try {
+      return !!localStorage.getItem(`app:${id}:previewOpenedAt`);
+    } catch {
+      return false;
+    }
+  }, [id]);
+
+  const settingsComplete = useMemo(() => {
+    const name = String(app?.name || "").trim();
+    const hasName = name.length > 0;
+    const hasLogo = Boolean(app?.iconUrl) || (Boolean(String(app?.icon || "").trim()) && app?.icon !== "rocket");
+    return hasName && hasLogo;
+  }, [app?.name, app?.icon, app?.iconUrl]);
+
+  const hasScreens = useMemo(() => {
+    const screens = safeArray<any>((app as any)?.editorScreens);
+    return screens.length >= 1;
+  }, [app]);
+
+  const showReadySummary = settingsComplete && hasScreens && previewOpened;
+
   const modeMutation = useMutation({
     mutationFn: async (mode: "central" | "user") => {
       if (!app) throw new Error("App not loaded");
@@ -252,7 +277,10 @@ export default function Publish() {
     },
     onSuccess: async (data: any) => {
       await qc.invalidateQueries({ queryKey: ["app", id] });
-      toast({ title: "Published (Internal testing)", description: data?.testingUrl ? "Tester link created." : "Done." });
+      toast({
+        title: "Published for Testing (Google Play)",
+        description: data?.testingUrl ? "Testing link is ready for invited testers." : "Done.",
+      });
     },
     onError: (err: any) =>
       toast({ title: "Publish failed", description: err?.message || "Please try again", variant: "destructive" }),
@@ -267,7 +295,7 @@ export default function Publish() {
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["app", id] });
-      toast({ title: "Requested", description: "Production approval request sent." });
+      toast({ title: "Requested", description: "Public release preparation requested." });
     },
     onError: (err: any) =>
       toast({ title: "Request failed", description: err?.message || "Please try again", variant: "destructive" }),
@@ -286,7 +314,7 @@ export default function Publish() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["app", id] });
       await qc.invalidateQueries({ queryKey: ["publish-preflight", id] });
-      toast({ title: "Published", description: "Production release submitted to Play." });
+      toast({ title: "Published", description: "Public release submitted to Google Play." });
     },
     onError: (err: any) =>
       toast({ title: "Publish blocked", description: err?.message || "Please try again", variant: "destructive" }),
@@ -405,11 +433,20 @@ export default function Publish() {
 
         {appQuery.isLoading || appQuery.isError || !app ? null : (
           <div className="space-y-6 mb-6">
+            {showReadySummary ? (
+              <div className="border-l-4 border-green-500/50 bg-green-500/5 p-5">
+                <div className="text-sm font-medium text-white">🚀 Your app is ready to go live.</div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  You’ve completed the required setup steps. You can safely publish now.
+                </div>
+              </div>
+            ) : null}
+
             <Card className="border-white/10">
               <CardHeader>
                 <CardTitle className="text-white">Publishing Mode</CardTitle>
                 <CardDescription>
-                  Choose how publishing is authorized. Platform-managed requires admin approval for production.
+                  Choose how you want to release your app. Start with testing if this is your first launch.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -428,14 +465,14 @@ export default function Publish() {
                       <Label htmlFor="mode-central" className="text-slate-300/80">
                         Managed by Platform (approval required)
                       </Label>
-                      <div className="text-sm text-muted-foreground">Central service account publishes after staff approval.</div>
+                      <div className="text-sm text-muted-foreground">A platform-managed account publishes after staff approval.</div>
                     </div>
                   </div>
                   <div className="flex items-start gap-3 rounded-lg border border-white/10 p-3">
                     <RadioGroupItem value="user" id="mode-user" className="mt-1" />
                     <div className="flex-1">
                       <Label htmlFor="mode-user" className="text-slate-300/80">Connect Your Play Account (recommended)</Label>
-                      <div className="text-sm text-muted-foreground">OAuth-based publishing on behalf of your account.</div>
+                      <div className="text-sm text-muted-foreground">Secure sign-in so publishing happens from your account.</div>
                     </div>
                   </div>
                 </RadioGroup>
@@ -499,14 +536,17 @@ export default function Publish() {
                       <div className="text-sm text-red-300">
                         {isStaff
                           ? "Policy risk is high, but staff can still publish."
-                          : "Policy risk too high; production publish is blocked."}
+                          : "Policy risk too high; public release is blocked."}
                       </div>
                     ) : null}
+
+                    <div className="text-xs text-muted-foreground">You can update and republish anytime.</div>
 
                     <div className="flex gap-2 pt-2">
                       <Button
                         variant="outline"
                         className="border-white/10"
+                        title="Testing (Google Play – limited users)"
                         onClick={() => {
                           void (async () => {
                             const ok = await runPublishGate();
@@ -519,8 +559,8 @@ export default function Publish() {
                         {publishInternalMutation.isPending
                           ? "Publishing…"
                           : publishGateMomentum === "publish_play"
-                            ? "Preparing production build…"
-                            : "Publish Internal"}
+                            ? "Preparing release…"
+                            : "Publish for Testing"}
                       </Button>
 
                       {publishingMode === "central" ? (
@@ -539,8 +579,8 @@ export default function Publish() {
                           {requestProdMutation.isPending
                             ? "Requesting…"
                             : publishGateMomentum === "publish_play"
-                              ? "Preparing production build…"
-                              : "Request Production Approval"}
+                              ? "Preparing release…"
+                              : "Prepare for Public Release"}
                         </Button>
                       ) : null}
 
@@ -548,13 +588,14 @@ export default function Publish() {
                         <AlertDialogTrigger asChild>
                           <div className="inline-flex items-center gap-2">
                             <Button
+                              title="Public Release (Google Play – everyone)"
                               disabled={
                                 publishProdMutation.isPending ||
                                 (!isStaff && !!preflightQuery.data?.policyBlocked) ||
                                 !preflightQuery.data?.validation?.isValid
                               }
                             >
-                              Publish Production
+                              Publish Publicly
                             </Button>
 
                             {!isStaff && !isAllowed("publish_play") ? (
@@ -579,9 +620,9 @@ export default function Publish() {
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <AlertDialogTitle>Publish to Google Play Production?</AlertDialogTitle>
+                            <AlertDialogTitle>Publish publicly on Google Play?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This will upload the latest AAB and create a production release. Make sure all store assets and compliance items are correct.
+                              This will upload the latest Android App Bundle (AAB file) and create a public release. Make sure all store assets and compliance items are correct.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
