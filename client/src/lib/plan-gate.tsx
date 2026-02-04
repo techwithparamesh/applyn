@@ -83,7 +83,7 @@ export function requiredPlanForFeature(feature: FeatureKey): PlanId {
     case "download_build":
       return "starter";
     case "publish_play":
-      return "pro";
+      return "standard";
     case "remove_watermark":
       return "starter";
     case "custom_branding":

@@ -112,8 +112,8 @@ export interface IStorage {
 
   enqueueBuildJob(ownerId: string, appId: string): Promise<BuildJob>;
   claimNextBuildJob(workerId: string): Promise<BuildJob | null>;
-  completeBuildJob(jobId: string, status: Exclude<BuildJobStatus, "queued" | "running">, error?: string | null): Promise<BuildJob | undefined>;
-  requeueBuildJob(jobId: string): Promise<BuildJob | undefined>;
+  completeBuildJob(jobId: string, lockToken: string, status: Exclude<BuildJobStatus, "queued" | "running">, error?: string | null): Promise<boolean>;
+  requeueBuildJob(jobId: string, lockToken: string): Promise<boolean>;
   listBuildJobsForApp(appId: string): Promise<BuildJob[]>;
   updateAppBuild(id: string, patch: AppBuildPatch): Promise<App | undefined>;
 
@@ -796,11 +796,16 @@ export class MemStorage implements IStorage {
 
   async completeBuildJob(
     jobId: string,
+    lockToken: string,
     status: Exclude<BuildJobStatus, "queued" | "running">,
     error?: string | null,
-  ): Promise<BuildJob | undefined> {
+  ): Promise<boolean> {
     const existing = this.buildJobs.get(jobId);
-    if (!existing) return undefined;
+    if (!existing) return false;
+    if (!existing.lockToken || existing.lockToken !== lockToken) {
+      console.warn(`[Storage] completeBuildJob ignored; lock token mismatch for job ${jobId}`);
+      return false;
+    }
     const updated: BuildJob = {
       ...existing,
       status,
@@ -808,12 +813,16 @@ export class MemStorage implements IStorage {
       updatedAt: new Date(),
     };
     this.buildJobs.set(jobId, updated);
-    return updated;
+    return true;
   }
 
-  async requeueBuildJob(jobId: string): Promise<BuildJob | undefined> {
+  async requeueBuildJob(jobId: string, lockToken: string): Promise<boolean> {
     const job = this.buildJobs.get(jobId);
-    if (!job) return undefined;
+    if (!job) return false;
+    if (!job.lockToken || job.lockToken !== lockToken) {
+      console.warn(`[Storage] requeueBuildJob ignored; lock token mismatch for job ${jobId}`);
+      return false;
+    }
     const updated: BuildJob = {
       ...job,
       status: "queued",
@@ -823,7 +832,7 @@ export class MemStorage implements IStorage {
       updatedAt: new Date(),
     };
     this.buildJobs.set(jobId, updated);
-    return updated;
+    return true;
   }
 
   async listBuildJobsForApp(appId: string): Promise<BuildJob[]> {

@@ -393,6 +393,25 @@ export const appWebhooks = mysqlTable("app_webhooks", {
   enabledIdx: index("app_webhooks_enabled_idx").on(table.appId, table.enabled),
 }));
 
+export const webhookDeliveries = mysqlTable("webhook_deliveries", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  webhookId: varchar("webhook_id", { length: 36 }).notNull(),
+  appId: varchar("app_id", { length: 36 }).notNull(),
+  eventName: varchar("event_name", { length: 64 }).notNull(),
+  payload: json("payload").notNull(),
+  attemptCount: int("attempt_count").notNull().default(0),
+  lastError: text("last_error"),
+  nextRetryAt: timestamp("next_retry_at", { mode: "date" }),
+  deliveredAt: timestamp("delivered_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  webhookIdIdx: index("webhook_deliveries_webhook_id_idx").on(table.webhookId),
+  appIdIdx: index("webhook_deliveries_app_id_idx").on(table.appId),
+  nextRetryAtIdx: index("webhook_deliveries_next_retry_at_idx").on(table.nextRetryAt),
+  deliveredAtIdx: index("webhook_deliveries_delivered_at_idx").on(table.deliveredAt),
+  deliveredRetryIdx: index("webhook_deliveries_delivered_retry_idx").on(table.deliveredAt, table.nextRetryAt),
+}));
+
 // --- App Runtime (booking) tables ---
 
 export const appServices = mysqlTable("app_services", {
@@ -1181,6 +1200,7 @@ export const buildJobs = mysqlTable("build_jobs", {
   appIdIdx: index("build_jobs_app_id_idx").on(table.appId),
   statusIdx: index("build_jobs_status_idx").on(table.status),
   ownerIdIdx: index("build_jobs_owner_id_idx").on(table.ownerId),
+  statusLockedCreatedIdx: index("build_jobs_status_locked_created_idx").on(table.status, table.lockedAt, table.createdAt),
 }));
 
 export const supportTickets = mysqlTable("support_tickets", {

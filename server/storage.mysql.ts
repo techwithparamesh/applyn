@@ -960,42 +960,49 @@ export class MysqlStorage {
   }
 
   async enqueueBuildJob(ownerId: string, appId: string): Promise<BuildJob> {
-    // Check if there's already a queued or running job for this app
-    const existing = await getMysqlDb()
-      .select()
-      .from(buildJobs)
-      .where(
-        and(
-          eq(buildJobs.appId, appId),
-          sql`${buildJobs.status} IN ('queued', 'running')`
-        )
-      )
-      .limit(1);
-    
-    if (existing.length > 0) {
-      console.log(`[Storage] Job already exists for app ${appId}, returning existing job ${existing[0].id}`);
-      return existing[0] as unknown as BuildJob;
-    }
+    const db = getMysqlDb();
 
-    const id = randomUUID();
-    const now = new Date();
+    return await db.transaction(async (tx) => {
+      // Serialize enqueue per app by locking the app row.
+      await tx
+        .select({ id: apps.id })
+        .from(apps)
+        .where(eq(apps.id, appId))
+        .limit(1)
+        .for("update");
 
-    await getMysqlDb().insert(buildJobs).values({
-      id,
-      ownerId,
-      appId,
-      status: "queued",
-      attempts: 0,
-      lockToken: null,
-      lockedAt: null,
-      error: null,
-      createdAt: now,
-      updatedAt: now,
+      // Check if there's already an active job for this app.
+      const existing = await tx
+        .select()
+        .from(buildJobs)
+        .where(and(eq(buildJobs.appId, appId), sql`${buildJobs.status} IN ('queued', 'running', 'processing')`))
+        .limit(1);
+
+      if (existing.length > 0) {
+        console.log(`[Storage] Job already exists for app ${appId}, returning existing job ${existing[0].id}`);
+        return existing[0] as unknown as BuildJob;
+      }
+
+      const id = randomUUID();
+      const now = new Date();
+
+      await tx.insert(buildJobs).values({
+        id,
+        ownerId,
+        appId,
+        status: "queued",
+        attempts: 0,
+        lockToken: null,
+        lockedAt: null,
+        error: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      console.log(`[Storage] Created new build job ${id} for app ${appId}`);
+      const rows = await tx.select().from(buildJobs).where(eq(buildJobs.id, id)).limit(1);
+      return rows[0] as unknown as BuildJob;
     });
-
-    console.log(`[Storage] Created new build job ${id} for app ${appId}`);
-    const rows = await getMysqlDb().select().from(buildJobs).where(eq(buildJobs.id, id)).limit(1);
-    return rows[0] as unknown as BuildJob;
   }
 
   async claimNextBuildJob(workerId: string): Promise<BuildJob | null> {
@@ -1055,21 +1062,27 @@ export class MysqlStorage {
 
   async completeBuildJob(
     jobId: string,
+    lockToken: string,
     status: Exclude<BuildJobStatus, "queued" | "running">,
     error?: string | null,
-  ): Promise<BuildJob | undefined> {
+  ): Promise<boolean> {
     const now = new Date();
-    await getMysqlDb()
+    const result = await getMysqlDb()
       .update(buildJobs)
       .set({
         status,
         error: error ?? null,
         updatedAt: now,
       })
-      .where(eq(buildJobs.id, jobId));
+      .where(and(eq(buildJobs.id, jobId), eq(buildJobs.lockToken, lockToken)));
 
-    const rows = await getMysqlDb().select().from(buildJobs).where(eq(buildJobs.id, jobId)).limit(1);
-    return rows[0] as unknown as BuildJob;
+    const affected = (result as any)?.rowsAffected ?? (result as any)?.affectedRows ?? (result as any)?.[0]?.affectedRows ?? 0;
+    if (affected !== 1) {
+      console.warn(`[Storage] completeBuildJob ignored; lock token mismatch for job ${jobId}`);
+      return false;
+    }
+
+    return true;
   }
 
   async listBuildJobsForApp(appId: string): Promise<BuildJob[]> {
@@ -1081,9 +1094,9 @@ export class MysqlStorage {
     return rows as unknown as BuildJob[];
   }
 
-  async requeueBuildJob(jobId: string): Promise<BuildJob | undefined> {
+  async requeueBuildJob(jobId: string, lockToken: string): Promise<boolean> {
     const now = new Date();
-    await getMysqlDb()
+    const result = await getMysqlDb()
       .update(buildJobs)
       .set({
         status: "queued",
@@ -1092,10 +1105,15 @@ export class MysqlStorage {
         error: null,
         updatedAt: now,
       })
-      .where(eq(buildJobs.id, jobId));
+      .where(and(eq(buildJobs.id, jobId), eq(buildJobs.lockToken, lockToken)));
 
-    const rows = await getMysqlDb().select().from(buildJobs).where(eq(buildJobs.id, jobId)).limit(1);
-    return rows[0] as unknown as BuildJob;
+    const affected = (result as any)?.rowsAffected ?? (result as any)?.affectedRows ?? (result as any)?.[0]?.affectedRows ?? 0;
+    if (affected !== 1) {
+      console.warn(`[Storage] requeueBuildJob ignored; lock token mismatch for job ${jobId}`);
+      return false;
+    }
+
+    return true;
   }
 
   // --- Payment methods ---

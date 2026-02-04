@@ -3,8 +3,9 @@ import "dotenv/config";
 import os from "os";
 import path from "path";
 import fs from "fs/promises";
-import { randomUUID } from "crypto";
+import { createHmac, randomUUID } from "crypto";
 import { pathToFileURL } from "url";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { storage } from "./storage";
 import { generateAndroidWrapperProject } from "./build/android-wrapper";
 import { runDockerGradleBuild } from "./build/docker-gradle";
@@ -14,6 +15,8 @@ import { getAllowedFeatures } from "./subscription-middleware";
 import { User } from "@shared/schema";
 import { sendBuildCompleteEmail } from "./email";
 import { getEntitlements } from "./entitlements";
+import { getMysqlDb } from "./db-mysql";
+import { appWebhooks, webhookDeliveries } from "@shared/db.mysql";
 
 function artifactsRoot() {
   return process.env.ARTIFACTS_DIR || path.resolve(process.cwd(), "artifacts");
@@ -50,6 +53,139 @@ function artifactRetentionDays() {
 
 function maxArtifactsPerApp() {
   return Number(process.env.ARTIFACT_MAX_PER_APP || 10);
+}
+
+function webhookRetryDelayMs(attemptCount: number) {
+  // attemptCount is 1-based (1st failure retry)
+  if (attemptCount <= 1) return 60_000;
+  if (attemptCount === 2) return 5 * 60_000;
+  if (attemptCount === 3) return 15 * 60_000;
+  if (attemptCount === 4) return 60 * 60_000;
+  return 6 * 60 * 60_000;
+}
+
+async function processWebhookDeliveryRetries() {
+  try {
+    if (!process.env.DATABASE_URL?.startsWith("mysql://")) return;
+    const db = getMysqlDb();
+    const now = new Date();
+
+    const due = await db
+      .select({
+        id: webhookDeliveries.id,
+        webhookId: webhookDeliveries.webhookId,
+        appId: webhookDeliveries.appId,
+        eventName: webhookDeliveries.eventName,
+        payload: webhookDeliveries.payload,
+        attemptCount: webhookDeliveries.attemptCount,
+        url: appWebhooks.url,
+        secret: appWebhooks.secret,
+        enabled: appWebhooks.enabled,
+      })
+      .from(webhookDeliveries)
+      .leftJoin(appWebhooks, eq(appWebhooks.id, webhookDeliveries.webhookId))
+      .where(
+        and(
+          sql`${webhookDeliveries.deliveredAt} IS NULL`,
+          sql`${webhookDeliveries.nextRetryAt} IS NOT NULL`,
+          sql`${webhookDeliveries.nextRetryAt} <= ${now}`,
+          sql`${webhookDeliveries.attemptCount} < 10`,
+        ),
+      )
+      .orderBy(asc(webhookDeliveries.nextRetryAt))
+      .limit(50);
+
+    if (!due.length) return;
+
+    await Promise.allSettled(
+      due.map(async (d: any) => {
+        const enabled = Number(d.enabled || 0) === 1;
+        const url = typeof d.url === "string" ? d.url : "";
+
+        if (!enabled || !url) {
+          await db
+            .update(webhookDeliveries)
+            .set({
+              attemptCount: 10,
+              nextRetryAt: null,
+              lastError: "Webhook missing or disabled",
+            })
+            .where(eq(webhookDeliveries.id, String(d.id)));
+          return;
+        }
+
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 8000);
+
+        try {
+          const payload = d.payload ?? {};
+
+          let normalizedPayload: any = payload;
+          if (typeof payload === "string") {
+            try {
+              normalizedPayload = JSON.parse(payload);
+            } catch {
+              normalizedPayload = payload;
+            }
+          }
+
+          const body = JSON.stringify(normalizedPayload);
+
+          const headers: Record<string, string> = {
+            "content-type": "application/json",
+            "x-app-id": String(d.appId),
+            "x-app-event": String(d.eventName || ""),
+            "x-app-delivery-id": String((payload as any)?.id || ""),
+            "x-app-webhook-delivery-id": String(d.id),
+          };
+
+          const secret = typeof d.secret === "string" ? d.secret : "";
+          if (secret) {
+            headers["x-app-signature"] = createHmac("sha256", secret).update(body).digest("hex");
+          }
+
+          const resp = await fetch(String(url), {
+            method: "POST",
+            headers,
+            body,
+            signal: controller.signal,
+          });
+
+          const nextAttempt = Number(d.attemptCount || 0) + 1;
+
+          if (!resp.ok) {
+            throw new Error(`HTTP ${resp.status}`);
+          }
+
+          await db
+            .update(webhookDeliveries)
+            .set({
+              attemptCount: nextAttempt,
+              lastError: null,
+              nextRetryAt: null,
+              deliveredAt: new Date(),
+            })
+            .where(eq(webhookDeliveries.id, String(d.id)));
+        } catch (err: any) {
+          const message = err?.name === "AbortError" ? "Timeout" : err?.message || String(err);
+          const nextAttempt = Number(d.attemptCount || 0) + 1;
+          const nextRetryAt = nextAttempt >= 10 ? null : new Date(Date.now() + webhookRetryDelayMs(nextAttempt));
+          await db
+            .update(webhookDeliveries)
+            .set({
+              attemptCount: nextAttempt,
+              lastError: String(message).slice(0, 10_000),
+              nextRetryAt,
+            })
+            .where(eq(webhookDeliveries.id, String(d.id)));
+        } finally {
+          clearTimeout(timer);
+        }
+      }),
+    );
+  } catch (err) {
+    console.error("[Worker] Webhook retry loop error:", err);
+  }
 }
 
 function isTruthyEnv(value: string | undefined) {
@@ -154,13 +290,19 @@ export async function handleOneJob(workerId: string) {
   
   if (!job) return;
 
+  const lockToken = job.lockToken;
+  if (!lockToken) {
+    console.warn(`[Worker] Claimed job ${job.id} missing lockToken; skipping completion to avoid corruption`);
+    return;
+  }
+
   console.log(`[Worker] Claimed job ${job.id} for app ${job.appId}`);
 
   try {
     const app = await storage.getApp(job.appId);
     if (!app) {
       console.log(`[Worker] App not found for job ${job.id}`);
-      await storage.completeBuildJob(job.id, "failed", "App not found");
+      await storage.completeBuildJob(job.id, lockToken, "failed", "App not found");
       return;
     }
 
@@ -183,7 +325,7 @@ export async function handleOneJob(workerId: string) {
         buildError: failureReason,
         lastBuildAt: new Date(),
       });
-      await storage.completeBuildJob(job.id, "failed", failureReason);
+      await storage.completeBuildJob(job.id, lockToken, "failed", failureReason);
       return;
     }
 
@@ -196,7 +338,7 @@ export async function handleOneJob(workerId: string) {
         buildError: failureReason,
         lastBuildAt: new Date(),
       });
-      await storage.completeBuildJob(job.id, "failed", failureReason);
+      await storage.completeBuildJob(job.id, lockToken, "failed", failureReason);
       return;
     }
     const pkg = app.packageName || safePackageName(app.id);
@@ -223,26 +365,26 @@ export async function handleOneJob(workerId: string) {
 
     // Route to the appropriate build handler based on platform
     if (platform === "ios") {
-      await handleIOSBuild(job, app, pkg, versionCode);
+      await handleIOSBuild(job, lockToken, app, pkg, versionCode);
       return;
     } else if (platform === "both") {
       // For "both", we need to build Android first, then trigger iOS
       // iOS build is async via GitHub Actions, so we handle Android here
       // and iOS will be triggered separately
-      await handleAndroidBuild(job, app, pkg, versionCode);
+      await handleAndroidBuild(job, lockToken, app, pkg, versionCode);
       // Trigger iOS build in background (doesn't block)
       triggerIOSBuildAsync(app, pkg, versionCode);
       return;
     } else {
       // Default: Android
       console.log(`[Worker] Starting Android build...`);
-      await handleAndroidBuild(job, app, pkg, versionCode);
+      await handleAndroidBuild(job, lockToken, app, pkg, versionCode);
       return;
     }
   } catch (err: any) {
     console.error(`[Worker] Error processing job ${job.id}:`, err);
     try {
-      await storage.completeBuildJob(job.id, "failed", err?.message || String(err));
+      await storage.completeBuildJob(job.id, lockToken, "failed", err?.message || String(err));
     } catch (e) {
       console.error(`[Worker] Failed to mark job as failed:`, e);
     }
@@ -250,14 +392,14 @@ export async function handleOneJob(workerId: string) {
 }
 
 // iOS build via GitHub Actions
-async function handleIOSBuild(job: any, app: any, pkg: string, versionCode: number) {
+async function handleIOSBuild(job: any, lockToken: string, app: any, pkg: string, versionCode: number) {
   if (!isIOSBuildConfigured()) {
     await storage.updateAppBuild(app.id, {
       status: "failed",
       buildError: "iOS builds not configured. Please contact support.",
       lastBuildAt: new Date(),
     });
-    await storage.completeBuildJob(job.id, "failed", "iOS builds not configured");
+    await storage.completeBuildJob(job.id, lockToken, "failed", "iOS builds not configured");
     return;
   }
 
@@ -287,14 +429,14 @@ async function handleIOSBuild(job: any, app: any, pkg: string, versionCode: numb
       });
       // Don't complete the job yet - callback will do it
       // But we need to release the job so worker can process other jobs
-      await storage.completeBuildJob(job.id, "succeeded", null);
+      await storage.completeBuildJob(job.id, lockToken, "succeeded", null);
     } else {
       await storage.updateAppBuild(app.id, {
         status: "failed",
         buildError: result.error || "Failed to trigger iOS build",
         lastBuildAt: new Date(),
       });
-      await storage.completeBuildJob(job.id, "failed", result.error || "iOS build trigger failed");
+      await storage.completeBuildJob(job.id, lockToken, "failed", result.error || "iOS build trigger failed");
     }
   } catch (err: any) {
     await storage.updateAppBuild(app.id, {
@@ -302,7 +444,7 @@ async function handleIOSBuild(job: any, app: any, pkg: string, versionCode: numb
       buildError: err?.message || "iOS build failed",
       lastBuildAt: new Date(),
     });
-    await storage.completeBuildJob(job.id, "failed", err?.message || "iOS build failed");
+    await storage.completeBuildJob(job.id, lockToken, "failed", err?.message || "iOS build failed");
   }
 }
 
@@ -331,7 +473,7 @@ async function triggerIOSBuildAsync(app: any, pkg: string, versionCode: number) 
 }
 
 // Android build handler (extracted from original handleOneJob)
-async function handleAndroidBuild(job: any, app: any, pkg: string, versionCode: number) {
+async function handleAndroidBuild(job: any, lockToken: string, app: any, pkg: string, versionCode: number) {
   let logs = "";
   let workDir: string | null = null;
   try {
@@ -368,7 +510,7 @@ async function handleAndroidBuild(job: any, app: any, pkg: string, versionCode: 
         packageName: pkg,
       });
 
-      await storage.completeBuildJob(job.id, "succeeded", null);
+      await storage.completeBuildJob(job.id, lockToken, "succeeded", null);
       await cleanupArtifactsForApp(app.id);
       return;
     }
@@ -443,13 +585,13 @@ async function handleAndroidBuild(job: any, app: any, pkg: string, versionCode: 
         if (delay > 0) await new Promise((r) => setTimeout(r, delay));
         
         // Requeue the same job instead of creating a new one
-        await storage.requeueBuildJob(job.id);
+        await storage.requeueBuildJob(job.id, lockToken);
         console.log(`[Worker] Requeued job ${job.id} for retry (attempt ${job.attempts} of ${maxBuildAttempts()})`);
         return;
       }
 
       // Max attempts reached - mark as failed permanently
-      await storage.completeBuildJob(job.id, "failed", msg);
+      await storage.completeBuildJob(job.id, lockToken, "failed", msg);
       await storage.updateAppBuild(app.id, {
         status: "failed",
         buildError: msg,
@@ -493,7 +635,7 @@ async function handleAndroidBuild(job: any, app: any, pkg: string, versionCode: 
       packageName: pkg,
     });
 
-    await storage.completeBuildJob(job.id, "succeeded", null);
+  await storage.completeBuildJob(job.id, lockToken, "succeeded", null);
 
     // Send build success email notification
     const owner = await storage.getUser(app.ownerId);
@@ -521,13 +663,13 @@ async function handleAndroidBuild(job: any, app: any, pkg: string, versionCode: 
       if (delay > 0) await new Promise((r) => setTimeout(r, delay));
       
       // Requeue the same job instead of creating a new one
-      await storage.requeueBuildJob(job.id);
+      await storage.requeueBuildJob(job.id, lockToken);
       console.log(`[Worker] Requeued job ${job.id} for retry (attempt ${job.attempts} of ${maxBuildAttempts()})`);
       return;
     }
 
     // Max attempts reached - mark as failed permanently
-    await storage.completeBuildJob(job.id, "failed", msg);
+    await storage.completeBuildJob(job.id, lockToken, "failed", msg);
     await storage.updateAppBuild(app.id, {
       status: "failed",
       buildError: msg,
@@ -560,12 +702,19 @@ export async function runWorkerLoop() {
   await ensureDir(artifactsRoot());
 
   let pollCount = 0;
+  let lastWebhookRetryAt = 0;
   // eslint-disable-next-line no-constant-condition
   while (true) {
     pollCount++;
     if (pollCount % 150 === 1) {  // Log every 5 minutes (150 * 2 seconds)
       console.log(`[Worker] Worker alive, poll #${pollCount}`);
     }
+
+    if (Date.now() - lastWebhookRetryAt >= 60_000) {
+      lastWebhookRetryAt = Date.now();
+      await processWebhookDeliveryRetries();
+    }
+
     // run one job at a time
     await handleOneJob(workerId);
     await new Promise((r) => setTimeout(r, pollIntervalMs()));

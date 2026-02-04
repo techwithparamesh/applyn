@@ -18,6 +18,14 @@ import { runWorkerLoop } from "./worker";
 import { startSubscriptionCronInterval } from "./subscription-cron";
 import { errorHandler, requestIdMiddleware, requestLoggingMiddleware } from "./logger";
 
+if (!process.env.APP_CUSTOMER_TOKEN_SECRET) {
+  throw new Error("APP_CUSTOMER_TOKEN_SECRET must be set");
+}
+
+if (!process.env.SESSION_SECRET) {
+  throw new Error("SESSION_SECRET must be set");
+}
+
 const app = express();
 const httpServer = createServer(app);
 
@@ -82,10 +90,7 @@ const MemoryStore = MemoryStoreFactory(session);
 const MysqlSession = MySQLStoreFactory(session);
 
 const isProd = process.env.NODE_ENV === "production";
-const sessionSecret = process.env.SESSION_SECRET || "dev-secret-change-me";
-if (isProd && !process.env.SESSION_SECRET) {
-  throw new Error("SESSION_SECRET is required in production");
-}
+const sessionSecret = process.env.SESSION_SECRET!;
 
 function getAllowedOrigins() {
   const raw = (process.env.APP_ORIGINS || "").trim();

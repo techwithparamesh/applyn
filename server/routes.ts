@@ -99,6 +99,7 @@ import {
   appMusicTracks,
   appLeads,
   appWebhooks,
+  webhookDeliveries,
   users as usersTable,
 } from "@shared/db.mysql";
 import {
@@ -126,7 +127,7 @@ import { createPlayService } from "./services/play/playService";
 import { validateForPublish } from "./publishing/publishValidator";
 import { scanPolicy } from "./publishing/policyScanner";
 import { assertCanQueueBuild, getEntitlements } from "./entitlements";
-import { normalizeAndValidatePermissions, requirePermission } from "./permissions";
+import { hasPermission, normalizeAndValidatePermissions, requirePermission } from "./permissions";
 import { logger } from "./logger";
 
 function isGoogleConfigured() {
@@ -208,8 +209,7 @@ function base64UrlDecodeToString(s: string) {
 function runtimeTokenSecret(appId: string) {
   const base =
     process.env.APP_CUSTOMER_TOKEN_SECRET ||
-    process.env.SESSION_SECRET ||
-    "dev-secret-change-me";
+    process.env.SESSION_SECRET;
   return `${base}:${appId}`;
 }
 
@@ -361,8 +361,19 @@ async function deliverAppWebhooks(appId: string, payload: any, onlyWebhookId?: s
 
     if (!targets.length) return;
 
+    const retryDelayMs = (attemptCount: number) => {
+      // attemptCount is 1-based (1st failure retry)
+      if (attemptCount <= 1) return 60_000;
+      if (attemptCount === 2) return 5 * 60_000;
+      if (attemptCount === 3) return 15 * 60_000;
+      if (attemptCount === 4) return 60 * 60_000;
+      return 6 * 60 * 60_000;
+    };
+
     await Promise.allSettled(
       targets.map(async (h) => {
+        const deliveryId = crypto.randomUUID();
+        const initialNextRetryAt = new Date(Date.now() + 60_000);
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 8000);
         try {
@@ -399,11 +410,30 @@ async function deliverAppWebhooks(appId: string, payload: any, onlyWebhookId?: s
           const outPayload = { ...payload, name: outName };
           const body = JSON.stringify(outPayload);
 
+          // Persist the delivery before attempting network IO.
+          try {
+            await db.insert(webhookDeliveries).values({
+              id: deliveryId,
+              webhookId: String(h.id),
+              appId: String(appId),
+              eventName: String(outName || ""),
+              payload: outPayload,
+              attemptCount: 0,
+              lastError: null,
+              nextRetryAt: initialNextRetryAt,
+              deliveredAt: null,
+              createdAt: new Date(),
+            });
+          } catch {
+            // If persistence fails, still attempt best-effort delivery.
+          }
+
           const headers: Record<string, string> = {
             "content-type": "application/json",
             "x-app-id": String(appId),
             "x-app-event": String(outName || ""),
             "x-app-delivery-id": String(payload?.id || ""),
+            "x-app-webhook-delivery-id": String(deliveryId),
           };
 
           const secret = typeof h.secret === "string" ? h.secret : "";
@@ -412,12 +442,47 @@ async function deliverAppWebhooks(appId: string, payload: any, onlyWebhookId?: s
             headers["x-app-signature"] = sig;
           }
 
-          await fetch(String(h.url), {
+          const resp = await fetch(String(h.url), {
             method: "POST",
             headers,
             body,
             signal: controller.signal,
           });
+
+          if (!resp.ok) {
+            throw new Error(`HTTP ${resp.status}`);
+          }
+
+          // Mark delivered.
+          try {
+            await db
+              .update(webhookDeliveries)
+              .set({
+                attemptCount: 1,
+                lastError: null,
+                nextRetryAt: null,
+                deliveredAt: new Date(),
+              })
+              .where(eq(webhookDeliveries.id, deliveryId));
+          } catch {
+            // Best-effort.
+          }
+        } catch (err: any) {
+          const message = err?.name === "AbortError" ? "Timeout" : err?.message || String(err);
+          const attemptCount = 1;
+          const nextRetryAt = attemptCount >= 10 ? null : new Date(Date.now() + retryDelayMs(attemptCount));
+          try {
+            await db
+              .update(webhookDeliveries)
+              .set({
+                attemptCount,
+                lastError: String(message).slice(0, 10_000),
+                nextRetryAt,
+              })
+              .where(eq(webhookDeliveries.id, deliveryId));
+          } catch {
+            // Best-effort.
+          }
         } finally {
           clearTimeout(timer);
         }
@@ -5375,12 +5440,17 @@ export async function registerRoutes(
       const appId = String((req as any).params?.id || "");
 
       const appItem = await storage.getApp(appId);
-      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+      if (!appItem) {
         return res.status(404).json({ message: "Not found" });
       }
 
+      const canManageBuilds = hasPermission(user, "manage_builds");
+      if (appItem.ownerId !== user.id && !canManageBuilds) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
       // --- Enforce plan entitlements (single source of truth; staff bypass) ---
-      if (!isStaff(user)) {
+      if (!canManageBuilds) {
         try {
           assertCanQueueBuild(user, ((appItem as any).platform || "android") as any);
         } catch (e: any) {
@@ -5440,8 +5510,13 @@ export async function registerRoutes(
       const appId = String((req as any).params?.id || "");
 
       const appItem = await storage.getApp(appId);
-      if (!appItem || (!isStaff(user) && appItem.ownerId !== user.id)) {
+      if (!appItem) {
         return res.status(404).json({ message: "App not found" });
+      }
+
+      const canManageBuilds = hasPermission(user, "manage_builds");
+      if (appItem.ownerId !== user.id && !canManageBuilds) {
+        return res.status(403).json({ message: "Forbidden" });
       }
 
       // Only allow retry for failed builds
@@ -5457,7 +5532,7 @@ export async function registerRoutes(
       }
 
       // Enforce plan entitlements (single source of truth; staff bypass)
-      if (!isStaff(user)) {
+      if (!canManageBuilds) {
         try {
           assertCanQueueBuild(user, ((appItem as any).platform || "android") as any);
         } catch (e: any) {
@@ -6249,6 +6324,7 @@ export async function registerRoutes(
       const rzpOrder = (await rzpRes.json()) as { id: string; amount: number; currency: string };
 
       // Save payment record
+      const paymentPlan = type === "subscription" ? plan : type;
       const payment = await storage.createPayment(user.id, {
         appId: appId || null,
         provider: "razorpay",
@@ -6256,7 +6332,7 @@ export async function registerRoutes(
         amountPaise: amountInPaise,
         // Legacy (rupees) field retained for older rows/clients
         amountInr: Math.floor(amountInPaise / 100),
-        plan: type === "extra_rebuild" ? "extra_rebuild" : plan,
+        plan: paymentPlan,
       });
 
       return res.json({
