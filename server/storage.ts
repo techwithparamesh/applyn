@@ -93,6 +93,11 @@ export interface IStorage {
     maxTeamMembers?: number;
   }): Promise<User | undefined>;
   updateSubscriptionStatus(userId: string, status: string): Promise<User | undefined>;
+  startTrial(userId: string, trialDays: number): Promise<
+    | { status: "subscription_active" }
+    | { status: "already_started"; trialEndsAt: Date }
+    | { status: "started"; trialEndsAt: Date }
+  >;
   decrementRebuilds(userId: string): Promise<User | undefined>;
   addRebuilds(userId: string, count: number): Promise<User | undefined>;
   addExtraAppSlot(userId: string, count: number): Promise<User | undefined>;
@@ -405,6 +410,40 @@ export class MemStorage implements IStorage {
     };
     this.users.set(userId, updated);
     return updated;
+  }
+
+  async startTrial(
+    userId: string,
+    trialDays: number,
+  ): Promise<
+    | { status: "subscription_active" }
+    | { status: "already_started"; trialEndsAt: Date }
+    | { status: "started"; trialEndsAt: Date }
+  > {
+    const existing = this.users.get(userId);
+    if (!existing) return { status: "subscription_active" };
+
+    if ((existing as any).planStatus === "active") {
+      return { status: "subscription_active" };
+    }
+
+    const startedAt = (existing as any).trialStartedAt as Date | null | undefined;
+    const endsAt = (existing as any).trialEndsAt as Date | null | undefined;
+    if (startedAt) {
+      const inferredEndsAt = endsAt ? new Date(endsAt) : new Date(new Date(startedAt).getTime() + trialDays * 24 * 60 * 60 * 1000);
+      return { status: "already_started", trialEndsAt: inferredEndsAt };
+    }
+
+    const now = new Date();
+    const newEndsAt = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
+    const updated: any = {
+      ...existing,
+      trialStartedAt: now,
+      trialEndsAt: newEndsAt,
+      updatedAt: new Date(),
+    };
+    this.users.set(userId, updated);
+    return { status: "started", trialEndsAt: newEndsAt };
   }
 
   async decrementRebuilds(userId: string): Promise<User | undefined> {

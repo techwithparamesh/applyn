@@ -42,6 +42,8 @@ export type User = {
   planStatus?: PlanStatus | null;
   planStartDate?: Date | null;
   planExpiryDate?: Date | null;
+  trialStartedAt?: Date | null;
+  trialEndsAt?: Date | null;
   remainingRebuilds?: number | null;
   subscriptionId?: string | null;  // Razorpay subscription ID
   // App limit tracking

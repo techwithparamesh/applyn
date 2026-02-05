@@ -29,6 +29,7 @@
 import { Request, Response, NextFunction } from "express";
 import { User, PlanStatus, PlanId } from "@shared/schema";
 import { getPlan, getRebuildsForPlan, getMaxAppsForPlan, getMaxTeamMembersForPlan, isSubscriptionActive, PlanDefinition, checkAppLimit } from "@shared/pricing";
+import { getEntitlements } from "./entitlements";
 
 // ============================================
 // TYPES
@@ -72,13 +73,16 @@ export type GatedFeature =
  * Get subscription info for a user
  */
 export function getSubscriptionInfo(user: User): SubscriptionInfo {
-  const plan = (user.plan as PlanId) || null;
+  const entitlements = getEntitlements(user);
+  const plan = (entitlements.plan as PlanId) || null;
   const planStatus = (user.planStatus as PlanStatus) || null;
   const planStartDate = user.planStartDate || null;
   const planExpiryDate = user.planExpiryDate || null;
   const remainingRebuilds = user.remainingRebuilds || 0;
-  
-  const isActive = planStatus === "active" && isSubscriptionActive(planExpiryDate);
+
+  // IMPORTANT: operational gating should rely on getEntitlements(user) as the source of truth,
+  // so trials behave like an active Standard subscription.
+  const isActive = Boolean(entitlements.isActive);
   
   // Calculate days until expiry
   let daysUntilExpiry = 0;

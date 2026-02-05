@@ -52,9 +52,11 @@ export function Navbar() {
 
   const isAuthed = !!me;
   const role = ((me as any)?.role as string | undefined) || "user";
-  const isStaff = role === "admin" || role === "support";
+  const isStaff = role === "admin" || role === "support" || role === "staff";
   const isSupport = role === "support";
   const isAdmin = role === "admin";
+  const permissions = Array.isArray((me as any)?.permissions) ? ((me as any).permissions as string[]) : [];
+  const canViewFounderConsole = isAdmin || (isStaff && permissions.includes("view_metrics"));
 
   const { data: productionRequestsMeta } = useQuery<ProductionRequestsMeta | null>({
     queryKey: ["/api/admin/play/production-requests", "meta"],
@@ -232,6 +234,14 @@ export function Navbar() {
                       className="text-muted-foreground hover:text-white focus:text-white"
                     >
                       Analytics
+                    </DropdownMenuItem>
+                  )}
+                  {canViewFounderConsole && (
+                    <DropdownMenuItem
+                      onClick={() => setLocation("/admin/founder")}
+                      className="text-muted-foreground hover:text-white focus:text-white"
+                    >
+                      Founder Console
                     </DropdownMenuItem>
                   )}
                   {isAdmin && (

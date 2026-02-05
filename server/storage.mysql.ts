@@ -353,6 +353,54 @@ export class MysqlStorage {
     return await this.getUser(userId);
   }
 
+  async startTrial(
+    userId: string,
+    trialDays: number,
+  ): Promise<
+    | { status: "subscription_active" }
+    | { status: "already_started"; trialEndsAt: Date }
+    | { status: "started"; trialEndsAt: Date }
+  > {
+    const db = getMysqlDb();
+
+    return await db.transaction(async (tx) => {
+      const lockedRows = await tx
+        .select()
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1)
+        .for("update");
+
+      const user = lockedRows[0] as unknown as User | undefined;
+      if (!user) return { status: "subscription_active" };
+
+      if ((user as any).planStatus === "active") {
+        return { status: "subscription_active" };
+      }
+
+      const startedAt = (user as any).trialStartedAt as Date | null | undefined;
+      const endsAt = (user as any).trialEndsAt as Date | null | undefined;
+      if (startedAt) {
+        const inferredEndsAt = endsAt ? new Date(endsAt) : new Date(new Date(startedAt).getTime() + trialDays * 24 * 60 * 60 * 1000);
+        return { status: "already_started", trialEndsAt: inferredEndsAt };
+      }
+
+      const now = new Date();
+      const newEndsAt = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
+
+      await tx
+        .update(users)
+        .set({
+          trialStartedAt: now,
+          trialEndsAt: newEndsAt,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
+
+      return { status: "started", trialEndsAt: newEndsAt };
+    });
+  }
+
   async applyEntitlementsIfNeeded(paymentId: string): Promise<void> {
     const db = getMysqlDb();
 
@@ -385,6 +433,7 @@ export class MysqlStorage {
 
   async completePaymentAndApplyEntitlements(
     paymentId: string,
+    isProviderAuthoritative: boolean,
   ): Promise<{ updated: boolean; payment: Payment | null }> {
     const db = getMysqlDb();
 
@@ -416,6 +465,35 @@ export class MysqlStorage {
             entitlementsAppliedAt: sql`NOW()`,
           })
           .where(eq(payments.id, paymentId));
+
+        const refreshed = await tx.select().from(payments).where(eq(payments.id, paymentId)).limit(1);
+        return { updated: true, payment: (refreshed[0] as unknown as Payment) ?? null };
+      }
+
+      // Provider-authoritative recovery path:
+      // allow a failed -> completed transition ONLY when invoked from a verified provider webhook.
+      if (payment.status === "failed") {
+        if (!isProviderAuthoritative) {
+          return { updated: false, payment };
+        }
+
+        await tx
+          .update(payments)
+          .set({
+            status: "completed",
+            updatedAt: new Date(),
+          })
+          .where(eq(payments.id, paymentId));
+
+        if (!payment.entitlementsAppliedAt) {
+          await this.applyPaymentEntitlementsInTx(tx, payment);
+          await tx
+            .update(payments)
+            .set({
+              entitlementsAppliedAt: sql`NOW()`,
+            })
+            .where(eq(payments.id, paymentId));
+        }
 
         const refreshed = await tx.select().from(payments).where(eq(payments.id, paymentId)).limit(1);
         return { updated: true, payment: (refreshed[0] as unknown as Payment) ?? null };
@@ -1202,6 +1280,7 @@ export class MysqlStorage {
       .select()
       .from(payments)
       .where(and(eq(payments.appId, appId), eq(payments.status, "completed")))
+      .orderBy(desc(payments.createdAt))
       .limit(1);
     return rows[0] as unknown as Payment | undefined;
   }

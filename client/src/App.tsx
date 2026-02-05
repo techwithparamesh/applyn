@@ -26,6 +26,7 @@ import AdminUsers from "@/pages/admin-users";
 import AdminAnalytics from "@/pages/admin-analytics";
 import AdminAuditLogs from "@/pages/admin-audit-logs";
 import AdminPlayApprovals from "@/pages/admin-play-approvals";
+import AdminFounder from "@/pages/admin-founder";
 import Ops from "@/pages/ops";
 import Tickets from "@/pages/tickets";
 import EditApp from "@/pages/edit-app";
@@ -61,6 +62,7 @@ function Router() {
       <Route path="/admin/analytics" component={AdminAnalytics} />
       <Route path="/admin/audit-logs" component={AdminAuditLogs} />
       <Route path="/admin/play-approvals" component={AdminPlayApprovals} />
+      <Route path="/admin/founder" component={AdminFounder} />
       <Route path="/ops" component={Ops} />
       <Route path="/tickets" component={Tickets} />
       <Route path="/dashboard" component={Dashboard} />

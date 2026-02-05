@@ -24,6 +24,8 @@ export const users = mysqlTable("users", {
   planStatus: varchar("plan_status", { length: 16 }),  // active, expired, cancelled
   planStartDate: timestamp("plan_start_date", { mode: "date" }),
   planExpiryDate: timestamp("plan_expiry_date", { mode: "date" }),
+  trialStartedAt: timestamp("trial_started_at", { mode: "date" }),
+  trialEndsAt: timestamp("trial_ends_at", { mode: "date" }),
   remainingRebuilds: int("remaining_rebuilds").default(0),
   extraAppSlots: int("extra_app_slots").default(0),  // Purchased extra app slots
   subscriptionId: varchar("subscription_id", { length: 128 }),  // Razorpay subscription ID
@@ -386,6 +388,8 @@ export const appWebhooks = mysqlTable("app_webhooks", {
   secret: varchar("secret", { length: 128 }),
   events: text("events"), // JSON array of event names
   enabled: tinyint("enabled").notNull().default(1),
+  disabledUntil: timestamp("disabled_until", { mode: "date" }),
+  consecutiveFailures: int("consecutive_failures").default(0),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 }, (table) => ({
@@ -403,6 +407,8 @@ export const webhookDeliveries = mysqlTable("webhook_deliveries", {
   lastError: text("last_error"),
   nextRetryAt: timestamp("next_retry_at", { mode: "date" }),
   deliveredAt: timestamp("delivered_at", { mode: "date" }),
+  leaseUntil: timestamp("lease_until", { mode: "date" }),
+  leaseToken: varchar("lease_token", { length: 64 }),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 }, (table) => ({
   webhookIdIdx: index("webhook_deliveries_webhook_id_idx").on(table.webhookId),
@@ -410,7 +416,19 @@ export const webhookDeliveries = mysqlTable("webhook_deliveries", {
   nextRetryAtIdx: index("webhook_deliveries_next_retry_at_idx").on(table.nextRetryAt),
   deliveredAtIdx: index("webhook_deliveries_delivered_at_idx").on(table.deliveredAt),
   deliveredRetryIdx: index("webhook_deliveries_delivered_retry_idx").on(table.deliveredAt, table.nextRetryAt),
+  deliveredRetryLeaseIdx: index("webhook_deliveries_delivered_retry_lease_idx").on(table.deliveredAt, table.nextRetryAt, table.leaseUntil),
 }));
+
+export const razorpayWebhookEvents = mysqlTable(
+  "razorpay_webhook_events",
+  {
+    id: varchar("id", { length: 64 }).primaryKey(),
+    receivedAt: timestamp("received_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    receivedAtIdx: index("razorpay_webhook_events_received_at_idx").on(table.receivedAt),
+  }),
+);
 
 // --- App Runtime (booking) tables ---
 

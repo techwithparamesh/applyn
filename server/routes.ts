@@ -100,6 +100,8 @@ import {
   appLeads,
   appWebhooks,
   webhookDeliveries,
+  razorpayWebhookEvents,
+  pushNotifications,
   users as usersTable,
 } from "@shared/db.mysql";
 import {
@@ -372,6 +374,11 @@ async function deliverAppWebhooks(appId: string, payload: any, onlyWebhookId?: s
 
     await Promise.allSettled(
       targets.map(async (h) => {
+        const disabledUntilMs = h?.disabledUntil ? new Date(h.disabledUntil).getTime() : NaN;
+        if (Number.isFinite(disabledUntilMs) && disabledUntilMs > Date.now()) {
+          return;
+        }
+
         const deliveryId = crypto.randomUUID();
         const initialNextRetryAt = new Date(Date.now() + 60_000);
         const controller = new AbortController();
@@ -467,6 +474,20 @@ async function deliverAppWebhooks(appId: string, payload: any, onlyWebhookId?: s
           } catch {
             // Best-effort.
           }
+
+          // Circuit breaker reset.
+          try {
+            await db
+              .update(appWebhooks)
+              .set({
+                consecutiveFailures: 0,
+                disabledUntil: null,
+                updatedAt: new Date(),
+              } as any)
+              .where(eq(appWebhooks.id, String(h.id)));
+          } catch {
+            // Best-effort.
+          }
         } catch (err: any) {
           const message = err?.name === "AbortError" ? "Timeout" : err?.message || String(err);
           const attemptCount = 1;
@@ -480,6 +501,24 @@ async function deliverAppWebhooks(appId: string, payload: any, onlyWebhookId?: s
                 nextRetryAt,
               })
               .where(eq(webhookDeliveries.id, deliveryId));
+          } catch {
+            // Best-effort.
+          }
+
+          // Circuit breaker increment + possible disable.
+          const nextFailures = Number((h as any)?.consecutiveFailures ?? 0) + 1;
+          if (nextFailures >= 5) {
+            console.warn(`[Webhooks] Disabling webhook ${String(h.id)} for 15 minutes after ${nextFailures} consecutive failures`);
+          }
+          try {
+            await db
+              .update(appWebhooks)
+              .set({
+                consecutiveFailures: sql`COALESCE(consecutive_failures, 0) + 1`,
+                disabledUntil: sql`CASE WHEN COALESCE(consecutive_failures, 0) + 1 >= 5 THEN DATE_ADD(NOW(), INTERVAL 15 MINUTE) ELSE disabled_until END`,
+                updatedAt: new Date(),
+              } as any)
+              .where(eq(appWebhooks.id, String(h.id)));
           } catch {
             // Best-effort.
           }
@@ -602,58 +641,38 @@ const PLAN_LIMITS: Record<string, {
     aabEnabled: true,
     iosEnabled: true,
   },
+  agency: {
+    rebuilds: 3,
+    rebuildWindowDays: 90,
+    pushEnabled: true,
+    playStoreReady: true,
+    appStoreReady: true,
+    aabEnabled: true,
+    iosEnabled: true,
+  },
 };
 
 function getPlanLimits(plan: string) {
   return PLAN_LIMITS[plan] || PLAN_LIMITS.starter;
 }
 
-// Helper to get the plan for an app (from the completed payment)
-async function getAppPlanInfo(appId: string): Promise<{ plan: string; paidAt: Date | null; limits: typeof PLAN_LIMITS.starter }> {
-  const payment = await storage.getCompletedPaymentForApp(appId);
-  const plan = payment?.plan || "starter";
-  return {
-    plan,
-    paidAt: payment?.createdAt || null,
-    limits: getPlanLimits(plan),
-  };
-}
-
-// Check if a rebuild is allowed for an app based on plan limits
-async function checkRebuildAllowed(appId: string): Promise<{ allowed: boolean; reason?: string; used: number; limit: number }> {
-  const { plan, paidAt, limits } = await getAppPlanInfo(appId);
-  
-  // No payment = no builds allowed (first build happens after payment)
-  if (!paidAt) {
-    return { allowed: false, reason: "No completed payment found for this app", used: 0, limit: 0 };
-  }
-  
-  // Starter plan = no rebuilds allowed
-  if (limits.rebuilds === 0) {
-    return { allowed: false, reason: "Starter plan does not include rebuilds. Upgrade to Standard or Pro.", used: 0, limit: 0 };
-  }
-  
-  // Calculate rebuild window
-  const windowStart = new Date(paidAt.getTime());
-  const windowEnd = new Date(paidAt.getTime() + limits.rebuildWindowDays * 24 * 60 * 60 * 1000);
-  const now = new Date();
-  
-  if (now > windowEnd) {
-    return { allowed: false, reason: `Rebuild window expired (${limits.rebuildWindowDays} days from purchase)`, used: 0, limit: limits.rebuilds };
-  }
-  
-  // Count completed builds since payment (first build + rebuilds)
-  const completedBuilds = await storage.countCompletedBuildsForApp(appId, paidAt);
-  
-  // First build is free; rebuilds are counted after that
-  // So if completedBuilds >= 1 + limits.rebuilds, they've exhausted their rebuilds
-  const rebuildsUsed = Math.max(0, completedBuilds - 1);
-  
-  if (rebuildsUsed >= limits.rebuilds) {
-    return { allowed: false, reason: `Rebuild limit reached (${limits.rebuilds} rebuilds on ${plan} plan)`, used: rebuildsUsed, limit: limits.rebuilds };
-  }
-  
-  return { allowed: true, used: rebuildsUsed, limit: limits.rebuilds };
+function getOperationalPlanContext(user: any): {
+  entitlements: ReturnType<typeof getEntitlements>;
+  plan: string;
+  limits: typeof PLAN_LIMITS.starter;
+  canPublishPlay: boolean;
+  canPublishProduction: boolean;
+  canPublishAppStore: boolean;
+  canUsePush: boolean;
+} {
+  const entitlements = getEntitlements(user);
+  const plan = String(entitlements.plan || "starter");
+  const limits = getPlanLimits(plan);
+  const canPublishPlay = Boolean(entitlements.canPublishPlay);
+  const canPublishProduction = canPublishPlay;
+  const canPublishAppStore = Boolean(entitlements.canPublishAppStore);
+  const canUsePush = Boolean(entitlements.canUsePush);
+  return { entitlements, plan, limits, canPublishPlay, canPublishProduction, canPublishAppStore, canUsePush };
 }
 
 export async function registerRoutes(
@@ -680,6 +699,17 @@ export async function registerRoutes(
     legacyHeaders: false,
     keyGenerator: (req: any) => getAuthedUser(req)?.id || req.ip || "unknown",
     handler: rateLimitJsonHandler,
+  });
+
+  const paymentsCreateOrderLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req: any) => getAuthedUser(req)?.id || req.ip || "unknown",
+    handler: (_req: any, res: any) => {
+      res.status(429).json({ message: "Too many payment requests. Please try again later." });
+    },
   });
 
   const razorpayWebhookLimiter = rateLimit({
@@ -1053,7 +1083,21 @@ export async function registerRoutes(
   app.get("/api/me", (req, res) => {
     const user = getAuthedUser(req);
     if (!user) return res.status(401).json({ message: "Unauthorized" });
-    return res.json(sanitizeUser(user));
+    const ent = getEntitlements(user);
+    return res.json({
+      ...sanitizeUser(user),
+      entitlements: {
+        plan: ent.plan,
+        isActive: ent.isActive,
+        isTrialActive: ent.isTrialActive,
+        isGraceActive: ent.isGraceActive,
+        graceEndsAt: ent.graceEndsAt ?? null,
+        canBuild: ent.canBuild,
+        canPublishPlay: ent.canPublishPlay,
+        canPublishAppStore: ent.canPublishAppStore,
+        canUsePush: ent.canUsePush,
+      },
+    });
   });
 
   // --- Product analytics (conversion funnel; best-effort) ---
@@ -1089,6 +1133,183 @@ export async function registerRoutes(
       } catch {
         return next(err);
       }
+    }
+  });
+
+  app.get("/api/admin/founder-metrics", requireAuth, requirePermission("view_metrics"), async (req, res, next) => {
+    try {
+      // Production-safe: prefer MySQL aggregate queries (fast, no large reads).
+      if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.json({
+          business: {
+            totalUsers: 0,
+            activeSubscriptions: 0,
+            activeTrials: 0,
+            trialToPaidConversionRate: 0,
+            totalRevenuePaise: 0,
+            revenueLast30DaysPaise: 0,
+            failedPaymentsLast7Days: 0,
+          },
+          operations: {
+            buildsToday: 0,
+            failedBuildsLast24h: 0,
+            pendingBuilds: 0,
+            webhookFailuresLast24h: 0,
+            disabledWebhooks: 0,
+          },
+          growth: {
+            appsCreatedLast7Days: 0,
+            appsPublishedLast7Days: 0,
+            pushNotificationsLast7Days: 0,
+          },
+          alerts: [],
+        });
+      }
+
+      const db = getMysqlDb();
+      const graceDays = 3;
+
+      const [
+        totalUsersRow,
+        activeSubscriptionsRow,
+        activeTrialsRow,
+        totalTrialsRow,
+        convertedTrialsRow,
+        totalRevenueRow,
+        revenue30Row,
+        failedPayments7Row,
+        buildsTodayRow,
+        failedBuilds24Row,
+        pendingBuildsRow,
+        webhookFailures24Row,
+        disabledWebhooksRow,
+        appsCreated7Row,
+        appsPublished7Row,
+        pushNotifications7Row,
+        entitlementInconsistencyRow,
+      ] = await Promise.all([
+        db.select({ v: sql<number>`COUNT(*)` }).from(usersTable),
+        db
+          .select({ v: sql<number>`COUNT(*)` })
+          .from(usersTable)
+          .where(
+            sql`${usersTable.planStatus} = 'active' AND ${usersTable.planExpiryDate} IS NOT NULL AND DATE_ADD(${usersTable.planExpiryDate}, INTERVAL ${graceDays} DAY) > NOW()`,
+          ),
+        db
+          .select({ v: sql<number>`COUNT(*)` })
+          .from(usersTable)
+          .where(
+            sql`${usersTable.trialStartedAt} IS NOT NULL AND ${usersTable.trialEndsAt} IS NOT NULL AND ${usersTable.trialEndsAt} > NOW() AND NOT (${usersTable.planStatus} = 'active' AND ${usersTable.planExpiryDate} IS NOT NULL AND DATE_ADD(${usersTable.planExpiryDate}, INTERVAL ${graceDays} DAY) > NOW())`,
+          ),
+        db.select({ v: sql<number>`COUNT(*)` }).from(usersTable).where(sql`${usersTable.trialStartedAt} IS NOT NULL`),
+        db
+          .select({ v: sql<number>`COUNT(*)` })
+          .from(usersTable)
+          .where(sql`${usersTable.trialStartedAt} IS NOT NULL AND ${usersTable.planStartDate} IS NOT NULL AND ${usersTable.planStartDate} > ${usersTable.trialStartedAt}`),
+        db
+          .select({ v: sql<number>`COALESCE(SUM(COALESCE(${paymentsTable.amountPaise}, ${paymentsTable.amountInr} * 100)), 0)` })
+          .from(paymentsTable)
+          .where(sql`${paymentsTable.status} = 'completed'`),
+        db
+          .select({ v: sql<number>`COALESCE(SUM(COALESCE(${paymentsTable.amountPaise}, ${paymentsTable.amountInr} * 100)), 0)` })
+          .from(paymentsTable)
+          .where(sql`${paymentsTable.status} = 'completed' AND ${paymentsTable.createdAt} >= DATE_SUB(NOW(), INTERVAL 30 DAY)`),
+        db
+          .select({ v: sql<number>`COUNT(*)` })
+          .from(paymentsTable)
+          .where(sql`${paymentsTable.status} = 'failed' AND ${paymentsTable.createdAt} >= DATE_SUB(NOW(), INTERVAL 7 DAY)`),
+        db.select({ v: sql<number>`COUNT(*)` }).from(buildJobs).where(sql`${buildJobs.createdAt} >= CURDATE()`),
+        db
+          .select({ v: sql<number>`COUNT(*)` })
+          .from(buildJobs)
+          .where(sql`${buildJobs.status} = 'failed' AND ${buildJobs.updatedAt} >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`),
+        db
+          .select({ v: sql<number>`COUNT(*)` })
+          .from(buildJobs)
+          .where(sql`${buildJobs.status} IN ('queued','running','processing')`),
+        db
+          .select({ v: sql<number>`COUNT(*)` })
+          .from(webhookDeliveries)
+          .where(sql`${webhookDeliveries.deliveredAt} IS NULL AND ${webhookDeliveries.lastError} IS NOT NULL AND ${webhookDeliveries.createdAt} >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`),
+        db
+          .select({ v: sql<number>`COUNT(*)` })
+          .from(appWebhooks)
+          .where(sql`${appWebhooks.disabledUntil} IS NOT NULL AND ${appWebhooks.disabledUntil} > NOW()`),
+        db.select({ v: sql<number>`COUNT(*)` }).from(apps).where(sql`${apps.createdAt} >= DATE_SUB(NOW(), INTERVAL 7 DAY)`),
+        db
+          .select({ v: sql<number>`COUNT(*)` })
+          .from(apps)
+          .where(sql`${apps.status} = 'live' AND ${apps.updatedAt} >= DATE_SUB(NOW(), INTERVAL 7 DAY)`),
+        db
+          .select({ v: sql<number>`COUNT(*)` })
+          .from(pushNotifications)
+          .where(sql`${pushNotifications.createdAt} >= DATE_SUB(NOW(), INTERVAL 7 DAY)`),
+        db
+          .select({ v: sql<number>`COUNT(*)` })
+          .from(paymentsTable)
+          .where(sql`${paymentsTable.status} = 'completed' AND ${paymentsTable.entitlementsAppliedAt} IS NULL`),
+      ]);
+
+      const totalUsers = Number((totalUsersRow as any)?.[0]?.v ?? 0);
+      const activeSubscriptions = Number((activeSubscriptionsRow as any)?.[0]?.v ?? 0);
+      const activeTrials = Number((activeTrialsRow as any)?.[0]?.v ?? 0);
+      const totalTrials = Number((totalTrialsRow as any)?.[0]?.v ?? 0);
+      const convertedTrials = Number((convertedTrialsRow as any)?.[0]?.v ?? 0);
+      const trialToPaidConversionRate = totalTrials > 0 ? convertedTrials / totalTrials : 0;
+
+      const totalRevenuePaise = Number((totalRevenueRow as any)?.[0]?.v ?? 0);
+      const revenueLast30DaysPaise = Number((revenue30Row as any)?.[0]?.v ?? 0);
+      const failedPaymentsLast7Days = Number((failedPayments7Row as any)?.[0]?.v ?? 0);
+
+      const buildsToday = Number((buildsTodayRow as any)?.[0]?.v ?? 0);
+      const failedBuildsLast24h = Number((failedBuilds24Row as any)?.[0]?.v ?? 0);
+      const pendingBuilds = Number((pendingBuildsRow as any)?.[0]?.v ?? 0);
+      const webhookFailuresLast24h = Number((webhookFailures24Row as any)?.[0]?.v ?? 0);
+      const disabledWebhooks = Number((disabledWebhooksRow as any)?.[0]?.v ?? 0);
+
+      const appsCreatedLast7Days = Number((appsCreated7Row as any)?.[0]?.v ?? 0);
+      const appsPublishedLast7Days = Number((appsPublished7Row as any)?.[0]?.v ?? 0);
+      const pushNotificationsLast7Days = Number((pushNotifications7Row as any)?.[0]?.v ?? 0);
+
+      const entitlementInconsistencyCount = Number((entitlementInconsistencyRow as any)?.[0]?.v ?? 0);
+
+      const alerts: string[] = [];
+      if (buildsToday > 0 && failedBuildsLast24h / buildsToday > 0.1) {
+        alerts.push("High build failure rate");
+      }
+      if (webhookFailuresLast24h > 20) {
+        alerts.push("Webhook instability");
+      }
+      if (entitlementInconsistencyCount > 0) {
+        alerts.push("Entitlement application inconsistency");
+      }
+
+      return res.json({
+        business: {
+          totalUsers,
+          activeSubscriptions,
+          activeTrials,
+          trialToPaidConversionRate,
+          totalRevenuePaise,
+          revenueLast30DaysPaise,
+          failedPaymentsLast7Days,
+        },
+        operations: {
+          buildsToday,
+          failedBuildsLast24h,
+          pendingBuilds,
+          webhookFailuresLast24h,
+          disabledWebhooks,
+        },
+        growth: {
+          appsCreatedLast7Days,
+          appsPublishedLast7Days,
+          pushNotificationsLast7Days,
+        },
+        alerts,
+      });
+    } catch (err) {
+      return next(err);
     }
   });
 
@@ -1614,6 +1835,17 @@ export async function registerRoutes(
         password: passwordHash,
         role: "user",
       });
+
+      // Optional: auto-start trial on signup (best-effort; never blocks signup)
+      if ((process.env.AUTO_START_TRIAL_ON_SIGNUP || "").trim() === "true") {
+        if (user.planStatus !== "active" && (user as any).trialStartedAt == null) {
+          try {
+            await storage.startTrial(user.id, 14);
+          } catch (err) {
+            console.error("[Register] Failed to auto-start trial:", err);
+          }
+        }
+      }
 
       // Generate email verification token and send email
       const verifyToken = crypto.randomBytes(32).toString("hex");
@@ -3870,6 +4102,27 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Not found" });
       }
       if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+
+  // --- Trial Activation Endpoint (idempotent; concurrency-safe) ---
+  app.post("/api/trial/start", requireAuth, async (req, res, next) => {
+    try {
+      const user = getAuthedUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      if (user.planStatus === "active") {
+        return res.status(400).json({ message: "Subscription already active." });
+      }
+
+      const result = await storage.startTrial(user.id, 14);
+      if (result.status === "subscription_active") {
+        return res.status(400).json({ message: "Subscription already active." });
+      }
+
+      return res.json({ ok: true, trialEndsAt: result.trialEndsAt });
+    } catch (err) {
+      return next(err);
+    }
+  });
         return res.status(503).json({ message: "Restaurant tables require MySQL storage" });
       }
 
@@ -6259,7 +6512,7 @@ export async function registerRoutes(
     type: z.enum(["subscription", "extra_rebuild", "extra_rebuild_pack", "extra_app_slot"]).default("subscription"),
   }).strict();
 
-  app.post("/api/payments/create-order", requireAuth, async (req, res, next) => {
+  app.post("/api/payments/create-order", requireAuth, paymentsCreateOrderLimiter, async (req, res, next) => {
     try {
       const user = getAuthedUser(req);
       if (!user) return res.status(401).json({ message: "Unauthorized" });
@@ -6389,6 +6642,38 @@ export async function registerRoutes(
       const event = req.body;
       console.log(`[Razorpay Webhook] Received event: ${event.event}`);
 
+      const eventId = typeof (event as any)?.id === "string" ? String((event as any).id) : "";
+      if (!eventId) {
+        logger.error("razorpay.webhook.missing_event_id", { requestId: (req as any).requestId, ip: req.ip });
+        return res.status(400).json({ message: "Missing event id" });
+      }
+
+      // Replay protection: insert event id before any processing.
+      if (process.env.DATABASE_URL?.startsWith("mysql://")) {
+        try {
+          const db = getMysqlDb();
+          await db.insert(razorpayWebhookEvents).values({ id: eventId });
+        } catch (err: any) {
+          const code = (err as any)?.code;
+          const errno = (err as any)?.errno;
+          if (code === "ER_DUP_ENTRY" || Number(errno) === 1062) {
+            logger.info("razorpay.webhook.replay_detected", {
+              requestId: (req as any).requestId,
+              ip: req.ip,
+              eventId,
+            });
+            return res.status(200).json({ ok: true });
+          }
+          // Best-effort: do not throw, and do not block processing.
+          logger.error("razorpay.webhook.dedupe_insert_failed", {
+            requestId: (req as any).requestId,
+            ip: req.ip,
+            eventId,
+            error: String((err as any)?.message || err),
+          });
+        }
+      }
+
       // Handle payment.captured event
       if (event.event === "payment.captured") {
         const payment = event.payload?.payment?.entity;
@@ -6426,9 +6711,22 @@ export async function registerRoutes(
           // Subscription/plan payments: lookup by provider order id (reliable; no "all" hacks)
           const dbPayment = await storage.getPaymentByOrderId(String(payment.order_id));
           if (dbPayment) {
-            const { updated } = await (storage as any).completePaymentAndApplyEntitlements(dbPayment.id);
-            if (updated) {
-              console.log(`[Razorpay Webhook] Payment ${dbPayment.id} marked as completed via webhook`);
+            const currentStatus = String((dbPayment as any).status || "");
+            if (currentStatus === "pending" || currentStatus === "failed") {
+              const { updated } = await (storage as any).completePaymentAndApplyEntitlements(dbPayment.id, true);
+              if (updated) {
+                console.log(`[Razorpay Webhook] Payment ${dbPayment.id} marked as completed via webhook`);
+              }
+            } else if (currentStatus === "completed") {
+              console.warn(
+                `[Razorpay Webhook] Ignoring payment.captured for payment ${dbPayment.id} in terminal state (${currentStatus})`,
+              );
+              return res.status(200).json({ ok: true });
+            } else {
+              console.warn(
+                `[Razorpay Webhook] Invalid payment state transition attempt: ${currentStatus} -> completed for payment ${dbPayment.id}`,
+              );
+              return res.status(200).json({ ok: true });
             }
           }
         }
@@ -6475,10 +6773,23 @@ export async function registerRoutes(
           }
 
           const dbPayment = await storage.getPaymentByOrderId(String(payment.order_id));
-          if (dbPayment && dbPayment.status === "pending") {
-            const { updated } = await storage.updatePaymentStatus(dbPayment.id, "failed");
-            if (updated) {
-              console.log(`[Razorpay Webhook] Payment ${dbPayment.id} marked as failed via webhook`);
+          if (dbPayment) {
+            const currentStatus = String((dbPayment as any).status || "");
+            if (currentStatus === "pending") {
+              const { updated } = await storage.updatePaymentStatus(dbPayment.id, "failed");
+              if (updated) {
+                console.log(`[Razorpay Webhook] Payment ${dbPayment.id} marked as failed via webhook`);
+              }
+            } else if (currentStatus === "failed" || currentStatus === "completed") {
+              console.warn(
+                `[Razorpay Webhook] Ignoring payment.failed for payment ${dbPayment.id} in terminal state (${currentStatus})`,
+              );
+              return res.status(200).json({ ok: true });
+            } else {
+              console.warn(
+                `[Razorpay Webhook] Invalid payment state transition attempt: ${currentStatus} -> failed for payment ${dbPayment.id}`,
+              );
+              return res.status(200).json({ ok: true });
             }
           }
         }
@@ -6515,22 +6826,9 @@ export async function registerRoutes(
         plan,
       });
 
-      // Mark as completed immediately
-      await storage.updatePaymentStatus(payment.id, "completed", `admin_${user.id}_${Date.now()}`);
-
-      // Activate subscription for admin
-      const now = new Date();
-      const expiryDate = new Date(now);
-      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-      
-      await storage.activateSubscription(user.id, {
-        plan,
-        planStatus: "active",
-        planStartDate: now,
-        planExpiryDate: expiryDate,
-        remainingRebuilds: PLAN_REBUILDS[plan] || 1,
-        maxAppsAllowed: PLAN_MAX_APPS[plan] || 1,
-      });
+      // Apply the same atomic completion + entitlement application path as normal payments.
+      // This ensures entitlements_applied_at is set and subscription activation occurs under lock.
+      await (storage as any).completePaymentAndApplyEntitlements(payment.id, true);
 
       return res.json({ ok: true, payment, message: "Admin bypass - payment skipped, subscription activated" });
     } catch (err) {
@@ -6577,7 +6875,7 @@ export async function registerRoutes(
 
       // Idempotency: never re-apply entitlements for already-processed payments.
       if (existingPayment.status === "completed") {
-        await (storage as any).completePaymentAndApplyEntitlements(existingPayment.id);
+        await (storage as any).completePaymentAndApplyEntitlements(existingPayment.id, false);
         return res.json({ ok: true, payment: existingPayment, message: "Already verified" });
       }
       if (existingPayment.status === "failed") {
@@ -6602,7 +6900,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Payment verification failed" });
       }
 
-      const { payment, updated } = await (storage as any).completePaymentAndApplyEntitlements(paymentId);
+      const { payment, updated } = await (storage as any).completePaymentAndApplyEntitlements(paymentId, false);
       if (!payment) return res.status(404).json({ message: "Payment record not found" });
 
       if (!updated) {
@@ -6996,24 +7294,32 @@ export async function registerRoutes(
         return res.status(404).json({ message: "App not found" });
       }
 
-      const { plan, paidAt, limits } = await getAppPlanInfo(appItem.id);
-      const rebuildCheck = paidAt ? await checkRebuildAllowed(appItem.id) : { allowed: false, used: 0, limit: 0 };
-      
-      // Calculate window expiry
-      let windowExpiresAt: Date | null = null;
-      if (paidAt && limits.rebuildWindowDays > 0) {
-        windowExpiresAt = new Date(paidAt.getTime() + limits.rebuildWindowDays * 24 * 60 * 60 * 1000);
-      }
+      const entitlements = getEntitlements(user);
+      const plan = String(entitlements.plan || "starter");
+      const limits = getPlanLimits(plan);
+
+      const rawStart = (user as any)?.planStartDate;
+      const paidAt = entitlements.isActive && rawStart ? new Date(rawStart) : null;
+
+      const limit = Number(limits.rebuilds ?? 0);
+      const remainingFromEntitlements = Math.max(0, Number(entitlements.rebuildsRemaining ?? 0));
+      const remaining = Math.min(limit, remainingFromEntitlements);
+      const used = Math.max(0, limit - remaining);
+      const allowed = Boolean(entitlements.canBuild && remaining > 0);
+      const windowExpiresAt: Date | null =
+        paidAt && Number(limits.rebuildWindowDays ?? 0) > 0
+          ? new Date(paidAt.getTime() + Number(limits.rebuildWindowDays) * 24 * 60 * 60 * 1000)
+          : null;
 
       return res.json({
         plan,
         paidAt,
         limits,
         rebuilds: {
-          used: rebuildCheck.used,
-          limit: rebuildCheck.limit,
-          remaining: Math.max(0, rebuildCheck.limit - rebuildCheck.used),
-          allowed: rebuildCheck.allowed,
+          used,
+          limit,
+          remaining,
+          allowed,
           windowExpiresAt,
         },
       });
@@ -7037,16 +7343,9 @@ export async function registerRoutes(
         return res.status(404).json({ message: "App not found" });
       }
 
-      const baseEntitlements = getEntitlements(user);
-      const entitlements = {
-        ...baseEntitlements,
-        canPublishPlay:
-          baseEntitlements.isActive &&
-          (baseEntitlements.plan === "standard" || baseEntitlements.plan === "pro" || baseEntitlements.plan === "agency"),
-      };
-      const plan = (entitlements.plan || "starter") as any;
+      const { plan, canPublishPlay } = getOperationalPlanContext(user);
 
-      if (!entitlements.canPublishPlay) {
+      if (!canPublishPlay) {
         return res.status(403).json({
           ready: false,
           message: "Play Store submission is not available on Starter plan",
@@ -7063,7 +7362,7 @@ export async function registerRoutes(
       // In production, these would come from the actual build artifacts
       const buildInfo = {
         isReleaseSigned: appItem.status === "live", // Assume live builds are signed
-        hasAabOutput: entitlements.canPublishPlay && appItem.status === "live",
+        hasAabOutput: canPublishPlay && appItem.status === "live",
         targetSdk: 34,
         hasDebugFlags: false,
         hasInternetPermission: true,
@@ -7075,7 +7374,7 @@ export async function registerRoutes(
       return res.json({
         ...result,
         plan,
-        canSubmit: result.ready && entitlements.canPublishPlay,
+        canSubmit: result.ready && canPublishPlay,
       });
     } catch (err) {
       return next(err);
@@ -7093,10 +7392,9 @@ export async function registerRoutes(
         return res.status(404).json({ message: "App not found" });
       }
 
-      // Get plan info
-      const { plan, limits } = await getAppPlanInfo(appItem.id);
-      
-      if (!limits.appStoreReady) {
+      const { plan, limits, canPublishAppStore } = getOperationalPlanContext(user);
+
+      if (!canPublishAppStore) {
         return res.status(403).json({
           ready: false,
           message: "App Store submission is only available on Pro plan",
@@ -7143,17 +7441,10 @@ export async function registerRoutes(
         return res.status(404).json({ message: "App not found" });
       }
 
-      const baseEntitlements = getEntitlements(user);
-      const entitlements = {
-        ...baseEntitlements,
-        canPublishPlay:
-          baseEntitlements.isActive &&
-          (baseEntitlements.plan === "standard" || baseEntitlements.plan === "pro" || baseEntitlements.plan === "agency"),
-      };
-      const plan = (entitlements.plan || "starter") as any;
+      const { plan, canPublishPlay } = getOperationalPlanContext(user);
 
       // Check if AAB is allowed for this plan
-      if (!entitlements.canPublishPlay) {
+      if (!canPublishPlay) {
         return res.status(403).json({
           allowed: false,
           reason: "AAB format (Play Store) is not available on Starter plan. Preview builds are not eligible for Play Store submission.",
@@ -7193,16 +7484,9 @@ export async function registerRoutes(
         return res.status(404).json({ message: "App not found" });
       }
 
-      const baseEntitlements = getEntitlements(user);
-      const entitlements = {
-        ...baseEntitlements,
-        canPublishPlay:
-          baseEntitlements.isActive &&
-          (baseEntitlements.plan === "standard" || baseEntitlements.plan === "pro" || baseEntitlements.plan === "agency"),
-      };
-      const plan = (entitlements.plan || "starter") as any;
+      const { plan, canPublishPlay } = getOperationalPlanContext(user);
 
-      if (!entitlements.canPublishPlay) {
+      if (!canPublishPlay) {
         return res.status(403).json({
           message: "Google Play publishing requires Standard plan or above.",
           requiresUpgrade: true,
@@ -7400,16 +7684,9 @@ export async function registerRoutes(
         return res.status(404).json({ message: "App not found" });
       }
 
-      const baseEntitlements = getEntitlements(user);
-      const entitlements = {
-        ...baseEntitlements,
-        canPublishPlay:
-          baseEntitlements.isActive &&
-          (baseEntitlements.plan === "standard" || baseEntitlements.plan === "pro" || baseEntitlements.plan === "agency"),
-      };
-      const plan = (entitlements.plan || "starter") as any;
+      const { plan, canPublishPlay } = getOperationalPlanContext(user);
 
-      if (!entitlements.canPublishPlay) {
+      if (!canPublishPlay) {
         return res.status(403).json({
           message: "Google Play publishing requires Standard plan or above.",
           requiresUpgrade: true,
@@ -7663,8 +7940,8 @@ export async function registerRoutes(
 
       // --- Enforce plan-based push access (staff bypass) ---
       if (!isStaff(user)) {
-        const { limits } = await getAppPlanInfo(appItem.id);
-        if (!limits.pushEnabled) {
+        const { canUsePush } = getOperationalPlanContext(user);
+        if (!canUsePush) {
           return res.status(402).json({
             code: "plan_required",
             requiresUpgrade: true,
@@ -7695,8 +7972,8 @@ export async function registerRoutes(
 
       // --- Enforce plan-based push access (staff bypass) ---
       if (!isStaff(user)) {
-        const { limits } = await getAppPlanInfo(appItem.id);
-        if (!limits.pushEnabled) {
+        const { canUsePush } = getOperationalPlanContext(user);
+        if (!canUsePush) {
           return res.status(402).json({
             code: "plan_required",
             requiresUpgrade: true,

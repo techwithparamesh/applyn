@@ -11,7 +11,6 @@ import { generateAndroidWrapperProject } from "./build/android-wrapper";
 import { runDockerGradleBuild } from "./build/docker-gradle";
 import { triggerIOSBuild } from "./build/github-ios";
 import { getPlan, PlanId } from "@shared/pricing";
-import { getAllowedFeatures } from "./subscription-middleware";
 import { User } from "@shared/schema";
 import { sendBuildCompleteEmail } from "./email";
 import { getEntitlements } from "./entitlements";
@@ -68,37 +67,85 @@ async function processWebhookDeliveryRetries() {
   try {
     if (!process.env.DATABASE_URL?.startsWith("mysql://")) return;
     const db = getMysqlDb();
-    const now = new Date();
+    const due = await db.transaction(async (tx) => {
+      const candidates = await tx
+        .select({
+          id: webhookDeliveries.id,
+          webhookId: webhookDeliveries.webhookId,
+          appId: webhookDeliveries.appId,
+          eventName: webhookDeliveries.eventName,
+          payload: webhookDeliveries.payload,
+          attemptCount: webhookDeliveries.attemptCount,
+          url: appWebhooks.url,
+          secret: appWebhooks.secret,
+          enabled: appWebhooks.enabled,
+          disabledUntil: appWebhooks.disabledUntil,
+          consecutiveFailures: appWebhooks.consecutiveFailures,
+        })
+        .from(webhookDeliveries)
+        .leftJoin(appWebhooks, eq(appWebhooks.id, webhookDeliveries.webhookId))
+        .where(
+          and(
+            sql`${webhookDeliveries.deliveredAt} IS NULL`,
+            sql`${webhookDeliveries.nextRetryAt} IS NOT NULL`,
+            sql`${webhookDeliveries.nextRetryAt} <= NOW()`,
+            sql`${webhookDeliveries.attemptCount} < 10`,
+            sql`(${webhookDeliveries.leaseUntil} IS NULL OR ${webhookDeliveries.leaseUntil} < NOW())`,
+            // Skip disabled webhooks during their cooldown window.
+            sql`(${appWebhooks.disabledUntil} IS NULL OR ${appWebhooks.disabledUntil} <= NOW())`,
+          ),
+        )
+        .orderBy(asc(webhookDeliveries.nextRetryAt))
+        .limit(50);
 
-    const due = await db
-      .select({
-        id: webhookDeliveries.id,
-        webhookId: webhookDeliveries.webhookId,
-        appId: webhookDeliveries.appId,
-        eventName: webhookDeliveries.eventName,
-        payload: webhookDeliveries.payload,
-        attemptCount: webhookDeliveries.attemptCount,
-        url: appWebhooks.url,
-        secret: appWebhooks.secret,
-        enabled: appWebhooks.enabled,
-      })
-      .from(webhookDeliveries)
-      .leftJoin(appWebhooks, eq(appWebhooks.id, webhookDeliveries.webhookId))
-      .where(
-        and(
-          sql`${webhookDeliveries.deliveredAt} IS NULL`,
-          sql`${webhookDeliveries.nextRetryAt} IS NOT NULL`,
-          sql`${webhookDeliveries.nextRetryAt} <= ${now}`,
-          sql`${webhookDeliveries.attemptCount} < 10`,
-        ),
-      )
-      .orderBy(asc(webhookDeliveries.nextRetryAt))
-      .limit(50);
+      if (!candidates.length) return [];
+
+      const claimed: any[] = [];
+
+      for (const d of candidates as any[]) {
+        const leaseToken = randomUUID();
+
+        const result = await tx
+          .update(webhookDeliveries)
+          .set({
+            leaseUntil: sql`DATE_ADD(NOW(), INTERVAL 30 SECOND)`,
+            leaseToken,
+          })
+          .where(
+            and(
+              eq(webhookDeliveries.id, String(d.id)),
+              sql`(${webhookDeliveries.leaseUntil} IS NULL OR ${webhookDeliveries.leaseUntil} < NOW())`,
+            ),
+          );
+
+        const affected =
+          (result as any)?.rowsAffected ??
+          (result as any)?.affectedRows ??
+          (result as any)?.[0]?.affectedRows ??
+          0;
+
+        if (Number(affected) === 1) {
+          claimed.push({ ...d, leaseToken });
+        }
+      }
+
+      return claimed;
+    });
 
     if (!due.length) return;
 
     await Promise.allSettled(
       due.map(async (d: any) => {
+        // If the webhook becomes disabled between selection/claim and execution, skip without mutating attempts.
+        const disabledUntilMs = d?.disabledUntil ? new Date(d.disabledUntil).getTime() : NaN;
+        if (Number.isFinite(disabledUntilMs) && disabledUntilMs > Date.now()) {
+          await db
+            .update(webhookDeliveries)
+            .set({ leaseUntil: null, leaseToken: null })
+            .where(eq(webhookDeliveries.id, String(d.id)));
+          return;
+        }
+
         const enabled = Number(d.enabled || 0) === 1;
         const url = typeof d.url === "string" ? d.url : "";
 
@@ -109,6 +156,8 @@ async function processWebhookDeliveryRetries() {
               attemptCount: 10,
               nextRetryAt: null,
               lastError: "Webhook missing or disabled",
+              leaseUntil: null,
+              leaseToken: null,
             })
             .where(eq(webhookDeliveries.id, String(d.id)));
           return;
@@ -164,8 +213,24 @@ async function processWebhookDeliveryRetries() {
               lastError: null,
               nextRetryAt: null,
               deliveredAt: new Date(),
+              leaseUntil: null,
+              leaseToken: null,
             })
             .where(eq(webhookDeliveries.id, String(d.id)));
+
+          // Circuit breaker reset.
+          try {
+            await db
+              .update(appWebhooks)
+              .set({
+                consecutiveFailures: 0,
+                disabledUntil: null,
+                updatedAt: new Date(),
+              } as any)
+              .where(eq(appWebhooks.id, String(d.webhookId)));
+          } catch {
+            // Best-effort.
+          }
         } catch (err: any) {
           const message = err?.name === "AbortError" ? "Timeout" : err?.message || String(err);
           const nextAttempt = Number(d.attemptCount || 0) + 1;
@@ -176,8 +241,30 @@ async function processWebhookDeliveryRetries() {
               attemptCount: nextAttempt,
               lastError: String(message).slice(0, 10_000),
               nextRetryAt,
+              leaseUntil: null,
+              leaseToken: null,
             })
             .where(eq(webhookDeliveries.id, String(d.id)));
+
+          // Circuit breaker increment + possible disable.
+          const nextFailures = Number(d?.consecutiveFailures ?? 0) + 1;
+          if (nextFailures >= 5) {
+            console.warn(
+              `[Worker] Disabling webhook ${String(d.webhookId)} for 15 minutes after ${nextFailures} consecutive failures`,
+            );
+          }
+          try {
+            await db
+              .update(appWebhooks)
+              .set({
+                consecutiveFailures: sql`COALESCE(consecutive_failures, 0) + 1`,
+                disabledUntil: sql`CASE WHEN COALESCE(consecutive_failures, 0) + 1 >= 5 THEN DATE_ADD(NOW(), INTERVAL 15 MINUTE) ELSE disabled_until END`,
+                updatedAt: new Date(),
+              } as any)
+              .where(eq(appWebhooks.id, String(d.webhookId)));
+          } catch {
+            // Best-effort.
+          }
         } finally {
           clearTimeout(timer);
         }
@@ -255,15 +342,16 @@ async function cleanupArtifactsForApp(appId: string) {
  */
 function getPlanBasedFeatures(user: User | null, appFeatures: any) {
   // If no user (shouldn't happen), use app's stored features
-  if (!user || !user.plan) {
+  const entitlements = getEntitlements(user);
+  if (!entitlements.isActive || !entitlements.plan) {
     return appFeatures || {
       bottomNav: false,
       pullToRefresh: true,
       offlineScreen: true,
     };
   }
-  
-  const planDef = getPlan(user.plan as PlanId);
+
+  const planDef = getPlan(entitlements.plan as PlanId);
   
   // Apply plan-based restrictions:
   // - Starter: No push, no bottom nav, no native progress
