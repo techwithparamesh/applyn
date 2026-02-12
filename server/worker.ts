@@ -5,7 +5,7 @@ import path from "path";
 import fs from "fs/promises";
 import { createHmac, randomUUID } from "crypto";
 import { pathToFileURL } from "url";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { storage } from "./storage";
 import { generateAndroidWrapperProject } from "./build/android-wrapper";
 import { runDockerGradleBuild } from "./build/docker-gradle";
@@ -15,7 +15,8 @@ import { User } from "@shared/schema";
 import { sendBuildCompleteEmail } from "./email";
 import { getEntitlements } from "./entitlements";
 import { getMysqlDb } from "./db-mysql";
-import { appWebhooks, webhookDeliveries } from "@shared/db.mysql";
+import { appWebhooks, payments, webhookDeliveries } from "@shared/db.mysql";
+import { logger } from "./logger";
 
 function artifactsRoot() {
   return process.env.ARTIFACTS_DIR || path.resolve(process.cwd(), "artifacts");
@@ -272,6 +273,163 @@ async function processWebhookDeliveryRetries() {
     );
   } catch (err) {
     console.error("[Worker] Webhook retry loop error:", err);
+  }
+}
+
+function isPaymentReconciliationEnabled() {
+  const enabled = (process.env.ENABLE_PAYMENT_RECONCILIATION || "").trim() === "true";
+  return enabled && process.env.NODE_ENV === "production";
+}
+
+let paymentReconciliationDisabledLogged = false;
+function maybeLogPaymentReconciliationDisabled(): void {
+  if (paymentReconciliationDisabledLogged) return;
+  if ((process.env.ENABLE_PAYMENT_RECONCILIATION || "").trim() !== "true") return;
+  if (process.env.NODE_ENV === "production") return;
+  paymentReconciliationDisabledLogged = true;
+  console.log("Payment reconciliation disabled (non-production environment)");
+}
+
+function isEntitlementRepairEnabled() {
+  return (process.env.ENABLE_ENTITLEMENT_REPAIR || "").trim() === "true";
+}
+
+function isRazorpayApiConfigured() {
+  const keyId = (process.env.RAZORPAY_KEY_ID || "").trim();
+  const keySecret = (process.env.RAZORPAY_KEY_SECRET || "").trim();
+  return !!(keyId && keySecret);
+}
+
+async function isRazorpayOrderCaptured(orderId: string): Promise<boolean> {
+  const razorpayKeyId = (process.env.RAZORPAY_KEY_ID || "").trim();
+  const razorpayKeySecret = (process.env.RAZORPAY_KEY_SECRET || "").trim();
+
+  if (!razorpayKeyId || !razorpayKeySecret) {
+    throw new Error("Razorpay API not configured");
+  }
+
+  const auth = Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString("base64");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    const resp = await fetch(`https://api.razorpay.com/v1/orders/${encodeURIComponent(orderId)}/payments`, {
+      method: "GET",
+      headers: {
+        authorization: `Basic ${auth}`,
+        accept: "application/json",
+      },
+      signal: controller.signal,
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => "");
+      throw new Error(`Razorpay API HTTP ${resp.status}${errText ? `: ${errText}` : ""}`);
+    }
+
+    const json: any = await resp.json();
+    const items: any[] = Array.isArray(json?.items) ? json.items : [];
+    return items.some((p) => String(p?.status || "").toLowerCase() === "captured");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+let paymentReconciliationTickRunning = false;
+async function runPaymentReconciliationTick(): Promise<void> {
+  if (paymentReconciliationTickRunning) return;
+  paymentReconciliationTickRunning = true;
+
+  try {
+    if (!isPaymentReconciliationEnabled()) return;
+    if (!process.env.DATABASE_URL?.startsWith("mysql://")) return;
+    if (!isRazorpayApiConfigured()) return;
+
+    logger.info("payment.reconcile.tick.start", { limit: 50 });
+
+    const db = getMysqlDb();
+    const candidates = await db
+      .select({
+        id: payments.id,
+        status: payments.status,
+        providerOrderId: payments.providerOrderId,
+      })
+      .from(payments)
+      .where(
+        and(
+          eq(payments.provider, "razorpay"),
+          inArray(payments.status, ["pending", "failed"]),
+          sql`${payments.createdAt} < DATE_SUB(NOW(), INTERVAL 5 MINUTE)`,
+        ),
+      )
+      .orderBy(asc(payments.createdAt))
+      .limit(50);
+
+    let recoveredCount = 0;
+
+    for (const p of candidates as any[]) {
+      try {
+        const paymentId = String(p?.id || "");
+        const providerOrderId = String(p?.providerOrderId || "").trim();
+        if (!paymentId || !providerOrderId) continue;
+
+        const captured = await isRazorpayOrderCaptured(providerOrderId);
+        if (!captured) continue;
+
+        const { updated } = await (storage as any).completePaymentAndApplyEntitlements(paymentId, true);
+        if (updated) {
+          recoveredCount++;
+          logger.info("payment.reconcile.recovered", { paymentId, orderId: providerOrderId });
+        }
+      } catch (err: any) {
+        logger.warn("payment.reconcile.provider_error", {
+          orderId: String(p?.providerOrderId || ""),
+          error: err?.message || String(err),
+        });
+      }
+    }
+
+    if (recoveredCount > 10) {
+      logger.warn("payment.reconcile.anomaly", { recoveredCount });
+    }
+  } catch (err: any) {
+    logger.warn("payment.reconcile.tick.error", { error: err?.message || String(err) });
+  } finally {
+    paymentReconciliationTickRunning = false;
+  }
+}
+
+let entitlementRepairTickRunning = false;
+async function runEntitlementRepairTick(): Promise<void> {
+  if (entitlementRepairTickRunning) return;
+  entitlementRepairTickRunning = true;
+
+  try {
+    if (!process.env.DATABASE_URL?.startsWith("mysql://")) return;
+
+    const db = getMysqlDb();
+    const candidates = await db
+      .select({ id: payments.id })
+      .from(payments)
+      .where(and(eq(payments.status, "completed"), sql`${payments.entitlementsAppliedAt} IS NULL`))
+      .orderBy(asc(payments.createdAt))
+      .limit(100);
+
+    for (const p of candidates as any[]) {
+      try {
+        const paymentId = String(p?.id || "");
+        if (!paymentId) continue;
+
+        await (storage as any).completePaymentAndApplyEntitlements(paymentId, true);
+        console.info(`[EntitlementRepair] repaired payment=${paymentId}`);
+      } catch (err: any) {
+        console.warn(`[EntitlementRepair] failed payment=${String(p?.id || "")}: ${err?.message || String(err)}`);
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[EntitlementRepair] tick failed: ${err?.message || String(err)}`);
+  } finally {
+    entitlementRepairTickRunning = false;
   }
 }
 
@@ -568,7 +726,7 @@ async function handleAndroidBuild(job: any, lockToken: string, app: any, pkg: st
     // Optional mock mode: allows end-to-end sanity checks without Docker/Android SDK.
     if (mockAndroidBuildEnabled()) {
       logs = `MOCK_ANDROID_BUILD enabled at ${new Date().toISOString()}\n`;
-      if (mockAndroidFailOnce() && job.attempts <= 1) {
+      if (mockAndroidFailOnce() && Number(job.attempts ?? 0) === 0) {
         throw new Error("Mock build forced failure (first attempt)");
       }
 
@@ -661,7 +819,27 @@ async function handleAndroidBuild(job: any, lockToken: string, app: any, pkg: st
     if (!build.ok) {
       const msg = "Android build failed";
 
-      if (job.attempts < maxBuildAttempts()) {
+      const maxAttempts = maxBuildAttempts();
+      const attemptNumber = Number(job.attempts ?? 0) + 1;
+
+      if (attemptNumber >= maxAttempts) {
+        const failureReason = "Max retry attempts exceeded";
+        console.warn(
+          `[BuildJob] permanently_failed job=${job.id} app=${app.id} attempts=${attemptNumber} max=${maxAttempts}`,
+        );
+
+        await storage.completeBuildJob(job.id, lockToken, "failed", failureReason);
+        await storage.updateAppBuild(app.id, {
+          status: "failed",
+          buildError: msg,
+          buildLogs: logs.slice(-20000),
+          lastBuildAt: new Date(),
+        });
+
+        return;
+      }
+
+      if (attemptNumber < maxAttempts) {
         await storage.updateAppBuild(app.id, {
           status: "processing",
           buildError: "Build failed. Retrying...",
@@ -669,25 +847,18 @@ async function handleAndroidBuild(job: any, lockToken: string, app: any, pkg: st
           lastBuildAt: new Date(),
         });
 
-        const delay = retryBackoffMs(job.attempts);
+        const delay = retryBackoffMs(attemptNumber);
         if (delay > 0) await new Promise((r) => setTimeout(r, delay));
         
         // Requeue the same job instead of creating a new one
-        await storage.requeueBuildJob(job.id, lockToken);
-        console.log(`[Worker] Requeued job ${job.id} for retry (attempt ${job.attempts} of ${maxBuildAttempts()})`);
+        const ok = await storage.requeueBuildJob(job.id, lockToken);
+        if (ok) {
+          console.info(
+            `[BuildJob] retry_scheduled job=${job.id} app=${app.id} nextAttempt=${attemptNumber + 1} max=${maxAttempts}`,
+          );
+        }
         return;
       }
-
-      // Max attempts reached - mark as failed permanently
-      await storage.completeBuildJob(job.id, lockToken, "failed", msg);
-      await storage.updateAppBuild(app.id, {
-        status: "failed",
-        buildError: msg,
-        buildLogs: logs.slice(-20000),
-        lastBuildAt: new Date(),
-      });
-
-      return;
     }
 
     // Copy release APK
@@ -739,7 +910,34 @@ async function handleAndroidBuild(job: any, lockToken: string, app: any, pkg: st
     const msg = err?.message || String(err);
     console.error(`[Worker] Build error for job ${job.id}:`, msg);
 
-    if (job.attempts < maxBuildAttempts()) {
+    const maxAttempts = maxBuildAttempts();
+    const attemptNumber = Number(job.attempts ?? 0) + 1;
+
+    if (attemptNumber >= maxAttempts) {
+      const failureReason = "Max retry attempts exceeded";
+      console.warn(`[BuildJob] permanently_failed job=${job.id} app=${app.id} attempts=${attemptNumber} max=${maxAttempts}`);
+
+      await storage.completeBuildJob(job.id, lockToken, "failed", failureReason);
+      await storage.updateAppBuild(app.id, {
+        status: "failed",
+        buildError: msg,
+        buildLogs: logs.slice(-20000),
+        lastBuildAt: new Date(),
+      });
+
+      // Send build failure email notification
+      const owner = await storage.getUser(app.ownerId);
+      if (owner) {
+        const dashboardUrl = `${process.env.APP_URL || 'https://applyn.co.in'}/apps/${app.id}/edit`;
+        sendBuildCompleteEmail(owner.username, app.name, "failed", dashboardUrl, msg).catch(err =>
+          console.error("[Worker] Failed to send build failure email:", err)
+        );
+      }
+
+      return;
+    }
+
+    if (attemptNumber < maxAttempts) {
       await storage.updateAppBuild(app.id, {
         status: "processing",
         buildError: "Build failed. Retrying...",
@@ -747,31 +945,17 @@ async function handleAndroidBuild(job: any, lockToken: string, app: any, pkg: st
         lastBuildAt: new Date(),
       });
 
-      const delay = retryBackoffMs(job.attempts);
+      const delay = retryBackoffMs(attemptNumber);
       if (delay > 0) await new Promise((r) => setTimeout(r, delay));
       
       // Requeue the same job instead of creating a new one
-      await storage.requeueBuildJob(job.id, lockToken);
-      console.log(`[Worker] Requeued job ${job.id} for retry (attempt ${job.attempts} of ${maxBuildAttempts()})`);
+      const ok = await storage.requeueBuildJob(job.id, lockToken);
+      if (ok) {
+        console.info(
+          `[BuildJob] retry_scheduled job=${job.id} app=${app.id} nextAttempt=${attemptNumber + 1} max=${maxAttempts}`,
+        );
+      }
       return;
-    }
-
-    // Max attempts reached - mark as failed permanently
-    await storage.completeBuildJob(job.id, lockToken, "failed", msg);
-    await storage.updateAppBuild(app.id, {
-      status: "failed",
-      buildError: msg,
-      buildLogs: logs.slice(-20000),
-      lastBuildAt: new Date(),
-    });
-
-    // Send build failure email notification
-    const owner = await storage.getUser(app.ownerId);
-    if (owner) {
-      const dashboardUrl = `${process.env.APP_URL || 'https://applyn.co.in'}/apps/${app.id}/edit`;
-      sendBuildCompleteEmail(owner.username, app.name, "failed", dashboardUrl, msg).catch(err =>
-        console.error("[Worker] Failed to send build failure email:", err)
-      );
     }
   } finally {
     if (workDir) {
@@ -788,6 +972,29 @@ export async function runWorkerLoop() {
   console.log(`[Worker] Poll interval: ${pollIntervalMs()}ms`);
   
   await ensureDir(artifactsRoot());
+
+  // Payment reconciliation runs out-of-band and must not block the main worker loop.
+  // Enable explicitly with ENABLE_PAYMENT_RECONCILIATION=true.
+  maybeLogPaymentReconciliationDisabled();
+  if (isPaymentReconciliationEnabled()) {
+    const interval = setInterval(() => {
+      void runPaymentReconciliationTick();
+    }, 5 * 60_000);
+
+    // Don't keep the process alive just for the interval.
+    (interval as any).unref?.();
+  }
+
+  // Entitlement repair runs out-of-band and must not block the main worker loop.
+  // Enable explicitly with ENABLE_ENTITLEMENT_REPAIR=true.
+  if (isEntitlementRepairEnabled()) {
+    const interval = setInterval(() => {
+      void runEntitlementRepairTick();
+    }, 12 * 60 * 60_000);
+
+    // Don't keep the process alive just for the interval.
+    (interval as any).unref?.();
+  }
 
   let pollCount = 0;
   let lastWebhookRetryAt = 0;

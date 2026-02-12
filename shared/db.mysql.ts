@@ -1278,6 +1278,7 @@ export const payments = mysqlTable("payments", {
   userIdIdx: index("payments_user_id_idx").on(table.userId),
   appIdIdx: index("payments_app_id_idx").on(table.appId),
   statusIdx: index("payments_status_idx").on(table.status),
+  statusCreatedAtIdx: index("payments_status_created_at_idx").on(table.status, table.createdAt),
   providerOrderIdIdx: index("payments_provider_order_id_idx").on(table.providerOrderId),
 }));
 

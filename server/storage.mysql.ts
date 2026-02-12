@@ -1,4 +1,4 @@
-import { and, desc, eq, sql, gte, lt, between, count } from "drizzle-orm";
+import { and, asc, desc, eq, sql, gte, lt, between, count } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import type {
   App,
@@ -434,6 +434,7 @@ export class MysqlStorage {
   async completePaymentAndApplyEntitlements(
     paymentId: string,
     isProviderAuthoritative: boolean,
+    providerBinding?: { providerOrderId?: string; providerPaymentId?: string },
   ): Promise<{ updated: boolean; payment: Payment | null }> {
     const db = getMysqlDb();
 
@@ -447,6 +448,29 @@ export class MysqlStorage {
 
       const payment = (lockedRows[0] as unknown as Payment | undefined) ?? null;
       if (!payment) return { updated: false, payment: null };
+
+      const boundOrderId = typeof providerBinding?.providerOrderId === "string" ? providerBinding.providerOrderId : "";
+      if (boundOrderId && payment.providerOrderId && payment.providerOrderId !== boundOrderId) {
+        throw new Error("PAYMENT_PROVIDER_ORDER_ID_MISMATCH");
+      }
+
+      const boundPaymentId = typeof providerBinding?.providerPaymentId === "string" ? providerBinding.providerPaymentId : "";
+      let providerPaymentIdUpdated = false;
+      if (boundPaymentId) {
+        if (payment.providerPaymentId && payment.providerPaymentId !== boundPaymentId) {
+          throw new Error("PAYMENT_PROVIDER_PAYMENT_ID_MISMATCH");
+        }
+        if (!payment.providerPaymentId) {
+          await tx
+            .update(payments)
+            .set({
+              providerPaymentId: boundPaymentId,
+              updatedAt: new Date(),
+            })
+            .where(eq(payments.id, paymentId));
+          providerPaymentIdUpdated = true;
+        }
+      }
 
       if (payment.status === "pending") {
         await tx
@@ -474,6 +498,10 @@ export class MysqlStorage {
       // allow a failed -> completed transition ONLY when invoked from a verified provider webhook.
       if (payment.status === "failed") {
         if (!isProviderAuthoritative) {
+          if (providerPaymentIdUpdated) {
+            const refreshed = await tx.select().from(payments).where(eq(payments.id, paymentId)).limit(1);
+            return { updated: false, payment: (refreshed[0] as unknown as Payment) ?? payment };
+          }
           return { updated: false, payment };
         }
 
@@ -484,6 +512,22 @@ export class MysqlStorage {
             updatedAt: new Date(),
           })
           .where(eq(payments.id, paymentId));
+
+        // Best-effort observability: count recoveries (failed -> completed) in founder metrics.
+        try {
+          await tx.insert(auditLogs).values({
+            id: randomUUID(),
+            userId: null,
+            action: "payment.recovered",
+            targetType: "payment",
+            targetId: paymentId,
+            metadata: JSON.stringify({ provider: payment.provider, providerOrderId: payment.providerOrderId || null }),
+            ipAddress: null,
+            userAgent: null,
+          } as any);
+        } catch {
+          // Best-effort.
+        }
 
         if (!payment.entitlementsAppliedAt) {
           await this.applyPaymentEntitlementsInTx(tx, payment);
@@ -512,6 +556,11 @@ export class MysqlStorage {
 
         const refreshed = await tx.select().from(payments).where(eq(payments.id, paymentId)).limit(1);
         return { updated: false, payment: (refreshed[0] as unknown as Payment) ?? null };
+      }
+
+      if (providerPaymentIdUpdated) {
+        const refreshed = await tx.select().from(payments).where(eq(payments.id, paymentId)).limit(1);
+        return { updated: false, payment: (refreshed[0] as unknown as Payment) ?? payment };
       }
 
       return { updated: false, payment };
@@ -1087,41 +1136,102 @@ export class MysqlStorage {
     const maxAttempts = maxBuildAttempts();
     const staleBefore = new Date(Date.now() - jobLockTtlMs());
 
+    const db = getMysqlDb();
+    const now = new Date();
+
+    // Guardrail: do not leave over-attempt jobs stuck in queued forever.
+    try {
+      await db
+        .update(buildJobs)
+        .set({
+          status: "failed",
+          error: "Max retry attempts exceeded",
+          lockToken: null,
+          lockedAt: null,
+          updatedAt: now,
+        } as any)
+        .where(and(eq(buildJobs.status as any, "queued"), sql`${buildJobs.attempts} >= ${maxAttempts}`));
+    } catch {
+      // Best-effort.
+    }
+
+    // Guardrail: if a stale in-flight job would exceed retries when reclaimed, fail it.
+    try {
+      const result = await db
+        .update(buildJobs)
+        .set({
+          status: "failed",
+          error: "Max retry attempts exceeded",
+          lockToken: null,
+          lockedAt: null,
+          updatedAt: now,
+        } as any)
+        .where(
+          and(
+            sql`${buildJobs.status} IN ('running','processing')`,
+            sql`${buildJobs.lockedAt} IS NOT NULL AND ${buildJobs.lockedAt} < ${staleBefore}`,
+            sql`${buildJobs.attempts} >= ${maxAttempts} - 1`,
+          ),
+        );
+
+      const affected =
+        (result as any)?.rowsAffected ??
+        (result as any)?.affectedRows ??
+        (result as any)?.[0]?.affectedRows ??
+        0;
+      if (Number(affected) > 0) {
+        console.warn(`[BuildJob] permanently_failed reason=max_attempts affected=${Number(affected)}`);
+      }
+    } catch {
+      // Best-effort.
+    }
+
     // Prefer queued jobs; reclaim stale running jobs if a worker died mid-build.
-    const rows = await getMysqlDb()
+    const rows = await db
       .select()
       .from(buildJobs)
       .where(
-        and(
-          sql`(${buildJobs.status} = 'queued' OR (${buildJobs.status} = 'running' AND ${buildJobs.lockedAt} < ${staleBefore}))`,
-          sql`${buildJobs.attempts} < ${maxAttempts}`,
-        ),
+        sql`(
+          (${buildJobs.status} = 'queued' AND ${buildJobs.attempts} < ${maxAttempts})
+          OR
+          (${buildJobs.status} IN ('running','processing') AND ${buildJobs.lockedAt} IS NOT NULL AND ${buildJobs.lockedAt} < ${staleBefore} AND ${buildJobs.attempts} < ${maxAttempts} - 1)
+        )`,
       )
-      .orderBy(buildJobs.createdAt)
+      .orderBy(asc(buildJobs.createdAt))
       .limit(1);
 
     const candidate = rows[0] as unknown as BuildJob | undefined;
     if (!candidate) return null;
 
     const lockToken = `${workerId}:${randomUUID()}`;
-    const now = new Date();
+    const candidateStatus = String((candidate as any).status || "");
+    const isStaleReclaim = candidateStatus === "running" || candidateStatus === "processing";
 
     try {
-      const result = await getMysqlDb()
+      const setPatch: any = {
+        status: "running",
+        lockToken,
+        lockedAt: now,
+        updatedAt: now,
+      };
+
+      // Increment attempts only when reclaiming a stale in-flight job.
+      if (isStaleReclaim) {
+        setPatch.attempts = sql`${buildJobs.attempts} + 1`;
+      }
+
+      const result = await db
         .update(buildJobs)
-        .set({
-          status: "running",
-          attempts: sql`${buildJobs.attempts} + 1`,
-          lockToken,
-          lockedAt: now,
-          updatedAt: now,
-        })
+        .set(setPatch)
         .where(
-          and(
-            eq(buildJobs.id, candidate.id),
-            sql`(${buildJobs.status} = 'queued' OR (${buildJobs.status} = 'running' AND ${buildJobs.lockedAt} < ${staleBefore}))`,
-            sql`${buildJobs.attempts} < ${maxAttempts}`,
-          ),
+          sql`(
+            ${buildJobs.id} = ${candidate.id}
+            AND (
+              (${buildJobs.status} = 'queued' AND ${buildJobs.attempts} < ${maxAttempts})
+              OR
+              (${buildJobs.status} IN ('running','processing') AND ${buildJobs.lockedAt} IS NOT NULL AND ${buildJobs.lockedAt} < ${staleBefore} AND ${buildJobs.attempts} < ${maxAttempts} - 1)
+            )
+          )`,
         );
 
       const affected = (result as any)?.rowsAffected ?? (result as any)?.affectedRows ?? (result as any)?.[0]?.affectedRows ?? 0;
@@ -1130,7 +1240,31 @@ export class MysqlStorage {
         return null;
       }
 
-      const claimed = await getMysqlDb().select().from(buildJobs).where(eq(buildJobs.id, candidate.id)).limit(1);
+      if (isStaleReclaim) {
+        console.warn(
+          `[BuildJob] reclaimed_stale job=${candidate.id} app=${candidate.appId} lockedAt=${String(
+            (candidate as any).lockedAt || "",
+          )}`,
+        );
+
+        // Best-effort observability: count stale reclaims in founder metrics.
+        try {
+          await db.insert(auditLogs).values({
+            id: randomUUID(),
+            userId: null,
+            action: "build.job.reclaimed",
+            targetType: "build_job",
+            targetId: String(candidate.id),
+            metadata: JSON.stringify({ appId: String(candidate.appId), workerId }),
+            ipAddress: null,
+            userAgent: null,
+          } as any);
+        } catch {
+          // Best-effort.
+        }
+      }
+
+      const claimed = await db.select().from(buildJobs).where(eq(buildJobs.id, candidate.id)).limit(1);
       return (claimed[0] as unknown as BuildJob) ?? null;
     } catch (err) {
       console.error(`[Storage] Error claiming job:`, err);
@@ -1173,22 +1307,40 @@ export class MysqlStorage {
   }
 
   async requeueBuildJob(jobId: string, lockToken: string): Promise<boolean> {
+    const maxAttempts = maxBuildAttempts();
     const now = new Date();
-    const result = await getMysqlDb()
+    const db = getMysqlDb();
+
+    const result = await db
       .update(buildJobs)
       .set({
-        status: "queued",
+        attempts: sql`${buildJobs.attempts} + 1`,
+        status: sql`CASE WHEN ${buildJobs.attempts} + 1 >= ${maxAttempts} THEN 'failed' ELSE 'queued' END`,
         lockToken: null,
         lockedAt: null,
-        error: null,
+        error: sql`CASE WHEN ${buildJobs.attempts} + 1 >= ${maxAttempts} THEN 'Max retry attempts exceeded' ELSE NULL END`,
         updatedAt: now,
-      })
+      } as any)
       .where(and(eq(buildJobs.id, jobId), eq(buildJobs.lockToken, lockToken)));
 
     const affected = (result as any)?.rowsAffected ?? (result as any)?.affectedRows ?? (result as any)?.[0]?.affectedRows ?? 0;
     if (affected !== 1) {
       console.warn(`[Storage] requeueBuildJob ignored; lock token mismatch for job ${jobId}`);
       return false;
+    }
+
+    try {
+      const rows = await db.select().from(buildJobs).where(eq(buildJobs.id, jobId)).limit(1);
+      const job = rows[0] as any;
+      const status = String(job?.status || "");
+      const attempts = Number(job?.attempts ?? 0);
+      if (status === "failed") {
+        console.warn(`[BuildJob] permanently_failed job=${jobId} reason=max_attempts attempts=${attempts} max=${maxAttempts}`);
+      } else {
+        console.info(`[BuildJob] retry_scheduled job=${jobId} attempts=${attempts} max=${maxAttempts}`);
+      }
+    } catch {
+      // Best-effort.
     }
 
     return true;

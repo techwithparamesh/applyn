@@ -16,7 +16,7 @@ import { parseMysqlUrl } from "./db-mysql";
 import { randomBytes } from "crypto";
 import { runWorkerLoop } from "./worker";
 import { startSubscriptionCronInterval } from "./subscription-cron";
-import { errorHandler, requestIdMiddleware, requestLoggingMiddleware } from "./logger";
+import { errorHandler, logger, requestIdMiddleware, requestLoggingMiddleware } from "./logger";
 
 if (!process.env.APP_CUSTOMER_TOKEN_SECRET) {
   throw new Error("APP_CUSTOMER_TOKEN_SECRET must be set");
@@ -133,16 +133,30 @@ function isCsrfAllowed(req: Request) {
   return !isProd;
 }
 
-const sessionStore =
-  process.env.SESSION_STORE === "mysql" && process.env.DATABASE_URL?.startsWith("mysql://")
-    ? new MysqlSession({
-        ...parseMysqlUrl(process.env.DATABASE_URL),
-        createDatabaseTable: true,
-        schema: {
-          tableName: "sessions",
-        },
-      })
-    : new MemoryStore({ checkPeriod: 1000 * 60 * 30 });
+const isMysqlSessionStoreRequested = (process.env.SESSION_STORE || "").trim() === "mysql";
+const useMysqlSessionStore = isMysqlSessionStoreRequested && process.env.DATABASE_URL?.startsWith("mysql://");
+
+if (isProd && !isMysqlSessionStoreRequested) {
+  throw new Error("SESSION_STORE must be explicitly set to 'mysql' in production");
+}
+
+if (isProd && !useMysqlSessionStore) {
+  throw new Error(
+    "Refusing to start in production without durable session storage. Set SESSION_STORE=mysql and a mysql:// DATABASE_URL.",
+  );
+}
+
+logger.info("session.store", { store: useMysqlSessionStore ? "mysql" : "memory" });
+
+const sessionStore = useMysqlSessionStore
+  ? new MysqlSession({
+      ...parseMysqlUrl(process.env.DATABASE_URL!),
+      createDatabaseTable: true,
+      schema: {
+        tableName: "sessions",
+      },
+    })
+  : new MemoryStore({ checkPeriod: 1000 * 60 * 30 });
 
 app.set("trust proxy", 1);
 

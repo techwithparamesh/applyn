@@ -102,6 +102,7 @@ import {
   webhookDeliveries,
   razorpayWebhookEvents,
   pushNotifications,
+  auditLogs,
   users as usersTable,
 } from "@shared/db.mysql";
 import {
@@ -128,6 +129,7 @@ import type { PlayCredentials, PlayTrack } from "./publishing/playPublisher";
 import { createPlayService } from "./services/play/playService";
 import { validateForPublish } from "./publishing/publishValidator";
 import { scanPolicy } from "./publishing/policyScanner";
+import { validateAndroidArtifact } from "./services/artifactValidator";
 import { assertCanQueueBuild, getEntitlements } from "./entitlements";
 import { hasPermission, normalizeAndValidatePermissions, requirePermission } from "./permissions";
 import { logger } from "./logger";
@@ -145,6 +147,52 @@ function safeReturnTo(raw: unknown) {
 function safeArtifactsRoot() {
   const root = process.env.ARTIFACTS_DIR || path.resolve(process.cwd(), "artifacts");
   return root;
+}
+
+async function resolveAabArtifactPathForApp(appItem: any): Promise<string> {
+  const root = path.resolve(safeArtifactsRoot());
+  const artifactPathRaw = typeof appItem?.artifactPath === "string" ? appItem.artifactPath.trim() : "";
+
+  // 1) If stored artifactPath points to an APK/AAB, prefer its sibling AAB.
+  if (artifactPathRaw) {
+    const candidateRel = artifactPathRaw.toLowerCase().endsWith(".apk")
+      ? artifactPathRaw.replace(/\.apk$/i, ".aab")
+      : artifactPathRaw.toLowerCase().endsWith(".aab")
+        ? artifactPathRaw
+        : "";
+    if (candidateRel) {
+      const abs = path.resolve(root, candidateRel);
+      if (abs.startsWith(root) && fs.existsSync(abs)) return abs;
+    }
+  }
+
+  // 2) Otherwise choose newest *.aab under artifacts/<appId>/
+  try {
+    const appDir = path.resolve(root, String(appItem?.id || ""));
+    if (!appDir.startsWith(root)) return "";
+    if (!fs.existsSync(appDir)) return "";
+    const entries = await fs.promises.readdir(appDir, { withFileTypes: true });
+    const aabs = await Promise.all(
+      entries
+        .filter((e) => e.isFile() && e.name.toLowerCase().endsWith(".aab"))
+        .map(async (e) => {
+          const abs = path.resolve(appDir, e.name);
+          try {
+            const st = await fs.promises.stat(abs);
+            return { abs, mtimeMs: st.mtimeMs };
+          } catch {
+            return null;
+          }
+        }),
+    );
+
+    const list = aabs.filter(Boolean) as Array<{ abs: string; mtimeMs: number }>;
+    if (!list.length) return "";
+    list.sort((a, b) => b.mtimeMs - a.mtimeMs);
+    return list[0].abs;
+  } catch {
+    return "";
+  }
 }
 
 function getAuthedUser(req: any): User | null {
@@ -721,6 +769,15 @@ export async function registerRoutes(
     handler: rateLimitJsonHandler,
   });
 
+  const iosBuildCallbackLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req: any) => req.ip || "unknown",
+    handler: rateLimitJsonHandler,
+  });
+
   // Build abuse control (per user)
   const buildLimiter = rateLimit({
     windowMs: 60 * 60 * 1000,
@@ -759,6 +816,33 @@ export async function registerRoutes(
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req: any) => getAuthedUser(req)?.id || req.ip || "unknown",
+    handler: rateLimitJsonHandler,
+  });
+
+  const trialStartIpLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req: any) => req.ip || "unknown",
+    handler: rateLimitJsonHandler,
+  });
+
+  const trialStartUserLimiter = rateLimit({
+    windowMs: 24 * 60 * 60 * 1000,
+    limit: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req: any) => getAuthedUser(req)?.id || req.ip || "unknown",
+    handler: rateLimitJsonHandler,
+  });
+
+  const runtimePaymentsLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req: any) => `${String(req.ip || "unknown")}:${String(req.params?.appId || "")}`,
     handler: rateLimitJsonHandler,
   });
 
@@ -1163,6 +1247,15 @@ export async function registerRoutes(
             pushNotificationsLast7Days: 0,
           },
           alerts: [],
+          integrity: {
+            paymentsRecoveredLast24h: 0,
+            paymentsPendingOver10m: 0,
+            paymentsCompletedWithoutEntitlements: 0,
+            webhookRetryQueueSize: 0,
+            activeWebhookBreakers: 0,
+            staleBuildJobs: 0,
+            buildJobsReclaimedLast24h: 0,
+          },
         });
       }
 
@@ -1187,6 +1280,12 @@ export async function registerRoutes(
         appsPublished7Row,
         pushNotifications7Row,
         entitlementInconsistencyRow,
+        paymentsRecoveredLast24hRow,
+        paymentsPendingOver10mRow,
+        webhookRetryQueueSizeRow,
+        activeWebhookBreakersRow,
+        staleBuildJobsRow,
+        buildJobsReclaimedLast24hRow,
       ] = await Promise.all([
         db.select({ v: sql<number>`COUNT(*)` }).from(usersTable),
         db
@@ -1248,6 +1347,29 @@ export async function registerRoutes(
           .select({ v: sql<number>`COUNT(*)` })
           .from(paymentsTable)
           .where(sql`${paymentsTable.status} = 'completed' AND ${paymentsTable.entitlementsAppliedAt} IS NULL`),
+        db
+          .select({ v: sql<number>`COUNT(*)` })
+          .from(auditLogs)
+          .where(sql`${auditLogs.action} = 'payment.recovered' AND ${auditLogs.createdAt} >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`),
+        db
+          .select({ v: sql<number>`COUNT(*)` })
+          .from(paymentsTable)
+          .where(sql`${paymentsTable.status} = 'pending' AND ${paymentsTable.createdAt} < DATE_SUB(NOW(), INTERVAL 10 MINUTE)`),
+        db.select({ v: sql<number>`COUNT(*)` }).from(webhookDeliveries).where(sql`${webhookDeliveries.deliveredAt} IS NULL`),
+        db
+          .select({ v: sql<number>`COUNT(*)` })
+          .from(appWebhooks)
+          .where(sql`${appWebhooks.disabledUntil} IS NOT NULL AND ${appWebhooks.disabledUntil} > NOW()`),
+        db
+          .select({ v: sql<number>`COUNT(*)` })
+          .from(buildJobs)
+          .where(
+            sql`${buildJobs.status} = 'processing' AND ${buildJobs.lockedAt} IS NOT NULL AND ${buildJobs.lockedAt} < DATE_SUB(NOW(), INTERVAL 15 MINUTE)`,
+          ),
+        db
+          .select({ v: sql<number>`COUNT(*)` })
+          .from(auditLogs)
+          .where(sql`${auditLogs.action} = 'build.job.reclaimed' AND ${auditLogs.createdAt} >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`),
       ]);
 
       const totalUsers = Number((totalUsersRow as any)?.[0]?.v ?? 0);
@@ -1272,6 +1394,15 @@ export async function registerRoutes(
       const pushNotificationsLast7Days = Number((pushNotifications7Row as any)?.[0]?.v ?? 0);
 
       const entitlementInconsistencyCount = Number((entitlementInconsistencyRow as any)?.[0]?.v ?? 0);
+
+      const paymentsRecoveredLast24h = Number((paymentsRecoveredLast24hRow as any)?.[0]?.v ?? 0);
+
+      const paymentsPendingOver10m = Number((paymentsPendingOver10mRow as any)?.[0]?.v ?? 0);
+      const paymentsCompletedWithoutEntitlements = entitlementInconsistencyCount;
+      const webhookRetryQueueSize = Number((webhookRetryQueueSizeRow as any)?.[0]?.v ?? 0);
+      const activeWebhookBreakers = Number((activeWebhookBreakersRow as any)?.[0]?.v ?? 0);
+      const staleBuildJobs = Number((staleBuildJobsRow as any)?.[0]?.v ?? 0);
+      const buildJobsReclaimedLast24h = Number((buildJobsReclaimedLast24hRow as any)?.[0]?.v ?? 0);
 
       const alerts: string[] = [];
       if (buildsToday > 0 && failedBuildsLast24h / buildsToday > 0.1) {
@@ -1307,6 +1438,15 @@ export async function registerRoutes(
           pushNotificationsLast7Days,
         },
         alerts,
+        integrity: {
+          paymentsRecoveredLast24h,
+          paymentsPendingOver10m,
+          paymentsCompletedWithoutEntitlements,
+          webhookRetryQueueSize,
+          activeWebhookBreakers,
+          staleBuildJobs,
+          buildJobsReclaimedLast24h,
+        },
       });
     } catch (err) {
       return next(err);
@@ -3531,7 +3671,7 @@ export async function registerRoutes(
   });
 
   // --- Runtime (customer) orders ---
-  app.post("/api/runtime/:appId/orders", async (req, res, next) => {
+  app.post("/api/runtime/:appId/orders", runtimePaymentsLimiter, async (req, res, next) => {
     try {
       const appId = String(req.params.appId || "");
       const appItem = await storage.getApp(appId);
@@ -3585,7 +3725,7 @@ export async function registerRoutes(
   });
 
   // Initiate Razorpay payment for an order (runtime)
-  app.post("/api/runtime/:appId/orders/:orderId/pay/razorpay", async (req, res, next) => {
+  app.post("/api/runtime/:appId/orders/:orderId/pay/razorpay", runtimePaymentsLimiter, async (req, res, next) => {
     try {
       const appId = String(req.params.appId || "");
       const orderId = String(req.params.orderId || "");
@@ -3675,7 +3815,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/runtime/:appId/orders/:orderId/pay/razorpay/verify", async (req, res, next) => {
+  app.post("/api/runtime/:appId/orders/:orderId/pay/razorpay/verify", runtimePaymentsLimiter, async (req, res, next) => {
     try {
       const appId = String(req.params.appId || "");
       const orderId = String(req.params.orderId || "");
@@ -4102,9 +4242,20 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Not found" });
       }
       if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
+        return res.status(503).json({ message: "Restaurant tables require MySQL storage" });
+      }
+
+      const body = createRestaurantTableSchema.parse(req.body ?? {});
+      const svc = restaurantService({ emit: emitAppEvent });
+      const out = await svc.createRestaurantTable({ appId, name: body.name, capacity: body.capacity, active: body.active });
+      return res.status(201).json(out);
+    } catch (err) {
+      return next(err);
+    }
+  });
 
   // --- Trial Activation Endpoint (idempotent; concurrency-safe) ---
-  app.post("/api/trial/start", requireAuth, async (req, res, next) => {
+  app.post("/api/trial/start", requireAuth, trialStartIpLimiter, trialStartUserLimiter, async (req, res, next) => {
     try {
       const user = getAuthedUser(req);
       if (!user) return res.status(401).json({ message: "Unauthorized" });
@@ -4119,17 +4270,6 @@ export async function registerRoutes(
       }
 
       return res.json({ ok: true, trialEndsAt: result.trialEndsAt });
-    } catch (err) {
-      return next(err);
-    }
-  });
-        return res.status(503).json({ message: "Restaurant tables require MySQL storage" });
-      }
-
-      const body = createRestaurantTableSchema.parse(req.body ?? {});
-      const svc = restaurantService({ emit: emitAppEvent });
-      const out = await svc.createRestaurantTable({ appId, name: body.name, capacity: body.capacity, active: body.active });
-      return res.status(201).json(out);
     } catch (err) {
       return next(err);
     }
@@ -4477,7 +4617,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/apps/:id/admin/healthcare/invoices/:invoiceId/payments", requireAuth, async (req, res, next) => {
+  app.post("/api/apps/:id/admin/healthcare/invoices/:invoiceId/payments", requireAuth, paymentsVerifyLimiter, async (req, res, next) => {
     try {
       const user = getAuthedUser(req);
       if (!user) return res.status(401).json({ message: "Unauthorized" });
@@ -6712,16 +6852,42 @@ export async function registerRoutes(
           const dbPayment = await storage.getPaymentByOrderId(String(payment.order_id));
           if (dbPayment) {
             const currentStatus = String((dbPayment as any).status || "");
-            if (currentStatus === "pending" || currentStatus === "failed") {
-              const { updated } = await (storage as any).completePaymentAndApplyEntitlements(dbPayment.id, true);
-              if (updated) {
-                console.log(`[Razorpay Webhook] Payment ${dbPayment.id} marked as completed via webhook`);
-              }
-            } else if (currentStatus === "completed") {
-              console.warn(
-                `[Razorpay Webhook] Ignoring payment.captured for payment ${dbPayment.id} in terminal state (${currentStatus})`,
-              );
+            const incomingProviderPaymentId = String(payment.id);
+            if ((dbPayment as any).providerPaymentId && String((dbPayment as any).providerPaymentId) !== incomingProviderPaymentId) {
+              logger.warn("razorpay.webhook.payment_id_mismatch", {
+                requestId: (req as any).requestId,
+                eventId,
+                paymentId: dbPayment.id,
+                providerOrderId: String(payment.order_id),
+                storedProviderPaymentId: String((dbPayment as any).providerPaymentId),
+                incomingProviderPaymentId,
+              });
               return res.status(200).json({ ok: true });
+            }
+
+            if (currentStatus === "pending" || currentStatus === "failed" || currentStatus === "completed") {
+              try {
+                const { updated } = await (storage as any).completePaymentAndApplyEntitlements(dbPayment.id, true, {
+                  providerOrderId: String(payment.order_id),
+                  providerPaymentId: incomingProviderPaymentId,
+                });
+                if (updated) {
+                  console.log(`[Razorpay Webhook] Payment ${dbPayment.id} marked as completed via webhook`);
+                }
+              } catch (e: any) {
+                const errMsg = String(e?.message || e);
+                if (errMsg === "PAYMENT_PROVIDER_PAYMENT_ID_MISMATCH" || errMsg === "PAYMENT_PROVIDER_ORDER_ID_MISMATCH") {
+                  logger.warn("razorpay.webhook.provider_binding_mismatch", {
+                    requestId: (req as any).requestId,
+                    eventId,
+                    paymentId: dbPayment.id,
+                    providerOrderId: String(payment.order_id),
+                    providerPaymentId: incomingProviderPaymentId,
+                  });
+                  return res.status(200).json({ ok: true });
+                }
+                throw e;
+              }
             } else {
               console.warn(
                 `[Razorpay Webhook] Invalid payment state transition attempt: ${currentStatus} -> completed for payment ${dbPayment.id}`,
@@ -6809,7 +6975,7 @@ export async function registerRoutes(
     appId: z.string().uuid(),
   }).strict();
 
-  app.post("/api/payments/admin-bypass", requireAuth, requireRole(["admin"]), async (req, res, next) => {
+  app.post("/api/payments/admin-bypass", requireAuth, paymentsCreateOrderLimiter, requireRole(["admin"]), async (req, res, next) => {
     try {
       const user = getAuthedUser(req);
       if (!user) return res.status(401).json({ message: "Unauthorized" });
@@ -6873,10 +7039,46 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Payment/order mismatch" });
       }
 
+      // If a provider payment id is already bound, require it to match.
+      if (existingPayment.providerPaymentId && existingPayment.providerPaymentId !== razorpay_payment_id) {
+        console.log(
+          `[Payment Verify] providerPaymentId mismatch for payment ${paymentId}: expected ${existingPayment.providerPaymentId}, got ${razorpay_payment_id}`,
+        );
+        return res.status(400).json({ message: "Payment/order mismatch" });
+      }
+
       // Idempotency: never re-apply entitlements for already-processed payments.
       if (existingPayment.status === "completed") {
-        await (storage as any).completePaymentAndApplyEntitlements(existingPayment.id, false);
-        return res.json({ ok: true, payment: existingPayment, message: "Already verified" });
+        // If providerPaymentId is not yet bound, require a valid signature before binding it.
+        if (!existingPayment.providerPaymentId) {
+          const expectedSignature = crypto
+            .createHmac("sha256", razorpayKeySecret)
+            .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+            .digest("hex");
+
+          const signatureBuffer = Buffer.from(razorpay_signature, 'utf8');
+          const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
+          const signaturesMatch = signatureBuffer.length === expectedBuffer.length && 
+            crypto.timingSafeEqual(signatureBuffer, expectedBuffer);
+
+          if (!signaturesMatch) {
+            return res.status(400).json({ message: "Payment verification failed" });
+          }
+        }
+
+        try {
+          const { payment } = await (storage as any).completePaymentAndApplyEntitlements(existingPayment.id, false, {
+            providerOrderId: razorpay_order_id,
+            providerPaymentId: razorpay_payment_id,
+          });
+          return res.json({ ok: true, payment: payment ?? existingPayment, message: "Already verified" });
+        } catch (e: any) {
+          const errMsg = String(e?.message || e);
+          if (errMsg === "PAYMENT_PROVIDER_PAYMENT_ID_MISMATCH" || errMsg === "PAYMENT_PROVIDER_ORDER_ID_MISMATCH") {
+            return res.status(400).json({ message: "Payment/order mismatch" });
+          }
+          throw e;
+        }
       }
       if (existingPayment.status === "failed") {
         return res.status(409).json({ message: "Payment already failed" });
@@ -6900,7 +7102,21 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Payment verification failed" });
       }
 
-      const { payment, updated } = await (storage as any).completePaymentAndApplyEntitlements(paymentId, false);
+      let completion;
+      try {
+        completion = await (storage as any).completePaymentAndApplyEntitlements(paymentId, false, {
+          providerOrderId: razorpay_order_id,
+          providerPaymentId: razorpay_payment_id,
+        });
+      } catch (e: any) {
+        const errMsg = String(e?.message || e);
+        if (errMsg === "PAYMENT_PROVIDER_PAYMENT_ID_MISMATCH" || errMsg === "PAYMENT_PROVIDER_ORDER_ID_MISMATCH") {
+          return res.status(400).json({ message: "Payment/order mismatch" });
+        }
+        throw e;
+      }
+
+      const { payment, updated } = completion;
       if (!payment) return res.status(404).json({ message: "Payment record not found" });
 
       if (!updated) {
@@ -7503,6 +7719,42 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Missing package name. Set a valid package name first." });
       }
 
+      // Additive enforcement: block publishing if artifact validation fails.
+      try {
+        const aabPath = await resolveAabArtifactPathForApp(appItem);
+        const previousVersionCodeRaw = (appItem as any)?.lastPlayVersionCode;
+        const previousVersionCode = Number.isFinite(Number(previousVersionCodeRaw)) ? Number(previousVersionCodeRaw) : undefined;
+        const artifactResult = await validateAndroidArtifact(aabPath, pkg, previousVersionCode);
+
+        if (artifactResult?.errors?.length) {
+          logger.warn("publish.blocked.artifact_validation", {
+            appId: appItem.id,
+            errorCount: artifactResult.errors.length,
+          });
+          return res.status(400).json({
+            message: "Build validation failed",
+            validation: {
+              isValid: false,
+              errors: artifactResult.errors,
+              warnings: artifactResult.warnings || [],
+            },
+          });
+        }
+      } catch {
+        logger.warn("publish.blocked.artifact_validation", {
+          appId: appItem.id,
+          errorCount: 1,
+        });
+        return res.status(400).json({
+          message: "Build validation failed",
+          validation: {
+            isValid: false,
+            errors: ["Artifact inspection failed. Please rebuild your app."],
+            warnings: [],
+          },
+        });
+      }
+
       let credentials: PlayCredentials;
       try {
         credentials = await resolvePlayCredentialsForApp(appItem, user);
@@ -7568,6 +7820,42 @@ export async function registerRoutes(
 
       const validation = validateForPublish(appItem);
       const policy = scanPolicy(appItem);
+
+      // Additive: artifact-based validation (best-effort).
+      // IMPORTANT: do not change response shape; only append to existing errors/warnings.
+      const expectedPackageName = String(appItem.packageName || "").trim();
+      const previousVersionCodeRaw = (appItem as any)?.lastPlayVersionCode;
+      const previousVersionCode = Number.isFinite(Number(previousVersionCodeRaw)) ? Number(previousVersionCodeRaw) : undefined;
+
+      try {
+        const aabPath = await resolveAabArtifactPathForApp(appItem);
+        const artifactResult = await validateAndroidArtifact(aabPath, expectedPackageName, previousVersionCode);
+
+        if (!artifactResult.valid && Array.isArray(artifactResult.errors)) {
+          for (const e of artifactResult.errors) {
+            if (typeof e === "string" && e.trim()) validation.errors.push(e);
+          }
+        }
+        if (Array.isArray(artifactResult.warnings) && artifactResult.warnings.length > 0) {
+          for (const w of artifactResult.warnings) {
+            if (typeof w === "string" && w.trim()) validation.warnings.push(w);
+          }
+        }
+
+        // Keep validation.isValid consistent with appended errors.
+        validation.isValid = validation.errors.length === 0;
+
+        if (artifactResult.errors?.length) {
+          logger.warn("publish.preflight.artifact_errors", {
+            appId: appItem.id,
+            artifactPath: aabPath || null,
+            errorCount: artifactResult.errors.length,
+          });
+        }
+      } catch {
+        validation.errors.push("Artifact inspection failed. Please rebuild your app.");
+        validation.isValid = validation.errors.length === 0;
+      }
 
       const riskThreshold = Number(process.env.PUBLISH_POLICY_RISK_THRESHOLD || 0.7);
       const policyBlocked = policy.riskScore >= riskThreshold;
@@ -7718,6 +8006,42 @@ export async function registerRoutes(
           message: "Publish blocked: policy risk too high",
           policy,
           policyRiskThreshold: riskThreshold,
+        });
+      }
+
+      // Additive enforcement: block publishing if artifact validation fails.
+      try {
+        const aabPath = await resolveAabArtifactPathForApp(appItem);
+        const previousVersionCodeRaw = (appItem as any)?.lastPlayVersionCode;
+        const previousVersionCode = Number.isFinite(Number(previousVersionCodeRaw)) ? Number(previousVersionCodeRaw) : undefined;
+        const artifactResult = await validateAndroidArtifact(aabPath, pkg, previousVersionCode);
+
+        if (artifactResult?.errors?.length) {
+          logger.warn("publish.blocked.artifact_validation", {
+            appId: appItem.id,
+            errorCount: artifactResult.errors.length,
+          });
+          return res.status(400).json({
+            message: "Build validation failed",
+            validation: {
+              isValid: false,
+              errors: artifactResult.errors,
+              warnings: artifactResult.warnings || [],
+            },
+          });
+        }
+      } catch {
+        logger.warn("publish.blocked.artifact_validation", {
+          appId: appItem.id,
+          errorCount: 1,
+        });
+        return res.status(400).json({
+          message: "Build validation failed",
+          validation: {
+            isValid: false,
+            errors: ["Artifact inspection failed. Please rebuild your app."],
+            warnings: [],
+          },
         });
       }
 
@@ -8111,7 +8435,7 @@ export async function registerRoutes(
   // Import iOS artifact download helper
   const { downloadIOSArtifact } = await import("./build/github-ios");
 
-  app.post("/api/ios-build-callback", async (req, res, next) => {
+  app.post("/api/ios-build-callback", iosBuildCallbackLimiter, async (req, res, next) => {
     try {
       // Verify callback authentication
       const authHeader = req.headers.authorization;
@@ -8907,7 +9231,7 @@ export async function registerRoutes(
   });
 
   // Check if LLM is configured and which provider
-  app.get("/api/ai/status", (req, res) => {
+  app.get("/api/ai/status", requireAuth, aiRateLimit, (req, res) => {
     res.json({ 
       available: isLLMConfigured(),
       provider: getLLMProvider(), // "openai" or "claude"
@@ -8915,7 +9239,7 @@ export async function registerRoutes(
   });
 
   // 1. Website Analyzer - Analyze a website for app conversion
-  app.post("/api/ai/analyze-website", aiRateLimit, async (req, res, next) => {
+  app.post("/api/ai/analyze-website", requireAuth, aiRateLimit, async (req, res, next) => {
     try {
       if (!isLLMConfigured()) {
         return res.status(503).json({ message: "AI features not available" });
@@ -8963,7 +9287,7 @@ export async function registerRoutes(
   });
 
   // 2. App Name Generator
-  app.post("/api/ai/generate-names", aiRateLimit, async (req, res, next) => {
+  app.post("/api/ai/generate-names", requireAuth, aiRateLimit, async (req, res, next) => {
     try {
       if (!isLLMConfigured()) {
         return res.status(503).json({ message: "AI features not available" });
@@ -8986,7 +9310,7 @@ export async function registerRoutes(
   });
 
   // 3. App Description Enhancer
-  app.post("/api/ai/enhance-description", aiRateLimit, async (req, res, next) => {
+  app.post("/api/ai/enhance-description", requireAuth, aiRateLimit, async (req, res, next) => {
     try {
       if (!isLLMConfigured()) {
         return res.status(503).json({ message: "AI features not available" });
@@ -9037,14 +9361,15 @@ export async function registerRoutes(
   });
 
   // 5. Build Error Analyzer (for apps with failed builds)
-  app.get("/api/ai/analyze-error/:appId", requireAuth, async (req, res, next) => {
+  app.get("/api/ai/analyze-error/:appId", requireAuth, aiRateLimit, async (req, res, next) => {
     try {
       if (!isLLMConfigured()) {
         return res.status(503).json({ message: "AI features not available" });
       }
 
       const user = getAuthedUser(req);
-      const appItem = await storage.getApp(req.params.appId);
+      const appId = String((req.params as any)?.appId || "");
+      const appItem = await storage.getApp(appId);
       
       if (!appItem || (!isStaff(user) && appItem.ownerId !== user?.id)) {
         return res.status(404).json({ message: "App not found" });
@@ -9065,7 +9390,7 @@ export async function registerRoutes(
   });
 
   // 6. Support Chatbot
-  app.post("/api/ai/chat", aiRateLimit, async (req, res, next) => {
+  app.post("/api/ai/chat", requireAuth, aiRateLimit, async (req, res, next) => {
     try {
       if (!isLLMConfigured()) {
         return res.status(503).json({ message: "AI features not available" });
@@ -9119,7 +9444,7 @@ export async function registerRoutes(
   });
 
   // 7. Ticket Categorization (for staff when viewing tickets)
-  app.post("/api/ai/categorize-ticket", requireRole(["admin", "support"]), async (req, res, next) => {
+  app.post("/api/ai/categorize-ticket", requireAuth, aiRateLimit, requireRole(["admin", "support"]), async (req, res, next) => {
     try {
       if (!isLLMConfigured()) {
         return res.status(503).json({ message: "AI features not available" });
@@ -9142,7 +9467,7 @@ export async function registerRoutes(
   });
 
   // 8. Parse App Prompt (AI App Builder)
-  app.post("/api/ai/parse-prompt", aiRateLimit, async (req, res, next) => {
+  app.post("/api/ai/parse-prompt", requireAuth, aiRateLimit, async (req, res, next) => {
     try {
       if (!isLLMConfigured()) {
         return res.status(503).json({ message: "AI features not available" });
@@ -9166,7 +9491,7 @@ export async function registerRoutes(
   });
 
   // 9. Generate Screen Content (for native screens)
-  app.post("/api/ai/generate-screen", aiRateLimit, async (req, res, next) => {
+  app.post("/api/ai/generate-screen", requireAuth, aiRateLimit, async (req, res, next) => {
     try {
       if (!isLLMConfigured()) {
         return res.status(503).json({ message: "AI features not available" });

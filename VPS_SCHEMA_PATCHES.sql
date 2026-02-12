@@ -55,6 +55,215 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+-- =====================================================
+-- Subscription / Trial fields (required for current server)
+-- =====================================================
+
+-- users.plan
+SET @col_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name = 'users'
+    AND column_name = 'plan'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE `users` ADD COLUMN `plan` VARCHAR(16) NULL',
+  'SELECT \'users.plan already exists\''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- users.plan_status
+SET @col_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name = 'users'
+    AND column_name = 'plan_status'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE `users` ADD COLUMN `plan_status` VARCHAR(16) NULL',
+  'SELECT \'users.plan_status already exists\''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- users.plan_start_date
+SET @col_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name = 'users'
+    AND column_name = 'plan_start_date'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE `users` ADD COLUMN `plan_start_date` DATETIME NULL',
+  'SELECT \'users.plan_start_date already exists\''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- users.plan_expiry_date
+SET @col_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name = 'users'
+    AND column_name = 'plan_expiry_date'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE `users` ADD COLUMN `plan_expiry_date` DATETIME NULL',
+  'SELECT \'users.plan_expiry_date already exists\''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- users.trial_started_at
+SET @col_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name = 'users'
+    AND column_name = 'trial_started_at'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE `users` ADD COLUMN `trial_started_at` DATETIME NULL',
+  'SELECT \'users.trial_started_at already exists\''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- users.trial_ends_at
+SET @col_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name = 'users'
+    AND column_name = 'trial_ends_at'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE `users` ADD COLUMN `trial_ends_at` DATETIME NULL',
+  'SELECT \'users.trial_ends_at already exists\''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- users.remaining_rebuilds
+SET @col_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name = 'users'
+    AND column_name = 'remaining_rebuilds'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE `users` ADD COLUMN `remaining_rebuilds` INT NULL DEFAULT 0',
+  'SELECT \'users.remaining_rebuilds already exists\''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- users.extra_app_slots
+SET @col_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name = 'users'
+    AND column_name = 'extra_app_slots'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE `users` ADD COLUMN `extra_app_slots` INT NULL DEFAULT 0',
+  'SELECT \'users.extra_app_slots already exists\''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- users.subscription_id (Razorpay subscription id)
+SET @col_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name = 'users'
+    AND column_name = 'subscription_id'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE `users` ADD COLUMN `subscription_id` VARCHAR(128) NULL',
+  'SELECT \'users.subscription_id already exists\''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- users.permissions (RBAC)
+SET @col_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name = 'users'
+    AND column_name = 'permissions'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE `users` ADD COLUMN `permissions` JSON NULL',
+  'SELECT \'users.permissions already exists\''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Helpful indexes for subscription queries
+-- users.plan_status index
+SET @idx_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.statistics
+  WHERE table_schema = DATABASE()
+    AND table_name = 'users'
+    AND index_name = 'users_plan_status_idx'
+);
+SET @sql := IF(
+  @idx_exists = 0,
+  'ALTER TABLE `users` ADD INDEX `users_plan_status_idx` (`plan_status`)',
+  'SELECT \'users_plan_status_idx already exists\''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- users.plan_expiry_date index
+SET @idx_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.statistics
+  WHERE table_schema = DATABASE()
+    AND table_name = 'users'
+    AND index_name = 'users_plan_expiry_idx'
+);
+SET @sql := IF(
+  @idx_exists = 0,
+  'ALTER TABLE `users` ADD INDEX `users_plan_expiry_idx` (`plan_expiry_date`)',
+  'SELECT \'users_plan_expiry_idx already exists\''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 -- ---- Apps build fields (if VPS schema is older) ----
 -- apps.package_name
 SET @col_exists := (

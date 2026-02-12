@@ -64,6 +64,9 @@ export const logger = {
   info(msg: string, fields?: Record<string, unknown>) {
     writeLog({ level: "info", time: nowIso(), msg, ...(fields || {}) });
   },
+  warn(msg: string, fields?: Record<string, unknown>) {
+    writeLog({ level: "warn", time: nowIso(), msg, ...(fields || {}) });
+  },
   critical(msg: string, fields?: Record<string, unknown>) {
     writeLog({ level: "critical", time: nowIso(), msg, ...(fields || {}) });
   },
