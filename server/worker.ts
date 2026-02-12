@@ -14,7 +14,7 @@ import { getPlan, PlanId } from "@shared/pricing";
 import { User } from "@shared/schema";
 import { sendBuildCompleteEmail } from "./email";
 import { getEntitlements } from "./entitlements";
-import { getMysqlDb } from "./db-mysql";
+import { getMysqlDb, getMysqlPool } from "./db-mysql";
 import { appWebhooks, payments, webhookDeliveries } from "@shared/db.mysql";
 import { logger } from "./logger";
 
@@ -437,6 +437,105 @@ function isTruthyEnv(value: string | undefined) {
   if (!value) return false;
   const v = value.trim().toLowerCase();
   return v === "1" || v === "true" || v === "yes";
+}
+
+function retentionDaysFromEnv(name: string, defaultDays: number): number {
+  const raw = (process.env as any)?.[name];
+  const n = typeof raw === "string" && raw.trim() ? Number(raw.trim()) : defaultDays;
+  if (!Number.isFinite(n)) return defaultDays;
+  // Safety: do not allow negative days.
+  return Math.max(0, Math.trunc(n));
+}
+
+function isRetentionCleanupEnabled(): boolean {
+  return String(process.env.ENABLE_RETENTION_CLEANUP || "").trim() === "true";
+}
+
+let retentionCleanupRunning = false;
+export async function runRetentionCleanup(): Promise<void> {
+  if (retentionCleanupRunning) return;
+  retentionCleanupRunning = true;
+
+  const sessionsRetentionDays = retentionDaysFromEnv("SESSION_RETENTION_DAYS", 7);
+  const webhookDeliveryRetentionDays = retentionDaysFromEnv("WEBHOOK_DELIVERY_RETENTION_DAYS", 30);
+  const auditLogRetentionDays = retentionDaysFromEnv("AUDIT_LOG_RETENTION_DAYS", 90);
+  const buildJobRetentionDays = retentionDaysFromEnv("BUILD_JOB_RETENTION_DAYS", 30);
+
+  let sessionsDeleted = 0;
+  let webhookDeliveriesDeleted = 0;
+  let auditLogsDeleted = 0;
+  let buildJobsDeleted = 0;
+
+  try {
+    if (!process.env.DATABASE_URL?.startsWith("mysql://")) return;
+
+    const pool = getMysqlPool();
+    const batchLimit = 500;
+
+    const deleteInBatches = async (label: string, sqlText: string, params: any[]): Promise<number> => {
+      let total = 0;
+      // Loop until no more rows are affected.
+      // Hard cap guards against pathological loops.
+      for (let i = 0; i < 1000; i++) {
+        try {
+          const [result] = await pool.query(sqlText, params);
+          const affected = Number((result as any)?.affectedRows ?? 0);
+          if (!Number.isFinite(affected) || affected <= 0) break;
+          total += affected;
+          if (affected < batchLimit) break;
+        } catch (err: any) {
+          logger.warn("retention.cleanup.table_error", {
+            table: label,
+            error: err?.message || String(err),
+          });
+          break;
+        }
+      }
+      return total;
+    };
+
+    // Sessions: only delete sessions that expired before the retention window.
+    // Never deletes recent/active sessions.
+    sessionsDeleted = await deleteInBatches(
+      "sessions",
+      "DELETE FROM sessions WHERE expires < DATE_SUB(NOW(), INTERVAL ? DAY) LIMIT 500",
+      [sessionsRetentionDays],
+    );
+
+    // Webhook deliveries: ONLY delete delivered ones older than retention.
+    // Never delete undelivered rows.
+    webhookDeliveriesDeleted = await deleteInBatches(
+      "webhook_deliveries",
+      "DELETE FROM webhook_deliveries WHERE delivered_at IS NOT NULL AND created_at < DATE_SUB(NOW(), INTERVAL ? DAY) LIMIT 500",
+      [webhookDeliveryRetentionDays],
+    );
+
+    // Audit logs: delete older than retention.
+    auditLogsDeleted = await deleteInBatches(
+      "audit_logs",
+      "DELETE FROM audit_logs WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY) LIMIT 500",
+      [auditLogRetentionDays],
+    );
+
+    // Build jobs: delete ONLY completed/failed, older than retention.
+    // Never delete queued/processing jobs.
+    buildJobsDeleted = await deleteInBatches(
+      "build_jobs",
+      "DELETE FROM build_jobs WHERE status IN ('completed','failed') AND created_at < DATE_SUB(NOW(), INTERVAL ? DAY) LIMIT 500",
+      [buildJobRetentionDays],
+    );
+
+    logger.info("retention.cleanup.completed", {
+      sessionsDeleted,
+      webhookDeliveriesDeleted,
+      auditLogsDeleted,
+      buildJobsDeleted,
+    });
+  } catch (err: any) {
+    logger.warn("retention.cleanup.error", { error: err?.message || String(err) });
+  } finally {
+    retentionCleanupRunning = false;
+  }
 }
 
 function mockAndroidBuildEnabled() {
@@ -994,6 +1093,19 @@ export async function runWorkerLoop() {
 
     // Don't keep the process alive just for the interval.
     (interval as any).unref?.();
+  }
+
+  // Retention cleanup runs out-of-band and must not block the main worker loop.
+  // Enable explicitly with ENABLE_RETENTION_CLEANUP=true.
+  if (isRetentionCleanupEnabled()) {
+    const interval = setInterval(() => {
+      void runRetentionCleanup();
+    }, 6 * 60 * 60_000);
+
+    (interval as any).unref?.();
+
+    // Kick once on startup (best-effort).
+    void runRetentionCleanup();
   }
 
   let pollCount = 0;
