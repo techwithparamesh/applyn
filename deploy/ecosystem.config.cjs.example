@@ -1,0 +1,41 @@
+/**
+ * PM2 ecosystem file example for Applyn on VPS.
+ *
+ * Copy to project root as ecosystem.config.cjs and adjust paths/env.
+ * From project root:
+ *   pm2 start ecosystem.config.cjs
+ *   pm2 start ecosystem.config.cjs --only applyn-worker
+ *   pm2 save && pm2 startup
+ */
+
+module.exports = {
+  apps: [
+    {
+      name: "applyn-server",
+      script: "dist/index.cjs",
+      instances: 1,
+      exec_mode: "fork",
+      env: { NODE_ENV: "production" },
+      max_memory_restart: "500M",
+      error_file: "./logs/applyn-server-error.log",
+      out_file: "./logs/applyn-server-out.log",
+      merge_logs: true,
+      time: true,
+    },
+    {
+      name: "applyn-worker",
+      script: "server/worker.ts",
+      interpreter: "node",
+      interpreter_args: "--import tsx",
+      instances: 1,
+      // If you build the worker: script: "dist/worker.cjs", and remove interpreter/interpreter_args
+      exec_mode: "fork",
+      env: { NODE_ENV: "production" },
+      max_memory_restart: "400M",
+      error_file: "./logs/applyn-worker-error.log",
+      out_file: "./logs/applyn-worker-out.log",
+      merge_logs: true,
+      time: true,
+    },
+  ],
+};

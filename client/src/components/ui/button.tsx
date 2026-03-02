@@ -58,11 +58,26 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const loaderSizeClass =
       size === "lg" ? "h-5 w-5" : size === "sm" ? "h-4 w-4" : size === "icon" ? "h-4 w-4" : "h-4 w-4"
 
+    // When asChild, Slot (Radix) requires exactly one child — no wrapper, no extra nodes
+    if (asChild) {
+      return (
+        <Comp
+          className={cn(buttonVariants({ variant, size, className }))}
+          ref={ref}
+          aria-disabled={isDisabled}
+          aria-label={props["aria-label"]}
+          {...props}
+        >
+          {children}
+        </Comp>
+      )
+    }
+
     return (
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
-        {...(!asChild ? { disabled: isDisabled } : { "aria-disabled": isDisabled })}
+        disabled={isDisabled}
         aria-busy={loading || undefined}
         aria-label={loading ? loadingLabel : props["aria-label"]}
         {...props}

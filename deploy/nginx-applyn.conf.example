@@ -1,0 +1,60 @@
+# Nginx example for https://applyn.co.in
+# Copy snippets into your existing server block or include this (after adjusting paths).
+# Reload: sudo nginx -t && sudo systemctl reload nginx
+
+# --- Option A: Proxy everything to Node (current typical setup) ---
+# Node serves both API and static from dist/public.
+
+# location / {
+#     proxy_pass http://127.0.0.1:5004;
+#     proxy_http_version 1.1;
+#     proxy_set_header Host $host;
+#     proxy_set_header X-Real-IP $remote_addr;
+#     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#     proxy_set_header X-Forwarded-Proto $scheme;
+#     proxy_read_timeout 60s;
+#     proxy_connect_timeout 60s;
+#     proxy_send_timeout 60s;
+# }
+
+# --- Option B: Nginx serves static, Node only API + SPA fallback ---
+# 1. Build: npm run build (creates dist/public/)
+# 2. Set $applyn_root to your deployed dist/public path, e.g. /var/www/applyn/current/dist/public
+
+# root /var/www/applyn/current/dist/public;
+# index index.html;
+
+# location / {
+#     try_files $uri $uri/ /index.html;
+# }
+
+# location /api/ {
+#     proxy_pass http://127.0.0.1:5004;
+#     proxy_http_version 1.1;
+#     proxy_set_header Host $host;
+#     proxy_set_header X-Real-IP $remote_addr;
+#     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#     proxy_set_header X-Forwarded-Proto $scheme;
+#     proxy_read_timeout 60s;
+#     proxy_connect_timeout 60s;
+#     proxy_send_timeout 60s;
+# }
+
+# location /assets/ {
+#     try_files $uri =404;
+#     add_header Cache-Control "public, max-age=31536000, immutable";
+# }
+
+# --- Security headers (add inside server { } for HTTPS) ---
+# add_header X-Frame-Options "SAMEORIGIN" always;
+# add_header X-Content-Type-Options "nosniff" always;
+# add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+# add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+# add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+
+# --- Gzip ---
+# gzip on;
+# gzip_vary on;
+# gzip_min_length 256;
+# gzip_proxied any;
+# gzip_types text/plain text/css application/json application/javascript application/x-javascript text/xml application/xml;
