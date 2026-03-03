@@ -121,7 +121,13 @@ export type AppFeatures = z.infer<typeof appFeaturesSchema>;
 
 export const insertAppSchema = z.object({
   name: z.string().min(2).max(200),
-  url: z.string().url().max(2000),
+  url: z
+    .string()
+    .max(2000)
+    .refine(
+      (s) => /^https?:\/\//.test(s) || s.startsWith("native://") || s.startsWith("runtime://"),
+      { message: "URL must be https, or native:// / runtime:// for native-only apps" }
+    ),
   icon: z.string().max(32).default("rocket"), // Icon ID; can be empty if user has custom logo
   iconUrl: z.string().max(500000).nullable().optional(), // base64 or URL
   iconColor: z.string().min(4).max(32).default("#2563EB").optional(), // Icon background color
