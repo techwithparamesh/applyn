@@ -154,9 +154,19 @@ export const editorComponentSchema: z.ZodType<EditorComponent, z.ZodTypeDef, Edi
   })
 );
 
+/** Normalize screen name: split camelCase (e.g. DoctorsAppointmentsRecords → Doctors Appointments Records) for display. */
+function normalizeScreenNameForStorage(name: string): string {
+  const s = String(name ?? "").trim();
+  if (!s || s.length <= 20) return s;
+  const noSpaces = s.replace(/\s/g, "");
+  if (noSpaces.length !== s.length) return s;
+  if (!/[a-z][A-Z]|[A-Z][a-z]/.test(s)) return s;
+  return s.replace(/([A-Z])/g, " $1").trim().replace(/\s+/g, " ");
+}
+
 export const editorScreenSchema = z.object({
   id: z.string().min(1).max(200),
-  name: z.string().min(1).max(80),
+  name: z.string().min(1).max(80).transform(normalizeScreenNameForStorage),
   icon: z.string().max(20).optional().default("file-text"),
   isHome: z.boolean().optional(),
   components: z.array(editorComponentSchema).default([]),

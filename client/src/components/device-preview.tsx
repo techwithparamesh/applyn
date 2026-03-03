@@ -494,9 +494,9 @@ function IOSDeviceFrame({
           className={`h-11 flex items-center justify-between px-4 shadow-md z-10 shrink-0 ${!primaryColor ? 'bg-gray-700' : ''}`}
           style={primaryColor ? { backgroundColor: primaryColor } : undefined}
         >
-          <div className="text-white font-bold flex items-center gap-2 text-sm">
-            <AppIcon icon={icon} appName={appName} className="w-6 h-6" />
-            <span className="truncate max-w-[180px]">{appName}</span>
+          <div className="text-white font-semibold flex items-center gap-2 text-sm min-w-0">
+            <AppIcon icon={icon} appName={appName} className="w-6 h-6 shrink-0" />
+            <span className="truncate max-w-[200px]" title={appName}>{appName}</span>
           </div>
           <Menu className="w-5 h-5 text-white/80" />
         </motion.div>
@@ -620,18 +620,17 @@ function AndroidDeviceFrame({
           </div>
         </div>
 
-        {/* App Header Bar with Android styling */}
+        {/* App Header Bar — Play Store style */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className={`h-12 flex items-center justify-between px-4 shadow-md z-10 shrink-0 ${!primaryColor ? 'bg-gray-700' : ''}`}
+          className={`h-12 flex items-center justify-between px-4 shadow-sm z-10 shrink-0 ${!primaryColor ? 'bg-gray-700' : ''}`}
           style={primaryColor ? { backgroundColor: primaryColor } : undefined}
         >
-          <div className="text-white font-bold flex items-center gap-3 text-sm">
-            {/* Android back arrow style */}
-            <ChevronLeft className="w-5 h-5 text-white/80" />
-            <AppIcon icon={icon} appName={appName} className="w-6 h-6" />
-            <span className="truncate max-w-[160px]">{appName}</span>
+          <div className="text-white font-semibold flex items-center gap-3 text-sm min-w-0">
+            <ChevronLeft className="w-5 h-5 text-white/90 shrink-0" />
+            <AppIcon icon={icon} appName={appName} className="w-6 h-6 shrink-0" />
+            <span className="truncate max-w-[180px]" title={appName}>{appName}</span>
           </div>
           {/* Android three-dot menu */}
           <div className="flex flex-col gap-0.5 p-2">
@@ -726,6 +725,57 @@ function NativeComponentPreview({
   );
 }
 
+/** Play Store–ready short labels for bottom nav (one clear word, no concatenation). */
+function getShortNavLabel(name: string): string {
+  const n = String(name || "").trim();
+  if (!n) return "Home";
+  const lower = n.toLowerCase().replace(/\s+/g, " ");
+  const short: Record<string, string> = {
+    "medical records": "Records",
+    "my appointments": "Visits",
+    "doctor directory": "Doctors",
+    "available doctors": "Doctors",
+    "doctorsappointmentsrecords": "Visits",
+    "appointments": "Visits",
+    "reservations": "Book",
+    "real estate": "Listings",
+    "listings": "Homes",
+    "inquiries": "Leads",
+    "push notifications": "Push",
+    "contact us": "Contact",
+    "about us": "About",
+    "order history": "Orders",
+    "my orders": "Orders",
+    "shopping cart": "Cart",
+    "product catalog": "Shop",
+    "menu": "Menu",
+    "our menu": "Menu",
+    "book now": "Book",
+    "health tips": "Tips",
+    "emergency": "Emergency",
+  };
+  if (short[lower]) return short[lower];
+  // No spaces and multiple capitals = camelCase concatenation (e.g. DoctorsAppointmentsRecords)
+  const noSpaces = n.replace(/\s/g, "");
+  if (noSpaces.length > 12 && /[a-z][A-Z]|[A-Z][a-z]/.test(n)) {
+    const first = n.replace(/([A-Z])/g, " $1").trim().split(/\s+/)[0];
+    return first || n.slice(0, 8);
+  }
+  if (n.length <= 10) return n;
+  return n.length > 12 ? n.slice(0, 10) + "…" : n;
+}
+
+/** Normalize screen name for display (avoid concatenated camelCase in titles). */
+function getDisplayScreenName(name: string): string {
+  const n = String(name || "").trim();
+  if (!n || n.length <= 14) return n;
+  const noSpaces = n.replace(/\s/g, "");
+  if (/[a-z][A-Z]|[A-Z][a-z]/.test(n)) {
+    return n.replace(/([A-Z])/g, " $1").trim().replace(/\s+/g, " ");
+  }
+  return n;
+}
+
 function NativeScreensPreview({
   screens,
   themeColor,
@@ -743,7 +793,7 @@ function NativeScreensPreview({
   const [modal, setModal] = useState<null | { kind: "product" | "order" | "checkout" | "info"; payload?: any }>(null);
   const activeScreen = screens[activeScreenIndex] || screens[0];
 
-  const screenTitle = activeScreen?.name || "Home";
+  const screenTitle = getDisplayScreenName(activeScreen?.name || "Home");
   const screenSubtitle = activeScreen?.isHome ? "Welcome back" : "";
 
   const showToast = (message: string) => {
@@ -807,19 +857,23 @@ function NativeScreensPreview({
   };
 
   return (
-    <div className="h-full flex flex-col bg-white overflow-hidden relative">
-      <div className="flex-1 min-h-0 overflow-y-auto bg-[#F6F7FB]">
-        <div className="px-4 pt-4 pb-6">
-          {/* Screen header */}
-          <div className="mb-4">
+    <div className="h-full flex flex-col bg-[#FAFAFA] overflow-hidden relative">
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="px-4 pt-5 pb-8">
+          {/* Screen header — Play Store style: clear hierarchy */}
+          <div className="mb-5">
             <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-[17px] font-semibold text-gray-900 truncate">{screenTitle}</div>
-                {screenSubtitle && <div className="text-[11px] text-gray-500 mt-0.5">{screenSubtitle}</div>}
+              <div className="min-w-0 flex-1">
+                <h1 className="text-[18px] font-semibold text-gray-900 leading-tight tracking-tight break-words line-clamp-2">
+                  {screenTitle}
+                </h1>
+                {screenSubtitle && (
+                  <p className="text-[13px] text-gray-500 mt-1 font-normal">{screenSubtitle}</p>
+                )}
               </div>
               <div className="shrink-0 flex items-center gap-2">
                 <div
-                  className="h-2 w-2 rounded-full"
+                  className="h-2 w-2 rounded-full shrink-0"
                   style={{ backgroundColor: themeColor, boxShadow: `0 0 0 4px ${themeColor}22` }}
                   aria-hidden
                 />
@@ -827,7 +881,7 @@ function NativeScreensPreview({
             </div>
           </div>
 
-          <div className="space-y-5">
+          <div className="space-y-6">
           {activeScreen?.components?.map((component) => (
             <NativeComponentPreview
               key={component.id}
@@ -948,15 +1002,17 @@ function NativeScreensPreview({
         </div>
       )}
 
-      {/* Native-style bottom navigation */}
-      <div className="relative h-16 bg-[color:var(--app-surface)]/90 backdrop-blur border-t border-[color:var(--app-border)] flex items-center justify-around px-1 shrink-0">
+      {/* Native-style bottom navigation — Play Store ready: short labels, 4 + More for 5+ tabs */}
+      <div className="relative h-[72px] bg-[color:var(--app-surface)]/95 backdrop-blur-md border-t border-[color:var(--app-border)] flex items-center justify-around px-2 shrink-0 safe-area-pb">
         {(() => {
-          const hasOverflow = screens.length > 5;
-          const tabScreens = hasOverflow ? screens.slice(0, 4) : screens.slice(0, 5);
-          const overflowScreens = hasOverflow ? screens.slice(4) : [];
+          const maxVisible = 4;
+          const hasOverflow = screens.length > maxVisible;
+          const tabScreens = hasOverflow ? screens.slice(0, maxVisible - 1) : screens;
+          const overflowScreens = hasOverflow ? screens.slice(maxVisible - 1) : [];
 
           const renderTab = (screen: NativeScreen, i: number) => {
             const isActive = i === activeScreenIndex;
+            const label = getShortNavLabel(screen.name);
             return (
               <button
                 key={screen.id}
@@ -965,31 +1021,31 @@ function NativeScreensPreview({
                   onScreenChange(i);
                 }}
                 className={
-                  "relative flex flex-col items-center justify-center gap-1 min-w-0 w-full h-full px-2 transition-colors duration-150 ease-out active:opacity-90 " +
+                  "relative flex flex-col items-center justify-center gap-1.5 min-w-[64px] max-w-[88px] flex-1 h-full py-2 transition-colors duration-150 ease-out active:opacity-90 " +
                   (isActive ? "text-[color:var(--app-text)]" : "text-[color:var(--app-muted-text)]")
                 }
               >
                 {isActive && (
                   <span
-                    className="absolute top-0 left-1/2 -translate-x-1/2 h-[3px] w-10 rounded-full"
+                    className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-full"
                     style={{ backgroundColor: themeColor }}
                   />
                 )}
                 <NativeIcon
                   name={screen.icon}
-                  className={"h-5 w-5 " + (isActive ? "" : "opacity-90")}
+                  className={"h-6 w-6 shrink-0 " + (isActive ? "" : "opacity-85")}
                 />
                 <span
-                  className="text-[10px] font-medium truncate max-w-[74px]"
+                  className="text-[11px] font-medium truncate w-full text-center leading-tight"
                   style={isActive ? { color: themeColor } : undefined}
                 >
-                  {screen.name}
+                  {label}
                 </span>
               </button>
             );
           };
 
-          const isMoreActive = hasOverflow && activeScreenIndex >= 4;
+          const isMoreActive = hasOverflow && activeScreenIndex >= maxVisible - 1;
 
           return (
             <>
@@ -1000,7 +1056,7 @@ function NativeScreensPreview({
                   key="__more"
                   onClick={() => setMoreOpen((v) => !v)}
                   className={
-                    "relative flex flex-col items-center justify-center gap-1 min-w-0 w-full h-full px-2 transition-colors duration-150 ease-out active:opacity-90 " +
+                    "relative flex flex-col items-center justify-center gap-1.5 min-w-[64px] max-w-[88px] flex-1 h-full py-2 transition-colors duration-150 ease-out active:opacity-90 " +
                     (isMoreActive ? "text-[color:var(--app-text)]" : "text-[color:var(--app-muted-text)]")
                   }
                   aria-haspopup="menu"
@@ -1008,13 +1064,13 @@ function NativeScreensPreview({
                 >
                   {isMoreActive && (
                     <span
-                      className="absolute top-0 left-1/2 -translate-x-1/2 h-[3px] w-10 rounded-full"
+                      className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-full"
                       style={{ backgroundColor: themeColor }}
                     />
                   )}
-                  <NativeIcon name="more" className={"h-5 w-5 " + (isMoreActive ? "" : "opacity-90")} />
+                  <NativeIcon name="more" className={"h-6 w-6 shrink-0 " + (isMoreActive ? "" : "opacity-85")} />
                   <span
-                    className="text-[10px] font-medium truncate max-w-[74px]"
+                    className="text-[11px] font-medium"
                     style={isMoreActive ? { color: themeColor } : undefined}
                   >
                     More
@@ -1025,14 +1081,14 @@ function NativeScreensPreview({
               {hasOverflow && moreOpen && (
                 <div
                   role="menu"
-                  className="absolute bottom-full left-3 right-3 mb-2 rounded-[var(--app-radius-card)] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] app-shadow-medium overflow-hidden"
+                  className="absolute bottom-full left-2 right-2 mb-1 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface)] shadow-lg overflow-hidden z-50"
                 >
                   <div className="px-3 py-2 text-[11px] font-semibold text-[color:var(--app-muted-text)] border-b border-[color:var(--app-border)]">
                     More screens
                   </div>
-                  <div className="max-h-48 overflow-y-auto">
+                  <div className="max-h-52 overflow-y-auto">
                     {overflowScreens.map((s, idx) => {
-                      const absoluteIndex = idx + 4;
+                      const absoluteIndex = idx + maxVisible - 1;
                       const isActive = absoluteIndex === activeScreenIndex;
                       return (
                         <button
@@ -1043,18 +1099,18 @@ function NativeScreensPreview({
                             onScreenChange(absoluteIndex);
                           }}
                           className={
-                            "w-full px-3 py-2.5 flex items-center justify-between text-left text-sm " +
+                            "w-full px-3 py-3 flex items-center justify-between text-left text-sm " +
                             (isActive
-                              ? "bg-white/5 text-[color:var(--app-text)]"
+                              ? "bg-white/10 text-[color:var(--app-text)]"
                               : "text-[color:var(--app-text)]/90 hover:bg-white/5")
                           }
                         >
-                          <span className="flex items-center gap-2 min-w-0">
-                            <NativeIcon name={s.icon} className="h-4 w-4 opacity-90" />
-                            <span className="truncate">{s.name}</span>
+                          <span className="flex items-center gap-3 min-w-0">
+                            <NativeIcon name={s.icon} className="h-5 w-5 opacity-90 shrink-0" />
+                            <span className="truncate font-medium">{s.name}</span>
                           </span>
                           {isActive && (
-                            <span className="text-xs font-semibold" style={{ color: themeColor }}>
+                            <span className="text-xs font-semibold shrink-0" style={{ color: themeColor }}>
                               Active
                             </span>
                           )}

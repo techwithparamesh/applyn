@@ -239,3 +239,46 @@ Example snippets: `deploy/nginx-applyn.conf.example` (Nginx), `deploy/ecosystem.
 - **Logs:** `pm2 logs applyn-server` (or your app name). For production, consider shipping logs to a service (e.g. Loki, Papertrail, CloudWatch).
 
 Implementing the proxy headers, HSTS, gzip, PM2 ecosystem + worker + log rotation, and env checks will already make https://applyn.co.in more robust and a bit faster.
+
+---
+
+## 7. Store-ready / premium polish checklist
+
+Use this list before submitting an app to Google Play or the App Store so your app feels professional and passes store guidelines.
+
+### Assets & identity
+
+| Item | Notes |
+|------|--------|
+| **App icon** | 512×512 px (Play) and 1024×1024 (App Store). No text; recognizable at small sizes. |
+| **Screenshots** | At least 2 (phone); 8 max. Show real screens, not placeholders. Use device frames if your builder provides them. |
+| **Feature graphic** | 1024×500 px for Play Store listing. |
+| **Short description** | Under 80 characters (Play). Clear value proposition. |
+| **Full description** | Explain features, audience, and why users should install. Include keywords naturally. |
+
+### Legal & support
+
+| Item | Notes |
+|------|--------|
+| **Privacy policy URL** | Required for Play and App Store if you collect any user data. Must be publicly accessible. |
+| **Support email** | Use a real, monitored address. Required for store listings. |
+| **Terms of use** | Recommended if you have accounts, payments, or subscriptions. |
+
+### App quality
+
+| Item | Notes |
+|------|--------|
+| **Test on real devices** | Run the built APK/IPA on at least one physical phone. Check portrait and landscape if supported. |
+| **No placeholder content** | Replace “Lorem ipsum”, “https://example.com”, and demo data before publishing. |
+| **Consistent branding** | App name, icon, and primary color should match your website/brand. |
+| **Error and empty states** | Ensure no broken images or blank screens; use friendly messages where content is missing. |
+
+### Before submit
+
+| Item | Notes |
+|------|--------|
+| **Version code / build number** | Increment for each upload. Play uses versionCode; iOS uses CFBundleVersion. |
+| **Signing** | Android: use a release keystore; iOS: proper provisioning and signing in Xcode/CI. |
+| **Store listing copy** | No misleading claims; comply with store content policies. |
+
+Keeping this checklist in mind (and in your publish flow) will help your apps look premium and get through review faster.

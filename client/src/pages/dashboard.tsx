@@ -1121,32 +1121,37 @@ export default function Dashboard() {
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
               {appsLoading && (
                 <Card className="md:col-span-2 lg:col-span-3 glass">
-                  <CardContent className="p-6 text-sm text-muted-foreground flex items-center gap-3">
-                    <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
-                    Loading your apps...
+                  <CardContent className="p-8 text-sm text-muted-foreground flex items-center justify-center gap-3">
+                    <Loader2 className="h-5 w-5 animate-spin text-cyan-400" />
+                    <span>Loading your apps…</span>
                   </CardContent>
                 </Card>
               )}
 
               {!appsLoading && filteredApps.length === 0 && (apps || []).length > 0 && (
-                <Card className="md:col-span-2 lg:col-span-3 glass">
+                <Card className="md:col-span-2 lg:col-span-3 glass border-dashed border-white/10">
                   <CardContent className="p-0">
                     <EmptyState
                       icon={Package}
-                      title={statusFilter === "all" ? "No apps yet. Create your first app!" : `No ${statusFilter} apps found.`}
+                      title={`No ${statusFilter} apps`}
+                      description="You have apps, but none match this filter. Show all apps or create a new one."
                     >
-                      {statusFilter !== "all" ? (
-                        <Button variant="ghost" size="sm" className="text-cyan-400" onClick={() => setStatusFilter("all")}>
-                          Show all apps
-                        </Button>
-                      ) : null}
+                      <Button variant="outline" size="sm" className="border-white/10 text-cyan-400 hover:bg-white/5" onClick={() => setStatusFilter("all")}>
+                        Show all apps
+                      </Button>
                     </EmptyState>
                   </CardContent>
                 </Card>
               )}
 
-              {filteredApps.map((app) => (
-                <Card key={app.id} className="border-white/[0.06] bg-[#0d1117] rounded-2xl overflow-hidden group hover:border-white/[0.12] transition-colors duration-150 ease-out">
+              {filteredApps.map((app, index) => (
+                <motion.div
+                  key={app.id}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05, duration: 0.3, ease: "easeOut" }}
+                >
+                <Card className="border-white/[0.06] bg-[#0d1117] rounded-2xl overflow-hidden group hover:border-white/[0.12] transition-colors duration-150 ease-out">
                   <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
                     <div className="flex items-center gap-3">
                       <div 
@@ -1382,6 +1387,7 @@ export default function Dashboard() {
                     )}
                   </CardFooter>
                 </Card>
+                </motion.div>
               ))}
 
               {!appsLoading && (apps || []).length === 0 && (
@@ -1389,12 +1395,12 @@ export default function Dashboard() {
                   <CardContent className="p-0">
                     <EmptyState
                       icon={Sparkles}
-                      title="No apps yet"
-                      description="Transform your website into a native mobile app in minutes. No coding required."
+                      title="Create your first app"
+                      description="Turn your website into a mobile app or build from scratch. Choose a template, add your details, and we’ll generate a store-ready app in minutes."
                     >
                       <Link href="/prompt-create">
-                        <Button className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold">
-                          <Plus className="h-4 w-4" /> Create Your First App
+                        <Button className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold rounded-xl shadow-lg shadow-cyan-500/20">
+                          <Plus className="h-4 w-4" /> Create your first app
                         </Button>
                       </Link>
                     </EmptyState>

@@ -1322,42 +1322,51 @@ export default function PromptCreate() {
             <span className="text-gradient">In Minutes</span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-            {step === "mode" 
-              ? "Choose how you want to create your app"
+            {step === "mode"
+              ? "Start from a website or build from scratch—you can always change later."
               : creationMode === "website"
-              ? "Convert your website into a mobile app"
-              : "Build a native app from scratch with our visual editor"
+              ? "We’ll use your site’s branding and structure to generate your app."
+              : "Pick a template and describe your app; we’ll generate screens you can edit."
             }
           </p>
         </motion.div>
 
         {/* Progress Steps - Only show after mode selection */}
         {step !== "mode" && (
-          <div className="flex items-center justify-center gap-2 mb-12">
-            {["template", "prompt", "preview"].map((s, i) => (
-              <div key={s} className="flex items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                  step === s || (s === "generating" && step === "generating")
-                    ? "bg-cyan-500 text-white"
-                    : ["template", "prompt", "generating", "preview"].indexOf(step) > i
-                    ? "bg-green-500 text-white"
-                    : "bg-white/10 text-white/40"
-                }`}>
-                  {["template", "prompt", "generating", "preview"].indexOf(step) > i ? (
-                    <Check className="h-4 w-4" />
-                  ) : (
-                    i + 1
+          <div className="flex flex-col items-center gap-3 mb-12">
+            <div className="flex items-center gap-2">
+              {[
+                { key: "template", label: "Template", sublabel: "Pick your industry" },
+                { key: "prompt", label: "Details", sublabel: "Describe your app" },
+                { key: "preview", label: "Preview", sublabel: "Review & create" },
+              ].map(({ key }, i) => (
+                <div key={key} className="flex items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
+                    step === key || (key === "prompt" && step === "generating")
+                      ? "bg-cyan-500 text-white"
+                      : ["template", "prompt", "generating", "preview"].indexOf(step) > i
+                      ? "bg-green-500 text-white"
+                      : "bg-white/10 text-white/40"
+                  }`}>
+                    {["template", "prompt", "generating", "preview"].indexOf(step) > i ? (
+                      <Check className="h-4 w-4" />
+                    ) : (
+                      i + 1
+                    )}
+                  </div>
+                  {i < 2 && (
+                    <div className={`w-12 md:w-16 h-0.5 mx-1 md:mx-2 ${
+                      ["template", "prompt", "generating", "preview"].indexOf(step) > i ? "bg-green-500" : "bg-white/10"
+                    }`} />
                   )}
                 </div>
-                {i < 2 && (
-                  <div className={`w-16 h-0.5 mx-2 ${
-                    ["template", "prompt", "generating", "preview"].indexOf(step) > i
-                      ? "bg-green-500"
-                      : "bg-white/10"
-                  }`} />
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {step === "template" && "Choose a template to get started."}
+              {step === "prompt" && "Add your URL or describe your app—AI will suggest screens and features."}
+              {(step === "generating" || step === "preview") && "Almost there. Review your app and confirm."}
+            </p>
           </div>
         )}
 
@@ -1373,52 +1382,64 @@ export default function PromptCreate() {
             >
               <div className="grid md:grid-cols-2 gap-6">
                 {/* Option 1: I have a website */}
-                <Card 
-                  className="glass border-white/10 cursor-pointer transition-colors duration-150 ease-out hover:border-cyan-500/50 group"
-                  onClick={() => handleModeSelect("website")}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1, duration: 0.35, ease: "easeOut" }}
                 >
-                  <CardContent className="p-8 text-center">
-                    <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
-                      <Smartphone className="h-10 w-10 text-white" />
-                    </div>
-                    <h3 className="text-xl font-bold text-white mb-2">I have a website</h3>
-                    <p className="text-muted-foreground text-sm mb-4">
-                      Convert your existing website into a mobile app instantly
-                    </p>
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      <Badge variant="secondary" className="bg-cyan-500/10 text-cyan-400 text-xs">
-                        Instant Preview
-                      </Badge>
-                      <Badge variant="secondary" className="bg-cyan-500/10 text-cyan-400 text-xs">
-                        Auto-detect Branding
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
+                  <Card
+                    className="glass border-white/10 cursor-pointer transition-colors duration-150 ease-out hover:border-cyan-500/50 group"
+                    onClick={() => handleModeSelect("website")}
+                  >
+                    <CardContent className="p-8 text-center">
+                      <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
+                        <Smartphone className="h-10 w-10 text-white" />
+                      </div>
+                      <h3 className="text-xl font-bold text-white mb-2">I have a website</h3>
+                      <p className="text-muted-foreground text-sm mb-4">
+                        Convert your existing website into a mobile app instantly
+                      </p>
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        <Badge variant="secondary" className="bg-cyan-500/10 text-cyan-400 text-xs">
+                          Instant Preview
+                        </Badge>
+                        <Badge variant="secondary" className="bg-cyan-500/10 text-cyan-400 text-xs">
+                          Auto-detect Branding
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
 
                 {/* Option 2: Build from scratch */}
-                <Card 
-                  className="glass border-white/10 cursor-pointer transition-colors duration-150 ease-out hover:border-purple-500/50 group"
-                  onClick={() => handleModeSelect("scratch")}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2, duration: 0.35, ease: "easeOut" }}
                 >
-                  <CardContent className="p-8 text-center">
-                    <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
-                      <Layout className="h-10 w-10 text-white" />
-                    </div>
-                    <h3 className="text-xl font-bold text-white mb-2">Build from scratch</h3>
-                    <p className="text-muted-foreground text-sm mb-4">
-                      Create a native app using our visual drag-and-drop builder
-                    </p>
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      <Badge variant="secondary" className="bg-purple-500/10 text-purple-400 text-xs">
-                        Visual Builder
-                      </Badge>
-                      <Badge variant="secondary" className="bg-purple-500/10 text-purple-400 text-xs">
-                        Native Screens
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
+                  <Card
+                    className="glass border-white/10 cursor-pointer transition-colors duration-150 ease-out hover:border-purple-500/50 group"
+                    onClick={() => handleModeSelect("scratch")}
+                  >
+                    <CardContent className="p-8 text-center">
+                      <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+                        <Layout className="h-10 w-10 text-white" />
+                      </div>
+                      <h3 className="text-xl font-bold text-white mb-2">Build from scratch</h3>
+                      <p className="text-muted-foreground text-sm mb-4">
+                        Create a native app using our visual drag-and-drop builder
+                      </p>
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        <Badge variant="secondary" className="bg-purple-500/10 text-purple-400 text-xs">
+                          Visual Builder
+                        </Badge>
+                        <Badge variant="secondary" className="bg-purple-500/10 text-purple-400 text-xs">
+                          Native Screens
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
               </div>
 
               <p className="text-center text-sm text-muted-foreground mt-8">
@@ -1446,24 +1467,30 @@ export default function PromptCreate() {
                 What type of app do you want to build?
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {INDUSTRY_TEMPLATES.map((template) => {
+                {INDUSTRY_TEMPLATES.map((template, index) => {
                   const Icon = template.icon;
                   return (
-                    <Card
+                    <motion.div
                       key={template.id}
-                      className={`glass border-white/10 cursor-pointer transition-colors duration-150 ease-out hover:border-cyan-500/50 ${
-                        selectedTemplate?.id === template.id ? "border-cyan-500 bg-cyan-500/10" : ""
-                      }`}
-                      onClick={() => handleTemplateSelect(template)}
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.06, duration: 0.28, ease: "easeOut" }}
                     >
-                      <CardContent className="p-4 text-center">
-                        <div className={`w-12 h-12 mx-auto rounded-xl bg-gradient-to-br ${template.color} flex items-center justify-center mb-3`}>
-                          <Icon className="h-6 w-6 text-white" />
-                        </div>
-                        <h3 className="font-semibold text-white text-sm mb-1">{template.name}</h3>
-                        <p className="text-xs text-muted-foreground line-clamp-2">{template.description}</p>
-                      </CardContent>
-                    </Card>
+                      <Card
+                        className={`glass border-white/10 cursor-pointer transition-colors duration-150 ease-out hover:border-cyan-500/50 ${
+                          selectedTemplate?.id === template.id ? "border-cyan-500 bg-cyan-500/10" : ""
+                        }`}
+                        onClick={() => handleTemplateSelect(template)}
+                      >
+                        <CardContent className="p-4 text-center">
+                          <div className={`w-12 h-12 mx-auto rounded-xl bg-gradient-to-br ${template.color} flex items-center justify-center mb-3`}>
+                            <Icon className="h-6 w-6 text-white" />
+                          </div>
+                          <h3 className="font-semibold text-white text-sm mb-1">{template.name}</h3>
+                          <p className="text-xs text-muted-foreground line-clamp-2">{template.description}</p>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
                   );
                 })}
               </div>
@@ -1675,6 +1702,7 @@ export default function PromptCreate() {
                     </>
                   )}
 
+                  <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} className="w-full">
                   <Button
                     onClick={handleGenerate}
                     disabled={
@@ -1682,8 +1710,8 @@ export default function PromptCreate() {
                       (creationMode === "scratch" && !appName.trim()) ||
                       generateMutation.isPending
                     }
-                    className={`w-full h-14 text-lg font-semibold disabled:opacity-50 ${
-                      creationMode === "website" 
+                    className={`w-full h-14 text-lg font-semibold disabled:opacity-50 rounded-xl ${
+                      creationMode === "website"
                         ? "bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500"
                         : "bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-400 hover:to-pink-500"
                     }`}
@@ -1700,6 +1728,7 @@ export default function PromptCreate() {
                       </>
                     )}
                   </Button>
+                  </motion.div>
 
                   {creationMode === "website" && !websiteUrl.trim() && (
                     <p className="text-center text-sm text-amber-400/80">

@@ -1,6 +1,6 @@
 import { Navbar } from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Download, RefreshCw, ExternalLink, QrCode, Share2, Copy, CheckCircle2, Wand2, AlertTriangle, MoreHorizontal, UploadCloud, Edit, Crown, Sparkles, Smartphone, Lock } from "lucide-react";
+import { ArrowLeft, Download, RefreshCw, ExternalLink, QrCode, Share2, Copy, CheckCircle2, AlertTriangle, MoreHorizontal, UploadCloud, Edit, Crown, Sparkles, Smartphone, Lock } from "lucide-react";
 import { useLocation, useParams, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
@@ -364,55 +364,47 @@ export default function PreviewApp() {
     <div className="min-h-screen bg-background bg-mesh-subtle flex flex-col">
       <Navbar />
 
-      <main className="flex-1 container mx-auto px-4 py-6">
-        {/* Header */}
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
+      <main className="flex-1 container mx-auto px-4 py-6 max-w-7xl">
+        {/* Header — clear hierarchy: back, app identity, primary actions */}
+        <motion.div
+          initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-2xl border border-white/[0.06] bg-[#0d1117] p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8"
+          className="rounded-2xl border border-white/[0.08] bg-[#0d1117] p-5 md:p-6 flex flex-col md:flex-row md:items-center justify-between gap-5 mb-8 shadow-lg shadow-black/5"
         >
-          <div className="flex items-center gap-4">
-            <Button 
-              variant="ghost" 
-              size="icon" 
+          <div className="flex items-center gap-4 min-w-0">
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setLocation("/dashboard")}
-              className="text-muted-foreground hover:text-white hover:bg-white/[0.06]"
+              className="text-muted-foreground hover:text-white hover:bg-white/[0.08] shrink-0"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <div className="flex items-center gap-3">
-              <div 
-                className="h-12 w-12 rounded-xl flex items-center justify-center text-2xl border border-white/[0.06]"
-                style={{ backgroundColor: `${app.primaryColor}20` }}
+            <div className="flex items-center gap-4 min-w-0">
+              <div
+                className="h-14 w-14 rounded-2xl flex items-center justify-center text-2xl border border-white/[0.08] shrink-0 shadow-inner"
+                style={{ backgroundColor: `${app.primaryColor}18` }}
               >
                 {app.iconUrl ? (
-                  <img src={app.iconUrl} alt={app.name} className="h-10 w-10 rounded-lg object-cover" />
+                  <img src={app.iconUrl} alt={app.name} className="h-11 w-11 rounded-xl object-cover" />
                 ) : (
                   app.icon
                 )}
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-bold text-white">{app.name}</h1>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight truncate">{app.name}</h1>
                   {getStatusBadge()}
                 </div>
-                <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  <ExternalLink className="h-3 w-3" />
-                  {getAppUrlDisplay(app.url, app.isNativeOnly)}
+                <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-1">
+                  <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{getAppUrlDisplay(app.url, app.isNativeOnly)}</span>
                 </p>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              onClick={() => setLocation(`/apps/${app.id}/visual-editor`)}
-              className="bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl"
-            >
-              <Wand2 className="mr-2 h-4 w-4" /> Open Builder
-            </Button>
-
             <Button
               size="sm"
               onClick={() => setLocation(`/apps/${app.id}/publish`)}
@@ -488,211 +480,141 @@ export default function PreviewApp() {
             />
           </div>
 
-          {/* App Details Sidebar */}
-          <div className="w-full lg:w-80 space-y-3">
-            {/* Preview Center */}
-            <div className="rounded-2xl border border-white/[0.06] bg-[#0d1117] overflow-hidden">
-              <div className="px-5 py-3 border-b border-white/[0.06]">
-                <div>
-                  <h3 className="text-sm font-semibold text-white">Preview</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">Test and share your app before publishing.</p>
-                </div>
+          {/* Sidebar — primary: Share & preview; secondary: Settings & info (accordion); compact Upgrade */}
+          <div className="w-full lg:w-80 space-y-4">
+            {/* Primary: Share & preview — one clear CTA block */}
+            <div className="rounded-2xl border border-white/[0.08] bg-[#0d1117] overflow-hidden shadow-lg shadow-black/10">
+              <div className="px-5 py-4 border-b border-white/[0.06]">
+                <h2 className="text-base font-semibold text-white">Share & preview</h2>
+                <p className="text-xs text-muted-foreground mt-1">Test on device or share the link with your team.</p>
               </div>
-              <div className="p-4 space-y-3">
-                <div>
-                  <label className="text-xs font-medium text-slate-300/80 mb-2 block">Shareable link</label>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 px-3 py-2.5 rounded-xl bg-white/5 border border-white/[0.06] text-sm text-muted-foreground truncate font-mono">
-                      {getPreviewUrl()}
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => void copyUrlToClipboard(getPreviewUrl())}
-                      className="border-white/[0.10] bg-white/[0.03] hover:bg-white/[0.06] rounded-xl h-10 w-10 p-0"
-                      aria-label="Copy preview link"
-                    >
-                      {copied ? <CheckCircle2 className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
-                    </Button>
+              <div className="p-4 space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-sm text-muted-foreground truncate font-mono">
+                    {getPreviewUrl()}
                   </div>
-                  <p className="mt-2 text-xs text-muted-foreground">Anyone with this link can preview your app.</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void copyUrlToClipboard(getPreviewUrl())}
+                    className="border-white/10 bg-white/[0.04] hover:bg-white/[0.08] rounded-xl h-10 w-10 p-0 shrink-0"
+                    aria-label="Copy preview link"
+                  >
+                    {copied ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                  </Button>
                 </div>
-
-                <div className="flex gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <Button
                     variant="outline"
-                    className="flex-1 border-white/[0.10] bg-white/[0.03] hover:bg-white/[0.06] rounded-xl h-11"
+                    className="border-white/10 bg-white/[0.04] hover:bg-white/[0.08] rounded-xl h-11"
                     onClick={() => setShowQRModal(true)}
                   >
-                    <QrCode className="mr-2 h-4 w-4 text-cyan-300" /> QR Code
+                    <QrCode className="mr-2 h-4 w-4 text-cyan-400" /> QR Code
                   </Button>
                   <Button
-                    className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl h-11"
+                    className="bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl h-11 font-medium"
                     onClick={() => window.open(getPreviewUrl(), "_blank", "noopener,noreferrer")}
                   >
-                    <ExternalLink className="mr-2 h-4 w-4" /> Open Preview
+                    <ExternalLink className="mr-2 h-4 w-4" /> Open
                   </Button>
                 </div>
               </div>
             </div>
 
-            {/* Manage */}
+            {/* Settings & info — single accordion (Manage + Details) */}
             <div className="rounded-2xl border border-white/[0.06] bg-[#0d1117] overflow-hidden">
-              <div className="px-5 py-3 border-b border-white/[0.06]">
-                <div>
-                  <h3 className="text-sm font-semibold text-white">Manage</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">Settings and delivery.</p>
-                </div>
-              </div>
-              <div className="p-3 space-y-1">
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-start text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl"
-                  onClick={() => setLocation(`/apps/${app.id}/editor`)}
-                >
-                  <Edit className="mr-3 h-4 w-4" /> Open Settings
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-start text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl"
-                  onClick={() => setLocation(`/apps/${app.id}/push`)}
-                >
-                  <RefreshCw className="mr-3 h-4 w-4" /> Push Notifications
-                </Button>
-                {isHttpUrl(app.url) && (
-                  <Button 
-                    variant="ghost" 
-                    className="w-full justify-start text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl"
-                    onClick={() => window.open(app.url, "_blank", "noopener,noreferrer")}
-                  >
-                    <ExternalLink className="mr-3 h-4 w-4" /> Visit Website
-                  </Button>
-                )}
-
-                {!isPreviewOnly && app.status === "live" && (
-                  <div className="pt-2 mt-2 border-t border-white/[0.06] space-y-2">
-                    {(app.platform === "android" || app.platform === "both") && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleDownload("android")}
-                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl"
-                      >
-                        <Download className="mr-2 h-4 w-4" /> Download Android App (APK)
-                      </Button>
-                    )}
-                    {(app.platform === "ios" || app.platform === "both") && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleDownload("ios")}
-                        className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-xl"
-                      >
-                        <Download className="mr-2 h-4 w-4" /> Download iOS
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Details (collapsed by default) */}
-            <div className="rounded-2xl border border-white/[0.06] bg-[#0d1117] overflow-hidden">
-              <Accordion type="single" collapsible>
-                <AccordionItem value="details" className="border-none">
+              <Accordion type="single" collapsible defaultValue="">
+                <AccordionItem value="settings" className="border-none">
                   <AccordionTrigger className="px-5 py-3 text-sm font-semibold text-white hover:no-underline hover:bg-white/[0.03] transition-colors data-[state=open]:bg-white/[0.02]">
                     <div className="text-left">
-                      <div>Details</div>
-                      <div className="text-xs font-normal text-muted-foreground mt-0.5">Platform, status, and theme.</div>
+                      <div>Settings & info</div>
+                      <div className="text-xs font-normal text-muted-foreground mt-0.5">Manage app, platform, theme.</div>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="px-5 pb-5 pt-1">
-                    <div className="space-y-4">
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium text-slate-300/80">Platform</span>
-                          <span className="text-sm text-white capitalize px-2.5 py-1 rounded-full bg-white/5 border border-white/10">{app.platform}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium text-slate-300/80">Status</span>
-                          <span className="text-sm text-white capitalize">{app.status}</span>
-                        </div>
-                        {app.packageName && (
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm font-medium text-slate-300/80">Package</span>
-                            <span className="text-white text-xs truncate max-w-[150px] font-mono bg-white/5 px-2 py-0.5 rounded">{app.packageName}</span>
-                          </div>
+                  <AccordionContent className="px-5 pb-5 pt-1 space-y-4">
+                    <div className="space-y-1">
+                      <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl" onClick={() => setLocation(`/apps/${app.id}/editor`)}>
+                        <Edit className="mr-3 h-4 w-4" /> Open Settings
+                      </Button>
+                      <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl" onClick={() => setLocation(`/apps/${app.id}/push`)}>
+                        <RefreshCw className="mr-3 h-4 w-4" /> Push Notifications
+                      </Button>
+                      {isHttpUrl(app.url) && (
+                        <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl" onClick={() => window.open(app.url, "_blank", "noopener,noreferrer")}>
+                          <ExternalLink className="mr-3 h-4 w-4" /> Visit Website
+                        </Button>
+                      )}
+                    </div>
+                    {!isPreviewOnly && app.status === "live" && (
+                      <div className="pt-3 border-t border-white/[0.06] space-y-2">
+                        {(app.platform === "android" || app.platform === "both") && (
+                          <Button size="sm" onClick={() => handleDownload("android")} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl">
+                            <Download className="mr-2 h-4 w-4" /> Download Android (APK)
+                          </Button>
                         )}
-                        {app.versionCode && (
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm font-medium text-slate-300/80">Version</span>
-                            <span className="text-sm text-white">{app.versionCode}</span>
-                          </div>
+                        {(app.platform === "ios" || app.platform === "both") && (
+                          <Button size="sm" onClick={() => handleDownload("ios")} className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-xl">
+                            <Download className="mr-2 h-4 w-4" /> Download iOS
+                          </Button>
                         )}
-                        {app.artifactSize && (
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm font-medium text-slate-300/80">Size</span>
-                            <span className="text-sm text-white">{(app.artifactSize / 1024 / 1024).toFixed(1)} MB</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium text-slate-300/80">Created</span>
-                          <span className="text-sm text-white">{new Date(app.createdAt).toLocaleDateString()}</span>
-                        </div>
                       </div>
-
-                      <div className="pt-4 border-t border-white/[0.06] space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-slate-300/80">Primary</span>
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="h-7 w-7 rounded-full border-2 border-white/20 shadow-lg"
-                              style={{ backgroundColor: app.primaryColor }}
-                            />
-                            <span className="text-xs text-white font-mono bg-white/5 px-2 py-0.5 rounded">{app.primaryColor}</span>
-                          </div>
+                    )}
+                    <div className="pt-3 border-t border-white/[0.06] space-y-3 text-sm">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400">Platform</span>
+                        <span className="text-white capitalize px-2 py-0.5 rounded-md bg-white/5">{app.platform}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400">Status</span>
+                        <span className="text-white capitalize">{app.status}</span>
+                      </div>
+                      {app.packageName && (
+                        <div className="flex justify-between items-center gap-2">
+                          <span className="text-slate-400 shrink-0">Package</span>
+                          <span className="text-white text-xs truncate font-mono bg-white/5 px-2 py-0.5 rounded">{app.packageName}</span>
                         </div>
-                        {app.splashColor && (
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-slate-300/80">Splash</span>
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="h-7 w-7 rounded-lg border-2 border-white/20 shadow-lg"
-                                style={{ backgroundColor: app.splashColor }}
-                              />
-                              <span className="text-xs text-white font-mono bg-white/5 px-2 py-0.5 rounded">{app.splashColor}</span>
-                            </div>
-                          </div>
-                        )}
+                      )}
+                      {app.versionCode != null && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-400">Version</span>
+                          <span className="text-white">{app.versionCode}</span>
+                        </div>
+                      )}
+                      {app.artifactSize != null && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-400">Size</span>
+                          <span className="text-white">{(app.artifactSize / 1024 / 1024).toFixed(1)} MB</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400">Theme</span>
+                        <div className="h-5 w-5 rounded-full border border-white/20" style={{ backgroundColor: app.primaryColor }} title={app.primaryColor} />
                       </div>
                     </div>
                   </AccordionContent>
                 </AccordionItem>
               </Accordion>
             </div>
-            
-            {/* Upgrade Prompt for Preview Tier */}
+
+            {/* Compact upgrade CTA — only for preview tier */}
             {isPreviewOnly && (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/5 via-transparent to-purple-500/5 overflow-hidden"
+                transition={{ delay: 0.2 }}
+                className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4"
               >
-                <div className="p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="h-9 w-9 rounded-xl bg-cyan-500/10 flex items-center justify-center">
-                      <Crown className="h-5 w-5 text-cyan-400" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-white">Upgrade to Download</h3>
+                <div className="flex items-start gap-3">
+                  <div className="h-9 w-9 rounded-lg bg-cyan-500/10 flex items-center justify-center shrink-0">
+                    <Crown className="h-4 w-4 text-cyan-400" />
                   </div>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    You're on the free preview tier. Upgrade to download your app and publish to app stores.
-                  </p>
-                  <Button 
-                    className="w-full bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 rounded-xl"
-                    onClick={() => setLocation(`/pricing?upgrade=${app.id}`)}
-                  >
-                    <Sparkles className="mr-2 h-4 w-4" /> View Plans & Upgrade
-                  </Button>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-white">Download & publish</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Upgrade to get your app file and publish to stores.</p>
+                    <Button size="sm" className="mt-3 w-full bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-medium" onClick={() => setLocation(`/pricing?upgrade=${app.id}`)}>
+                      <Sparkles className="mr-2 h-3.5 w-3.5" /> View plans
+                    </Button>
+                  </div>
                 </div>
               </motion.div>
             )}

@@ -1,5 +1,6 @@
 import type { NativeActionHandler } from "@/native/types";
 
+/** Premium hero for all industries — Play Store ready: image or gradient, no grey placeholder. */
 export function HeroSection({
   title,
   subtitle,
@@ -19,31 +20,44 @@ export function HeroSection({
   overlayColor?: string;
   onAction: NativeActionHandler;
 }) {
+  const hasImage = Boolean(backgroundImage?.trim());
   return (
     <div
-      className="relative overflow-hidden rounded-[var(--app-radius-card)] app-shadow-soft"
+      className="relative overflow-hidden rounded-2xl shadow-lg min-h-[220px]"
       style={{
-        backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
+        backgroundImage: hasImage ? `url(${backgroundImage})` : undefined,
         backgroundSize: "cover",
         backgroundPosition: "center",
-        backgroundColor: backgroundImage ? undefined : themeColor,
+        backgroundColor: themeColor,
       }}
     >
-      <div className="absolute inset-0" style={{ backgroundColor: overlayColor || "rgba(0,0,0,0.42)" }} />
-      <div className="relative z-10 aspect-[16/9] flex flex-col justify-end px-[var(--space-24)] py-[var(--space-hero-y)] text-white">
-        <div className="text-[length:var(--font-h1)] font-[var(--font-weight-h1)] leading-tight tracking-[-0.01em]">
+      {hasImage ? (
+        <div
+          className="absolute inset-0"
+          style={{ backgroundColor: overlayColor ?? "rgba(0,0,0,0.45)" }}
+        />
+      ) : (
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `linear-gradient(135deg, transparent 0%, rgba(0,0,0,0.25) 100%)`,
+          }}
+        />
+      )}
+      <div className="relative z-10 min-h-[220px] flex flex-col justify-end px-5 py-6 text-white">
+        <h2 className="text-[20px] font-semibold leading-tight tracking-tight text-white drop-shadow-md break-words">
           {title}
-        </div>
+        </h2>
         {subtitle && (
-          <div className="text-[length:var(--font-body)] font-normal text-white/85 mt-[var(--space-8)] max-w-[28ch]">
+          <p className="text-[15px] font-normal text-white/95 mt-1.5 max-w-[32ch] leading-snug drop-shadow-sm">
             {subtitle}
-          </div>
+          </p>
         )}
         {buttonText && (
-          <div className="mt-[var(--space-16)]">
+          <div className="mt-4">
             <button
               type="button"
-              className="inline-flex items-center justify-center px-[var(--space-24)] py-[var(--space-16)] bg-white/95 text-gray-900 rounded-[var(--app-radius-button)] text-[length:var(--font-small)] font-semibold app-press"
+              className="inline-flex items-center justify-center px-5 py-3 bg-white text-gray-900 rounded-xl text-sm font-semibold shadow-md active:opacity-90"
               onClick={() => {
                 const a = String(buttonAction || "").trim();
                 if (a) onAction(a);

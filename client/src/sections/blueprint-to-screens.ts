@@ -41,11 +41,26 @@ function buildSectionComponents(
 ): NativeComponent[] {
   switch (section.type) {
     case "hero": {
-      const backgroundImage = section.background
-        ? section.background.kind === "url"
+      const heroKeyword =
+        section.background?.kind === "keyword"
+          ? section.background.keyword
+          : section.background?.kind === "url"
+            ? undefined
+            : industry === "healthcare"
+              ? "modern clinic reception"
+              : industry === "ecommerce"
+                ? "shopping app hero"
+                : industry === "restaurant"
+                  ? "restaurant dining"
+                  : industry === "realestate"
+                    ? "modern house exterior"
+                    : "professional app hero";
+      const backgroundImage =
+        section.background?.kind === "url"
           ? section.background.url
-          : hydrateKeywordToUrl(section.background.keyword, { industry, variant: "hero", ratio: "16:9" })
-        : undefined;
+          : heroKeyword
+            ? hydrateKeywordToUrl(heroKeyword, { industry, variant: "hero", ratio: "16:9" })
+            : undefined;
       return [
         {
           id: nextId(),

@@ -15,7 +15,13 @@ const STEP_META: Array<{
   href: (appId: string) => string;
   title?: string;
 }> = [
-  { key: "builder", label: "Builder", icon: Wand2, href: (id) => `/apps/${id}/visual-editor` },
+  {
+    key: "builder",
+    label: "Edit",
+    icon: Wand2,
+    href: (id) => `/apps/${id}/visual-editor`,
+    title: "Open visual editor to design screens",
+  },
   {
     key: "preview",
     label: "Preview",
@@ -23,7 +29,7 @@ const STEP_META: Array<{
     href: (id) => `/apps/${id}/preview`,
     title: "Test & share your app",
   },
-  { key: "publish", label: "Publish", icon: Download, href: (id) => `/apps/${id}/publish` },
+  { key: "publish", label: "Publish", icon: Download, href: (id) => `/apps/${id}/publish`, title: "Prepare for app stores" },
 ];
 
 export function AppBuilderStepper({
