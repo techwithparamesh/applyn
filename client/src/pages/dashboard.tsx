@@ -17,7 +17,6 @@ import {
   Smartphone,
   Clock,
   CheckCircle,
-  Circle,
   RefreshCw,
   Settings,
   ArrowRight,
@@ -35,7 +34,6 @@ import {
   Mail,
   Loader2,
   X,
-  Shield,
   UploadCloud,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -576,25 +574,22 @@ export default function Dashboard() {
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="space-y-10"
+          className="space-y-6"
         >
-          {/* Header */}
+          {/* Header: short and clear */}
           <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-semibold tracking-tight text-white">
-                Welcome back, <span className="text-gradient">{me?.name || me?.username?.split("@")[0] || "User"}</span>
+              <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-white">
+                Hi, <span className="text-gradient">{me?.name || me?.username?.split("@")[0] || "there"}</span>
               </h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {isSupport 
-                  ? "Support Dashboard - Help users and manage tickets"
-                  : "Here's what's happening with your apps today"
-                }
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {isSupport ? "Tickets & build status" : "Your apps"}
               </p>
             </div>
             {!isSupport && (
               <Link href="/prompt-create">
-                <Button className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold">
-                  <Plus className="h-4 w-4" /> Create New App
+                <Button className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold shrink-0">
+                  <Plus className="h-4 w-4" /> New app
                 </Button>
               </Link>
             )}
@@ -611,10 +606,8 @@ export default function Dashboard() {
                         <Mail className="h-5 w-5 text-amber-400" />
                       </div>
                       <div>
-                        <p className="font-medium text-amber-200">Verify your email address</p>
-                        <p className="text-sm text-amber-300/70">
-                          Please verify your email to access all features and receive important notifications.
-                        </p>
+                        <p className="font-medium text-amber-200">Verify your email</p>
+                        <p className="text-sm text-amber-300/70">Required for full access and notifications.</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -645,8 +638,8 @@ export default function Dashboard() {
             </motion.div>
           )}
 
-          {/* Stats Grid - Role-based */}
-          <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {/* Stats: tap to filter (role-based) */}
+          <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {isSupport ? (
               /* Support Team Stats */
               <>
@@ -783,343 +776,98 @@ export default function Dashboard() {
             )}
           </motion.div>
 
-          {/* Quick Actions - Role-based */}
-          <motion.div variants={itemVariants}>
-            <h2 className="text-lg font-semibold text-white mb-3">Quick Actions</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {/* Support-specific actions */}
-              {isSupport ? (
-                <>
-                  <Link href="/tickets">
-                    <Card className="glass glass-hover cursor-pointer group">
-                      <CardContent className="p-4 flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
-                          <LifeBuoy className="h-5 w-5 text-purple-400" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-white">All Tickets</p>
-                          <p className="text-xs text-muted-foreground">View & respond</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-
-                  <Link href="/ops">
-                    <Card className="glass glass-hover cursor-pointer group">
-                      <CardContent className="p-4 flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-cyan-500/10 flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
-                          <Activity className="h-5 w-5 text-cyan-400" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-white">Build Logs</p>
-                          <p className="text-xs text-muted-foreground">Debug issues</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-
-                  <Link href="/profile">
-                    <Card className="glass glass-hover cursor-pointer group">
-                      <CardContent className="p-4 flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-yellow-500/10 flex items-center justify-center group-hover:bg-yellow-500/20 transition-colors">
-                          <Settings className="h-5 w-5 text-yellow-400" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-white">Settings</p>
-                          <p className="text-xs text-muted-foreground">Profile & more</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-
-                  <Card className="glass border-dashed border-white/10 opacity-60">
-                    <CardContent className="p-4 flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-xl bg-gray-500/10 flex items-center justify-center">
-                        <AlertCircle className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-400">Support Role</p>
-                        <p className="text-xs text-muted-foreground">Read-only access</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </>
-              ) : (
-                /* Regular user actions */
-                <>
-                  <Link href="/prompt-create">
-                    <Card className="glass glass-hover cursor-pointer group">
-                      <CardContent className="p-4 flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-cyan-500/10 flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
-                          <Sparkles className="h-5 w-5 text-cyan-400" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-white">New App</p>
-                          <p className="text-xs text-muted-foreground">Create or convert</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-
-                  <Link href="/tickets">
-                    <Card className="glass glass-hover cursor-pointer group">
-                      <CardContent className="p-4 flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
-                          <LifeBuoy className="h-5 w-5 text-purple-400" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-white">Support</p>
-                          <p className="text-xs text-muted-foreground">Get help</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-
-                  <Link href="/billing">
-                    <Card className="glass glass-hover cursor-pointer group">
-                      <CardContent className="p-4 flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-green-500/10 flex items-center justify-center group-hover:bg-green-500/20 transition-colors">
-                          <CreditCard className="h-5 w-5 text-green-400" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-white">Billing</p>
-                          <p className="text-xs text-muted-foreground">View payments</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-
-                  <Link href="/profile">
-                    <Card className="glass glass-hover cursor-pointer group">
-                      <CardContent className="p-4 flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-yellow-500/10 flex items-center justify-center group-hover:bg-yellow-500/20 transition-colors">
-                          <Settings className="h-5 w-5 text-yellow-400" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-white">Settings</p>
-                          <p className="text-xs text-muted-foreground">Profile & more</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                </>
-              )}
-            </div>
+          {/* Quick links: compact row (support gets cards, users get one line) */}
+          <motion.div variants={itemVariants} className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+            {isSupport ? (
+              <div className="flex flex-wrap gap-3">
+                <Link href="/tickets" className="text-cyan-400 hover:text-cyan-300 font-medium">Tickets</Link>
+                <Link href="/ops" className="text-muted-foreground hover:text-white">Build logs</Link>
+                <Link href="/profile" className="text-muted-foreground hover:text-white">Settings</Link>
+              </div>
+            ) : (
+              <>
+                <Link href="/billing" className="text-muted-foreground hover:text-white">Billing</Link>
+                <Link href="/tickets" className="text-muted-foreground hover:text-white">Support</Link>
+                <Link href="/profile" className="text-muted-foreground hover:text-white">Settings</Link>
+              </>
+            )}
           </motion.div>
 
-          {/* Subscription Status - Hidden for support */}
+          {/* Plan: compact when OK, full card when action needed */}
           {subscription && !isSupport && (
             <motion.div variants={itemVariants}>
-              <h2 className="text-lg font-semibold text-white mb-4">Plan Status</h2>
-              <Card className={`glass ${subscription.needsRenewal ? 'border-yellow-500/50' : subscription.isExpired ? 'border-red-500/50' : 'border-green-500/30'}`}>
-                <CardContent className="p-5">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className={`h-14 w-14 rounded-xl flex items-center justify-center ${
-                        subscription.isExpired 
-                          ? 'bg-red-500/10' 
-                          : subscription.needsRenewal 
-                            ? 'bg-yellow-500/10' 
-                            : 'bg-green-500/10'
-                      }`}>
-                        {subscription.isExpired ? (
-                          <AlertTriangle className="h-7 w-7 text-red-400" />
-                        ) : subscription.needsRenewal ? (
-                          <Clock className="h-7 w-7 text-yellow-400" />
-                        ) : (
-                          <Crown className="h-7 w-7 text-green-400" />
-                        )}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-white text-lg">
-                            {subscription.planDetails?.name || subscription.plan || 'No Plan'}
-                          </h3>
-                          <Badge variant="outline" className={
-                            subscription.isExpired 
-                              ? 'border-red-500/30 text-red-400' 
-                              : subscription.isActive 
-                                ? 'border-green-500/30 text-green-400' 
-                                : 'border-yellow-500/30 text-yellow-400'
-                          }>
-                            {subscription.planStatus || 'No Plan'}
-                          </Badge>
+              {subscription.isExpired || subscription.needsRenewal || !subscription.plan ? (
+                <Card className={`glass ${subscription.isExpired ? "border-red-500/50" : subscription.needsRenewal ? "border-yellow-500/50" : "border-white/10"}`}>
+                  <CardContent className="p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${subscription.isExpired ? "bg-red-500/10" : subscription.needsRenewal ? "bg-yellow-500/10" : "bg-white/5"}`}>
+                          {subscription.isExpired ? <AlertTriangle className="h-5 w-5 text-red-400" /> : subscription.needsRenewal ? <Clock className="h-5 w-5 text-yellow-400" /> : <Crown className="h-5 w-5 text-muted-foreground" />}
                         </div>
-                        {subscription.planExpiryDate && (
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {subscription.isExpired 
-                              ? `Expired on ${new Date(subscription.planExpiryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
-                              : `Expires ${new Date(subscription.planExpiryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} (${subscription.daysUntilExpiry} days)`
-                            }
+                        <div>
+                          <p className="font-medium text-white">{subscription.planDetails?.name || subscription.plan || "No plan"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {subscription.isExpired ? "Expired" : subscription.needsRenewal ? "Expires soon" : "Choose a plan to build & publish"}
                           </p>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-                      {/* Rebuilds Counter */}
-                      {subscription.plan && (
-                        <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-white/5">
-                          <RefreshCw className="h-5 w-5 text-purple-400" />
-                          <div>
-                            <p className="text-xs font-medium text-slate-300/80">Rebuilds Left</p>
-                            <p className="text-lg font-bold text-white">
-                              {subscription.remainingRebuilds}
-                              <span className="text-sm text-muted-foreground font-normal">
-                                /{subscription.planDetails?.rebuildsPerYear || 0}
-                              </span>
-                            </p>
-                          </div>
                         </div>
-                      )}
-                      
-                      {/* Action Button */}
-                      {subscription.isExpired || subscription.needsRenewal ? (
-                        <Link href="/pricing">
-                          <Button className="bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold">
-                            {subscription.isExpired ? 'Renew Now' : 'Renew Early'}
-                          </Button>
-                        </Link>
-                      ) : !subscription.plan ? (
-                        <Link href="/pricing">
-                          <Button className="bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold">
-                            Choose Plan
-                          </Button>
-                        </Link>
-                      ) : null}
+                      </div>
+                      <Link href="/pricing">
+                        <Button size="sm" className={subscription.isExpired || subscription.needsRenewal ? "bg-amber-500 hover:bg-amber-400 text-black" : ""}>
+                          {subscription.isExpired ? "Renew" : subscription.needsRenewal ? "Renew" : "View plans"}
+                        </Button>
+                      </Link>
                     </div>
-                  </div>
-                  
-                  {/* Warning Message */}
-                  {subscription.needsRenewal && !subscription.isExpired && (
-                    <div className="mt-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                      <p className="text-sm text-yellow-400">
-                        ⚠️ Your subscription expires soon! Renew to continue building apps and accessing premium features.
+                    {(subscription.isExpired || subscription.needsRenewal) && (
+                      <p className={`mt-3 text-xs ${subscription.isExpired ? "text-red-400" : "text-yellow-400"}`}>
+                        {subscription.isExpired ? "Renew to rebuild and publish." : "Renew early to avoid interruption."}
                       </p>
-                    </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="flex flex-wrap items-center gap-4 text-sm py-1">
+                  <span className="text-muted-foreground">
+                    <span className="text-white font-medium">{subscription.planDetails?.name || subscription.plan}</span>
+                    {subscription.planExpiryDate && (
+                      <> · Expires {new Date(subscription.planExpiryDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</>
+                    )}
+                  </span>
+                  {subscription.plan && typeof subscription.remainingRebuilds === "number" && (
+                    <span className="text-muted-foreground">
+                      {subscription.remainingRebuilds} rebuilds left
+                    </span>
                   )}
-                  
-                  {subscription.isExpired && (
-                    <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                      <p className="text-sm text-red-400">
-                        ⚠️ Your subscription has expired. Your apps will continue to work, but you cannot rebuild or modify them until you renew.
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                  <Link href="/billing" className="text-cyan-400 hover:text-cyan-300">Manage</Link>
+                </div>
+              )}
             </motion.div>
           )}
 
           {/* Apps Section - Hidden for support users */}
           {!isSupport && (
           <motion.div variants={itemVariants}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <div className="flex items-center gap-2">
                 <h2 className="text-lg font-semibold text-white">My Apps</h2>
                 {statusFilter !== "all" && (
-                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-white/10 text-white capitalize flex items-center gap-1">
-                    {statusFilter}
-                    <button 
-                      onClick={() => setStatusFilter("all")}
-                      className="ml-1 hover:text-cyan-400 transition-colors"
-                    >
-                      ×
-                    </button>
-                  </span>
+                  <>
+                    <span className="text-sm text-muted-foreground">Showing {filteredApps.length} {statusFilter}</span>
+                    <button type="button" onClick={() => setStatusFilter("all")} className="text-xs text-cyan-400 hover:text-cyan-300">Show all</button>
+                  </>
                 )}
               </div>
             </div>
 
-            {progress ? (
-              <Card className="glass border-white/10 mb-4">
-                <CardContent className="p-5">
-                  <div className="text-sm font-medium text-slate-300/80">Your App Setup Progress</div>
-                  <div className="mt-1 text-xs text-muted-foreground truncate">{progress.appName}</div>
-
-                  <div className="mt-4 space-y-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      {progress.settingsDone ? (
-                        <CheckCircle className="h-4 w-4 text-emerald-400" />
-                      ) : (
-                        <Circle className="h-4 w-4 text-muted-foreground" />
-                      )}
-                      <span>Configure Settings</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      {progress.screensDone ? (
-                        <CheckCircle className="h-4 w-4 text-emerald-400" />
-                      ) : (
-                        <Circle className="h-4 w-4 text-muted-foreground" />
-                      )}
-                      <span>Design Screens</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      {progress.previewDone ? (
-                        <CheckCircle className="h-4 w-4 text-emerald-400" />
-                      ) : (
-                        <Circle className="h-4 w-4 text-muted-foreground" />
-                      )}
-                      <span>Preview App</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      {progress.testingDone ? (
-                        <CheckCircle className="h-4 w-4 text-emerald-400" />
-                      ) : (
-                        <Circle className="h-4 w-4 text-muted-foreground" />
-                      )}
-                      <span>Publish for Testing</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      {progress.publicDone ? (
-                        <CheckCircle className="h-4 w-4 text-emerald-400" />
-                      ) : (
-                        <Circle className="h-4 w-4 text-muted-foreground" />
-                      )}
-                      <span>Publish Publicly</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : null}
-
-            <Card className="border-white/10 bg-white/[0.03] mb-4">
-              <CardContent className="p-4 text-sm text-slate-300/80">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-slate-300/70" />
-                    <span>Build success rate: 99.8%</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-slate-300/70" />
-                    <span>Secure payments powered by Razorpay</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-slate-300/70" />
-                    <span>Apps published every week</span>
-                  </div>
-                </div>
-
-                <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                  <span className="h-2 w-2 rounded-full bg-green-500" aria-hidden="true" />
-                  <span>System status: Operational</span>
-                </div>
-              </CardContent>
-            </Card>
 
             {showMomentumPublishNudge && progressApp ? (
-              <Card className="mb-4 border border-green-500/30 bg-green-900/10">
+              <Card className="mb-4 border border-cyan-500/20 bg-cyan-500/5">
                 <CardContent className="p-4 text-sm">
-                  <div className="text-white font-medium">Your app is ready to go live 🚀</div>
-                  <div className="mt-1 text-muted-foreground">You’ve completed all required steps. Publish now to make it available.</div>
-                  <div className="mt-3">
-                    <Button
-                      size="sm"
-                      className="bg-emerald-600 hover:bg-emerald-500 text-white"
-                      onClick={() => setLocation(`/apps/${progressApp.id}/publish`)}
-                    >
-                      Publish Now
-                    </Button>
+                  <p className="text-sm font-medium text-white">Ready to go live</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Preview, edit, or publish.</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" className="border-white/10 text-cyan-400 hover:bg-white/5" onClick={() => setLocation(`/apps/${progressApp.id}/preview`)}><Eye className="mr-1.5 h-3.5 w-3.5" /> Preview</Button>
+                    <Button size="sm" variant="outline" className="border-white/10 text-cyan-400 hover:bg-white/5" onClick={() => setLocation(`/apps/${progressApp.id}/visual-editor`)}>Edit</Button>
+                    <Button size="sm" className="bg-cyan-600 hover:bg-cyan-500 text-white" onClick={() => setLocation(`/apps/${progressApp.id}/publish`)}>Publish</Button>
                   </div>
                 </CardContent>
               </Card>
@@ -1145,14 +893,14 @@ export default function Dashboard() {
                       className="border-white/10 text-cyan-400 hover:bg-white/5"
                       onClick={() => setLocation(`/apps/${latestApp.id}/visual-editor`)}
                     >
-                      <Wand2 className="mr-2 h-4 w-4" /> Edit in Visual Editor
+                      <Wand2 className="mr-2 h-4 w-4" /> Edit
                     </Button>
                     <Button
                       size="sm"
                       className="bg-cyan-600 hover:bg-cyan-500 text-white"
                       onClick={() => setLocation(`/apps/${latestApp.id}/publish`)}
                     >
-                      <UploadCloud className="mr-2 h-4 w-4" /> Continue to Publish
+                      <UploadCloud className="mr-2 h-4 w-4" /> Publish
                     </Button>
                   </div>
                 </CardContent>
@@ -1269,30 +1017,30 @@ export default function Dashboard() {
                           <Settings className="mr-2 h-4 w-4" /> Open Settings
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/visual-editor`)}>
-                          <Wand2 className="mr-2 h-4 w-4" /> Open Builder
+                          <Wand2 className="mr-2 h-4 w-4" /> Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/preview`)}>
-                          <Eye className="mr-2 h-4 w-4" /> Preview App
+                          <Eye className="mr-2 h-4 w-4" /> Preview
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/publish`)}>
-                          <Package className="mr-2 h-4 w-4" /> Continue to Publish
+                          <Package className="mr-2 h-4 w-4" /> Publish
                         </DropdownMenuItem>
                         <DropdownMenuSeparator className="bg-white/[0.06]" />
-                        <DropdownMenuLabel>Advanced &amp; Tools</DropdownMenuLabel>
+                        <DropdownMenuLabel>More</DropdownMenuLabel>
                         <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/store-admin`)}>
                           <Package className="mr-2 h-4 w-4" /> Store Admin
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setLocation(`/runtime/${app.id}`)}>
-                          <Smartphone className="mr-2 h-4 w-4" /> Runtime Preview
+                          <Smartphone className="mr-2 h-4 w-4" /> Runtime
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/integrations`)}>
                           <Activity className="mr-2 h-4 w-4" /> Integrations
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/push`)}>
-                          Push Notifications
+                          Push
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/analytics`)}>
-                          📊 Analytics
+                          Analytics
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-red-400 focus:text-red-400"
@@ -1507,58 +1255,17 @@ export default function Dashboard() {
                 </Card>
               )}
               
-              {/* Support Info Card */}
-              <Card className="glass mt-6 border-cyan-500/20">
-                <CardContent className="p-5">
-                  <div className="flex items-start gap-4">
-                    <div className="h-10 w-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
-                      <AlertCircle className="h-5 w-5 text-cyan-400" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-white">Support Role Access</h3>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        As a support team member, you can view and respond to all user tickets, access build logs for debugging, and view user apps (read-only). 
-                        You cannot create apps, manage billing, or access team settings.
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <p className="text-xs text-muted-foreground mt-4">Support role: tickets, build logs, read-only app access.</p>
             </motion.div>
           )}
 
-          {/* Recent Tickets - For regular users only */}
+          {/* Recent Tickets - compact */}
           {!isSupport && (tickets || []).length > 0 && (
-            <motion.div variants={itemVariants}>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-white">Recent Tickets</h2>
-                <Link href="/tickets">
-                  <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground hover:text-white">
-                    View all <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </Link>
-              </div>
-              <Card className="glass">
-                <CardContent className="p-4">
-                  <div className="space-y-3">
-                    {(tickets || []).slice(0, 3).map((ticket) => (
-                      <div
-                        key={ticket.id}
-                        className="flex items-center justify-between p-3 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] transition-colors cursor-pointer"
-                        onClick={() => setLocation("/tickets")}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={`h-2 w-2 rounded-full ${ticket.status === "open" ? "bg-yellow-400" : "bg-green-400"}`} />
-                          <span className="text-sm text-white">{ticket.subject}</span>
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(ticket.createdAt), { addSuffix: true })}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+            <motion.div variants={itemVariants} className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">
+                {(tickets || []).filter((t) => t.status === "open").length} open ticket{(tickets || []).filter((t) => t.status === "open").length !== 1 ? "s" : ""}
+              </span>
+              <Link href="/tickets" className="text-cyan-400 hover:text-cyan-300">View all</Link>
             </motion.div>
           )}
         </motion.div>
