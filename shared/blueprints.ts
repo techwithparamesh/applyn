@@ -75,6 +75,7 @@ export type ImageRef = z.infer<typeof imageRefSchema>;
 
 export const sectionTypeSchema = z.enum([
   "hero",
+  "textBlock",
   "categoryGrid",
   "productGrid",
   "promoCarousel",
@@ -99,8 +100,20 @@ export const heroSectionSchema = baseSectionSchema.extend({
   subtitle: z.string().max(140).optional(),
   ctaText: z.string().max(32).optional(),
   ctaAction: z.string().max(200).optional(),
+  secondaryCtaText: z.string().max(32).optional(),
+  secondaryCtaAction: z.string().max(200).optional(),
   background: imageRefSchema.optional(),
   overlay: z.string().max(32).optional(),
+});
+
+export const textBlockSectionSchema = baseSectionSchema.extend({
+  type: z.literal("textBlock"),
+  title: z.string().min(1).max(80),
+  body: z.string().max(500).optional(),
+  primaryCtaText: z.string().max(32).optional(),
+  primaryCtaAction: z.string().max(200).optional(),
+  secondaryCtaText: z.string().max(32).optional(),
+  secondaryCtaAction: z.string().max(200).optional(),
 });
 
 export const categoryGridSectionSchema = baseSectionSchema.extend({
@@ -123,6 +136,7 @@ export const categoryGridSectionSchema = baseSectionSchema.extend({
 export const productGridSectionSchema = baseSectionSchema.extend({
   type: z.literal("productGrid"),
   title: z.string().max(60).optional(),
+  subtitle: z.string().max(80).optional(),
   showMoreAction: z.string().max(200).optional(),
   columns: z.number().int().min(1).max(2).default(2),
   products: z
@@ -228,6 +242,7 @@ export const dividerSectionSchema = baseSectionSchema.extend({
 
 export const sectionBlueprintSchema = z.discriminatedUnion("type", [
   heroSectionSchema,
+  textBlockSectionSchema,
   categoryGridSectionSchema,
   productGridSectionSchema,
   promoCarouselSectionSchema,
@@ -244,7 +259,7 @@ export type SectionBlueprint = z.infer<typeof sectionBlueprintSchema>;
 export const screenBlueprintSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1).max(40),
-  icon: z.string().max(10).optional(),
+  icon: z.string().max(24).optional(),
   isHome: z.boolean().optional(),
   sections: z.array(sectionBlueprintSchema).min(1).max(50),
 });

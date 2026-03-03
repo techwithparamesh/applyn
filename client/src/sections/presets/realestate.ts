@@ -125,7 +125,7 @@ export function buildRealEstateBlueprint(args: { appName: string; prompt?: strin
       {
         id: "search",
         name: "Search",
-        icon: "🔎",
+        icon: "home",
         isHome: true,
         sections: [
           {
@@ -133,20 +133,32 @@ export function buildRealEstateBlueprint(args: { appName: string; prompt?: strin
             type: "hero",
             title: "Find your next home",
             subtitle: variant === "luxury" ? "Premium listings, curated for you" : "Browse listings and book tours",
-            ctaText: "Explore",
+            ctaText: "Explore listings",
             ctaAction: "navigate:listings",
+            secondaryCtaText: "Learn more",
+            secondaryCtaAction: "navigate:listings",
             background: { kind: "keyword", keyword: variant === "luxury" ? "luxury home exterior" : "modern house exterior", w: 1200, orientation: "landscape" },
             overlay: "rgba(0,0,0,0.45)",
           },
+          {
+            id: "brand",
+            type: "textBlock",
+            title: "Introduce your agency",
+            body: "Tell buyers and sellers why they should work with you. Add your story, areas served, and credentials. Customize this in the visual editor.",
+            primaryCtaText: "View listings",
+            primaryCtaAction: "navigate:listings",
+            secondaryCtaText: "Contact us",
+            secondaryCtaAction: "action:contact",
+          },
           { id: "searchbar", type: "searchBar", placeholder: "City, neighborhood, ZIP…" },
           { id: "filters", type: "filterChips", chips: ["All", "House", "Apartment", "Townhome", "New"] },
-          { id: "top", type: "productGrid", title: "Top listings", columns: 2, products: listings.slice(0, 4) },
+          { id: "top", type: "productGrid", title: "Top listings", subtitle: "Handpicked for you", columns: 2, products: listings.slice(0, 4) },
         ],
       },
       {
         id: "listings",
         name: "Listings",
-        icon: "🏘️",
+        icon: "realestate",
         sections: [
           { id: "searchbar", type: "searchBar", placeholder: "Search listings…" },
           { id: "filters", type: "filterChips", chips: ["All", "Under $500k", "2+ beds", "Open house", "New"] },
@@ -156,7 +168,7 @@ export function buildRealEstateBlueprint(args: { appName: string; prompt?: strin
       {
         id: "saved",
         name: "Saved",
-        icon: "❤️",
+        icon: "bookmark",
         sections: [
           { id: "grid", type: "productGrid", title: "Saved homes", columns: 2, products: listings.slice(0, 2) },
         ],
@@ -164,7 +176,7 @@ export function buildRealEstateBlueprint(args: { appName: string; prompt?: strin
       {
         id: "agents",
         name: "Agents",
-        icon: "🧑‍💼",
+        icon: "users",
         sections: [
           { id: "search", type: "searchBar", placeholder: "Search agents…" },
           { id: "grid", type: "productGrid", title: "Featured agents", columns: 2, products: agents },
@@ -173,7 +185,7 @@ export function buildRealEstateBlueprint(args: { appName: string; prompt?: strin
       {
         id: "more",
         name: "More",
-        icon: "☰",
+        icon: "more",
         sections: [
           {
             id: "menu",

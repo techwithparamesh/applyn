@@ -2089,7 +2089,7 @@ export default function PromptCreate() {
                       </div>
                     )}
 
-                    {/* Suggested Screens */}
+                    {/* App Screens */}
                     <div>
                       <h4 className="text-sm font-medium text-white mb-2">App Screens</h4>
                       <div className="flex flex-wrap gap-1.5">
@@ -2116,10 +2116,13 @@ export default function PromptCreate() {
                       </div>
                     </div>
 
-                    {/* Enabled Features */}
-                    <div>
-                      <h4 className="text-sm font-medium text-white mb-2">Features Included</h4>
-                      <div className="flex flex-wrap gap-1.5">
+                    {/* Add Features — Appy Pie style */}
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-medium text-white">Add Features</h4>
+                      <p className="text-xs text-muted-foreground">Included in your app. Customize in the visual editor after creation.</p>
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1.5">App experience</p>
+                        <div className="flex flex-wrap gap-1.5">
                         {(() => {
                           const promptContext = (customPrompt || selectedTemplate?.prompt || "").trim();
                           const previewIndustryId = resolveSpecializedIndustryId(
@@ -2150,15 +2153,13 @@ export default function PromptCreate() {
                             {formatFeatureName(feature)}
                           </Badge>
                         ))}
+                        </div>
                       </div>
-                    </div>
-
-                    {/* Business-Ready Capabilities */}
-                    <div className="pt-2">
-                      <h4 className="text-sm font-medium text-white mb-2">Business-Ready Capabilities</h4>
-                      <p className="text-xs text-muted-foreground mb-3">
-                        Tailored for your {resolveSpecializedIndustryId(String(generatedConfig.industry || ""), (customPrompt || selectedTemplate?.prompt || "").trim())} business needs.
-                      </p>
+                      <div className="pt-3 border-t border-white/10">
+                        <p className="text-xs font-medium text-muted-foreground mb-2">Business & commerce</p>
+                        <p className="text-xs text-muted-foreground mb-3">
+                          Tailored for your {resolveSpecializedIndustryId(String(generatedConfig.industry || ""), (customPrompt || selectedTemplate?.prompt || "").trim())} business needs.
+                        </p>
 
                       {(() => {
                         const previewIndustryId = resolveSpecializedIndustryId(
@@ -2369,6 +2370,7 @@ export default function PromptCreate() {
                           </div>
                         );
                       })()}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

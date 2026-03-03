@@ -242,9 +242,18 @@ export function renderNativeComponent(
             : "py-[var(--space-section-y)]";
       return (
         <div className={"px-[var(--space-24)] " + yClass}>
-          {component.props?.title && (
-            <div className="text-[length:var(--font-h2)] font-[var(--font-weight-h2)] mb-[var(--space-16)] text-[color:var(--app-text)]">
-              {component.props.title}
+          {(component.props?.title || component.props?.subtitle) && (
+            <div className="mb-[var(--space-16)]">
+              {component.props?.title && (
+                <div className="text-[length:var(--font-h2)] font-[var(--font-weight-h2)] text-[color:var(--app-text)]">
+                  {component.props.title}
+                </div>
+              )}
+              {component.props?.subtitle && (
+                <div className="text-[length:var(--font-body)] text-[color:var(--app-muted-text)] mt-1">
+                  {component.props.subtitle}
+                </div>
+              )}
             </div>
           )}
           {component.children?.map((child) => (
@@ -550,6 +559,8 @@ export function renderNativeComponent(
           subtitle={component.props?.subtitle}
           buttonText={component.props?.buttonText}
           buttonAction={component.props?.buttonAction}
+          secondaryButtonText={component.props?.secondaryButtonText}
+          secondaryButtonAction={component.props?.secondaryButtonAction}
           themeColor={ctx.themeColor}
           backgroundImage={component.props?.backgroundImage}
           overlayColor={component.props?.overlayColor}

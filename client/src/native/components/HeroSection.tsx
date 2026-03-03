@@ -1,11 +1,13 @@
 import type { NativeActionHandler } from "@/native/types";
 
-/** Premium hero for all industries — Play Store ready: image or gradient, no grey placeholder. */
+/** Premium hero for all industries — Play Store ready: image or gradient, two CTAs like Appy Pie. */
 export function HeroSection({
   title,
   subtitle,
   buttonText,
   buttonAction,
+  secondaryButtonText,
+  secondaryButtonAction,
   themeColor,
   backgroundImage,
   overlayColor,
@@ -15,6 +17,8 @@ export function HeroSection({
   subtitle?: string;
   buttonText?: string;
   buttonAction?: string;
+  secondaryButtonText?: string;
+  secondaryButtonAction?: string;
   themeColor: string;
   backgroundImage?: string;
   overlayColor?: string;
@@ -53,18 +57,32 @@ export function HeroSection({
             {subtitle}
           </p>
         )}
-        {buttonText && (
-          <div className="mt-4">
-            <button
-              type="button"
-              className="inline-flex items-center justify-center px-5 py-3 bg-white text-gray-900 rounded-xl text-sm font-semibold shadow-md active:opacity-90"
-              onClick={() => {
-                const a = String(buttonAction || "").trim();
-                if (a) onAction(a);
-              }}
-            >
-              {buttonText}
-            </button>
+        {(buttonText || secondaryButtonText) && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {buttonText && (
+              <button
+                type="button"
+                className="inline-flex items-center justify-center px-5 py-3 bg-white text-gray-900 rounded-xl text-sm font-semibold shadow-md active:opacity-90"
+                onClick={() => {
+                  const a = String(buttonAction || "").trim();
+                  if (a) onAction(a);
+                }}
+              >
+                {buttonText}
+              </button>
+            )}
+            {secondaryButtonText && (
+              <button
+                type="button"
+                className="inline-flex items-center justify-center px-5 py-3 bg-white/20 text-white border border-white/40 rounded-xl text-sm font-semibold backdrop-blur-sm active:opacity-90"
+                onClick={() => {
+                  const a = String(secondaryButtonAction || "").trim();
+                  if (a) onAction(a);
+                }}
+              >
+                {secondaryButtonText}
+              </button>
+            )}
           </div>
         )}
       </div>

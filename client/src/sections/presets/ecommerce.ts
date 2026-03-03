@@ -178,16 +178,18 @@ export function buildEcommerceBlueprint(args: { appName: string; prompt?: string
       {
         id: "home",
         name: "Home",
-        icon: "🏠",
+        icon: "home",
         isHome: true,
         sections: [
           {
             id: "hero",
             type: "hero",
-            title: appName,
+            title: variant === "streetwear" ? "Discover your perfect fit in our store" : appName,
             subtitle: variant === "streetwear" ? "Streetwear essentials & new drops" : "Delivered to your door",
-            ctaText: variant === "streetwear" ? "Shop New Drops" : "Shop Now",
+            ctaText: "Shop Now",
             ctaAction: "navigate:products",
+            secondaryCtaText: "Learn More",
+            secondaryCtaAction: "navigate:products",
             background: {
               kind: "keyword",
               keyword: variant === "streetwear" ? "streetwear lookbook banner" : "fresh groceries hero banner",
@@ -195,6 +197,16 @@ export function buildEcommerceBlueprint(args: { appName: string; prompt?: string
               orientation: "landscape",
             },
             overlay: variant === "streetwear" ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0.4)",
+          },
+          {
+            id: "brand",
+            type: "textBlock",
+            title: "Introduce your Brand",
+            body: "Tell your story and what makes your store unique. You can edit this section in the visual editor to add your own copy and images.",
+            primaryCtaText: "Get Started",
+            primaryCtaAction: "navigate:products",
+            secondaryCtaText: "View Details",
+            secondaryCtaAction: "navigate:products",
           },
           {
             id: "categories",
@@ -206,7 +218,8 @@ export function buildEcommerceBlueprint(args: { appName: string; prompt?: string
           {
             id: "popular",
             type: "productGrid",
-            title: "Popular Products",
+            title: "Fresh Arrivals",
+            subtitle: "Explore our latest collection",
             showMoreAction: "navigate:products",
             columns: 2,
             products: products.slice(0, 4),
@@ -255,7 +268,7 @@ export function buildEcommerceBlueprint(args: { appName: string; prompt?: string
       {
         id: "products",
         name: "Products",
-        icon: "📦",
+        icon: "shop",
         sections: [
           { id: "search", type: "searchBar", placeholder: "Search products…" },
           {
@@ -269,7 +282,7 @@ export function buildEcommerceBlueprint(args: { appName: string; prompt?: string
       {
         id: "cart",
         name: "Cart",
-        icon: "🛍️",
+        icon: "cart",
         sections: [
           {
             id: "items",
@@ -311,7 +324,7 @@ export function buildEcommerceBlueprint(args: { appName: string; prompt?: string
       {
         id: "orders",
         name: "Orders",
-        icon: "📬",
+        icon: "list",
         sections: [
           {
             id: "ordersList",
@@ -326,7 +339,7 @@ export function buildEcommerceBlueprint(args: { appName: string; prompt?: string
       {
         id: "account",
         name: "Account",
-        icon: "👤",
+        icon: "user",
         sections: [
           {
             id: "menu",

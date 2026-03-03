@@ -70,10 +70,32 @@ function buildSectionComponents(
             subtitle: section.subtitle,
             buttonText: section.ctaText,
             buttonAction: section.ctaAction,
+            secondaryButtonText: section.secondaryCtaText,
+            secondaryButtonAction: section.secondaryCtaAction,
             backgroundImage,
             overlayColor: section.overlay,
             height: 280,
           },
+        },
+      ];
+    }
+    case "textBlock": {
+      const children: NativeComponent[] = [
+        { id: nextId(), type: "heading", props: { level: 2, text: section.title } },
+        { id: nextId(), type: "text", props: { text: section.body || "Add your brand story and what makes you unique. Customize this in the editor." } },
+      ];
+      if (section.primaryCtaText) {
+        children.push({ id: nextId(), type: "button", props: { text: section.primaryCtaText, action: section.primaryCtaAction, variant: "primary" } });
+      }
+      if (section.secondaryCtaText) {
+        children.push({ id: nextId(), type: "button", props: { text: section.secondaryCtaText, action: section.secondaryCtaAction, variant: "outline" } });
+      }
+      return [
+        {
+          id: nextId(),
+          type: "section",
+          props: { title: "", padding: "var(--space-section-y)" },
+          children,
         },
       ];
     }
@@ -112,6 +134,7 @@ function buildSectionComponents(
           type: "section",
           props: {
             title: section.title || "Products",
+            subtitle: section.subtitle,
             padding: "var(--space-section-y)",
             showMore: !!section.showMoreAction,
             showMoreAction: section.showMoreAction,

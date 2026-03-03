@@ -97,7 +97,7 @@ export function buildHealthcareBlueprint(args: { appName: string; prompt?: strin
       {
         id: "home",
         name: "Home",
-        icon: "🏥",
+        icon: "home",
         isHome: true,
         sections: [
           {
@@ -107,8 +107,20 @@ export function buildHealthcareBlueprint(args: { appName: string; prompt?: strin
             subtitle: variant === "dental" ? "Care for your smile, start here" : "Care you can trust, anytime",
             ctaText: "Book appointment",
             ctaAction: "navigate:appointments",
+            secondaryCtaText: "Our doctors",
+            secondaryCtaAction: "navigate:doctors",
             background: { kind: "keyword", keyword: variant === "dental" ? "dental clinic reception" : "modern clinic reception", w: 1200, orientation: "landscape" },
             overlay: "rgba(0,0,0,0.35)",
+          },
+          {
+            id: "brand",
+            type: "textBlock",
+            title: "About our clinic",
+            body: "Share your mission, values, and what makes your care special. Edit this section in the visual editor to add your own copy and images.",
+            primaryCtaText: "Book now",
+            primaryCtaAction: "navigate:appointments",
+            secondaryCtaText: "View doctors",
+            secondaryCtaAction: "navigate:doctors",
           },
           {
             id: "services",
@@ -128,13 +140,13 @@ export function buildHealthcareBlueprint(args: { appName: string; prompt?: strin
                     { id: "c3", title: "Records", icon: "📄", action: "navigate:records" },
                   ],
           },
-          { id: "doctors", type: "productGrid", title: "Available doctors", columns: 2, products: doctors.slice(0, 4) },
+          { id: "doctors", type: "productGrid", title: "Available doctors", subtitle: "Book your visit with our specialists", columns: 2, products: doctors.slice(0, 4) },
         ],
       },
       {
         id: "doctors",
         name: "Doctors",
-        icon: "🧑‍⚕️",
+        icon: "doctors",
         sections: [
           { id: "search", type: "searchBar", placeholder: "Search doctors…" },
           { id: "filters", type: "filterChips", chips: variant === "dental" ? ["All", "Dentist", "Ortho", "Hygiene"] : ["All", "GP", "Cardio", "Derm", "Peds"] },
@@ -144,7 +156,7 @@ export function buildHealthcareBlueprint(args: { appName: string; prompt?: strin
       {
         id: "appointments",
         name: "Appointments",
-        icon: "📅",
+        icon: "calendar",
         sections: [
           {
             id: "cta",
@@ -162,7 +174,7 @@ export function buildHealthcareBlueprint(args: { appName: string; prompt?: strin
       {
         id: "records",
         name: "Records",
-        icon: "📄",
+        icon: "list",
         sections: [
           {
             id: "menu",
@@ -178,7 +190,7 @@ export function buildHealthcareBlueprint(args: { appName: string; prompt?: strin
       {
         id: "profile",
         name: "Profile",
-        icon: "👤",
+        icon: "user",
         sections: [
           {
             id: "menu",

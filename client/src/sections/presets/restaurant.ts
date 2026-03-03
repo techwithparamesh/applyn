@@ -109,7 +109,7 @@ export function buildRestaurantBlueprint(args: { appName: string; prompt?: strin
       {
         id: "home",
         name: "Home",
-        icon: "🍽️",
+        icon: "home",
         isHome: true,
         sections: [
           {
@@ -119,6 +119,8 @@ export function buildRestaurantBlueprint(args: { appName: string; prompt?: strin
             subtitle: variant === "biryani" ? "Authentic biryani & Hyderabadi specials" : "Fresh food, fast delivery",
             ctaText: "Order Now",
             ctaAction: "navigate:menu",
+            secondaryCtaText: "View Menu",
+            secondaryCtaAction: "navigate:menu",
             background: {
               kind: "keyword",
               keyword: variant === "biryani" ? "hyderabadi biryani spread" : "modern restaurant dining table",
@@ -128,9 +130,20 @@ export function buildRestaurantBlueprint(args: { appName: string; prompt?: strin
             overlay: "rgba(0,0,0,0.45)",
           },
           {
+            id: "brand",
+            type: "textBlock",
+            title: "Introduce your restaurant",
+            body: "Share your story, signature dishes, and what makes your place special. Edit this section in the visual editor to add your own copy and images.",
+            primaryCtaText: "View Menu",
+            primaryCtaAction: "navigate:menu",
+            secondaryCtaText: "Reserve a table",
+            secondaryCtaAction: "navigate:reservations",
+          },
+          {
             id: "popular",
             type: "productGrid",
-            title: "Popular",
+            title: "Popular dishes",
+            subtitle: "Our bestsellers and today's picks",
             showMoreAction: "navigate:menu",
             columns: 2,
             products: menuItems.slice(0, 4),
@@ -161,7 +174,7 @@ export function buildRestaurantBlueprint(args: { appName: string; prompt?: strin
       {
         id: "menu",
         name: "Menu",
-        icon: "📖",
+        icon: "restaurant",
         sections: [
           { id: "search", type: "searchBar", placeholder: "Search menu…" },
           { id: "filters", type: "filterChips", chips: variant === "biryani" ? ["All", "Biryani", "Starters", "Curries", "Desserts"] : ["All", "Burgers", "Sides", "Salads", "Dessert"] },
@@ -171,7 +184,7 @@ export function buildRestaurantBlueprint(args: { appName: string; prompt?: strin
       {
         id: "orders",
         name: "Orders",
-        icon: "🧾",
+        icon: "list",
         sections: [
           { id: "sp1", type: "spacer", size: "sm" },
           { id: "orders", type: "orderList", items: orderItems },
@@ -180,7 +193,7 @@ export function buildRestaurantBlueprint(args: { appName: string; prompt?: strin
       {
         id: "reservations",
         name: "Reservations",
-        icon: "📅",
+        icon: "calendar",
         sections: [
           {
             id: "cta",
@@ -206,7 +219,7 @@ export function buildRestaurantBlueprint(args: { appName: string; prompt?: strin
       {
         id: "account",
         name: "Account",
-        icon: "👤",
+        icon: "user",
         sections: [
           {
             id: "menu",
