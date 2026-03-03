@@ -859,53 +859,27 @@ export default function Dashboard() {
             </div>
 
 
-            {showMomentumPublishNudge && progressApp ? (
-              <Card className="mb-4 border border-cyan-500/20 bg-cyan-500/5">
-                <CardContent className="p-4 text-sm">
-                  <p className="text-sm font-medium text-white">Ready to go live</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Preview, edit, or publish.</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" className="border-white/10 text-cyan-400 hover:bg-white/5" onClick={() => setLocation(`/apps/${progressApp.id}/preview`)}><Eye className="mr-1.5 h-3.5 w-3.5" /> Preview</Button>
-                    <Button size="sm" variant="outline" className="border-white/10 text-cyan-400 hover:bg-white/5" onClick={() => setLocation(`/apps/${progressApp.id}/visual-editor`)}>Edit</Button>
-                    <Button size="sm" className="bg-cyan-600 hover:bg-cyan-500 text-white" onClick={() => setLocation(`/apps/${progressApp.id}/publish`)}>Publish</Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : null}
-
-            {!appsLoading && latestApp && statusFilter === "all" ? (
-              <Card className="mb-4 border border-cyan-500/20 bg-cyan-500/5">
-                <CardContent className="p-4">
-                  <div className="text-white font-medium">Your app &quot;{latestApp.name}&quot; is ready</div>
-                  <p className="text-sm text-muted-foreground mt-1">Customize, preview, or continue to publish when ready.</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-white/10 text-cyan-400 hover:bg-white/5"
-                      onClick={() => setLocation(`/apps/${latestApp.id}/preview`)}
-                    >
-                      <Eye className="mr-2 h-4 w-4" /> Preview
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-white/10 text-cyan-400 hover:bg-white/5"
-                      onClick={() => setLocation(`/apps/${latestApp.id}/visual-editor`)}
-                    >
-                      <Wand2 className="mr-2 h-4 w-4" /> Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="bg-cyan-600 hover:bg-cyan-500 text-white"
-                      onClick={() => setLocation(`/apps/${latestApp.id}/publish`)}
-                    >
-                      <UploadCloud className="mr-2 h-4 w-4" /> Publish
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : null}
+            {/* Single “next steps” card: one app, one set of actions */}
+            {!appsLoading && statusFilter === "all" && (() => {
+              const app = (showMomentumPublishNudge && progressApp) ? progressApp : latestApp;
+              if (!app) return null;
+              const isReadyToGoLive = showMomentumPublishNudge && progressApp;
+              return (
+                <Card className="mb-4 border border-cyan-500/20 bg-cyan-500/5">
+                  <CardContent className="p-4">
+                    <p className="text-sm font-medium text-white">
+                      {isReadyToGoLive ? "Ready to go live" : `"${app.name}" — next steps`}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Preview, edit, or publish.</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" className="border-white/10 text-cyan-400 hover:bg-white/5" onClick={() => setLocation(`/apps/${app.id}/preview`)}><Eye className="mr-1.5 h-3.5 w-3.5" /> Preview</Button>
+                      <Button size="sm" variant="outline" className="border-white/10 text-cyan-400 hover:bg-white/5" onClick={() => setLocation(`/apps/${app.id}/visual-editor`)}>Edit</Button>
+                      <Button size="sm" className="bg-cyan-600 hover:bg-cyan-500 text-white" onClick={() => setLocation(`/apps/${app.id}/publish`)}>Publish</Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })()}
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
               {appsLoading && (
@@ -970,7 +944,7 @@ export default function Dashboard() {
                       <DropdownMenuContent align="end" className="bg-[#0d1117] border-white/[0.06] rounded-xl">
                         {app.status === "live" && (app.platform === "android" || app.platform === "both") && (
                           <DropdownMenuItem onClick={() => handleDownload(app.id, "android")}>
-                            <Download className="mr-2 h-4 w-4" /> Download Android App (APK)
+                            <Download className="mr-2 h-4 w-4" /> Download APK
                           </DropdownMenuItem>
                         )}
                         {app.status === "live" && (app.platform === "ios" || app.platform === "both") && (
@@ -1014,7 +988,7 @@ export default function Dashboard() {
                         )}
                         <DropdownMenuSeparator className="bg-white/[0.06]" />
                         <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/editor`)}>
-                          <Settings className="mr-2 h-4 w-4" /> Open Settings
+                          <Settings className="mr-2 h-4 w-4" /> Settings
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setLocation(`/apps/${app.id}/visual-editor`)}>
                           <Wand2 className="mr-2 h-4 w-4" /> Edit
@@ -1056,8 +1030,8 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <StatusBadge status={app.status} />
                       {app.plan === "preview" && (
-                        <Badge className="bg-green-500/10 text-green-400 border-green-500/20 text-[10px] rounded-full">
-                          Free Preview
+                        <Badge variant="outline" className="border-amber-500/30 text-amber-400/90 text-[10px] rounded-full">
+                          Preview plan
                         </Badge>
                       )}
                       <span className="text-xs text-muted-foreground">
@@ -1065,22 +1039,20 @@ export default function Dashboard() {
                       </span>
                     </div>
 
-                    {/* Upgrade prompt for preview apps */}
+                    {/* Primary actions: no need to open ⋮ for main flows */}
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      <Button size="sm" variant="ghost" className="h-7 text-xs text-cyan-400 hover:bg-cyan-500/10 px-2" onClick={() => setLocation(`/apps/${app.id}/preview`)}>Preview</Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground hover:text-white hover:bg-white/5 px-2" onClick={() => setLocation(`/apps/${app.id}/visual-editor`)}>Edit</Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground hover:text-white hover:bg-white/5 px-2" onClick={() => setLocation(`/apps/${app.id}/publish`)}>Publish</Button>
+                    </div>
+
+                    {/* Preview plan: one line + upgrade CTA */}
                     {app.plan === "preview" && (
-                      <div className="mt-3 p-3 rounded-xl border border-cyan-500/10 bg-gradient-to-r from-cyan-500/5 to-purple-500/5">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-xs font-medium text-white">Preview Only</p>
-                            <p className="text-[10px] text-muted-foreground">Upgrade to download & publish</p>
-                          </div>
-                          <Button 
-                            size="sm" 
-                            className="h-7 text-xs bg-gradient-to-r from-cyan-500 to-purple-500 rounded-lg"
-                            onClick={() => setLocation(`/pricing?upgrade=${app.id}`)}
-                          >
-                            <Crown className="h-3 w-3 mr-1" /> Upgrade
-                          </Button>
-                        </div>
+                      <div className="mt-3 flex items-center justify-between gap-2 p-2.5 rounded-lg bg-white/[0.04] border border-white/10">
+                        <span className="text-xs text-muted-foreground">Upgrade to download & publish</span>
+                        <Button size="sm" variant="outline" className="h-7 text-xs border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 shrink-0" onClick={() => setLocation(`/pricing?upgrade=${app.id}`)}>
+                          <Crown className="h-3 w-3 mr-1" /> Upgrade
+                        </Button>
                       </div>
                     )}
 

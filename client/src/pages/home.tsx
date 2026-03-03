@@ -114,6 +114,10 @@ export default function Home() {
                       { label: "Restaurant", path: "/prompt-create?template=restaurant" },
                       { label: "Healthcare", path: "/prompt-create?template=healthcare" },
                       { label: "Real Estate", path: "/prompt-create?template=realestate" },
+                      { label: "Education", path: "/prompt-create?template=education" },
+                      { label: "Fitness", path: "/prompt-create?template=fitness" },
+                      { label: "Events", path: "/prompt-create?template=events" },
+                      { label: "Travel", path: "/prompt-create?template=travel" },
                     ].map(({ label, path }) => (
                       <button
                         key={label}
