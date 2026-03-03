@@ -159,14 +159,14 @@ export function buildEcommerceBlueprint(args: { appName: string; prompt?: string
   const categories =
     variant === "streetwear"
       ? [
-          { id: "hoodies", title: "Hoodies", icon: "🧥", action: "navigate:products" },
-          { id: "tees", title: "Tees", icon: "👕", action: "navigate:products" },
-          { id: "sneakers", title: "Sneakers", icon: "👟", action: "navigate:products" },
+          { id: "hoodies", title: "Hoodies", icon: "package", action: "navigate:products" },
+          { id: "tees", title: "Tees", icon: "sparkles", action: "navigate:products" },
+          { id: "sneakers", title: "Sneakers", icon: "footprints", action: "navigate:products" },
         ]
       : [
-          { id: "veg", title: "Vegetables", icon: "🥬", action: "navigate:products" },
-          { id: "fruit", title: "Fruits", icon: "🍎", action: "navigate:products" },
-          { id: "dairy", title: "Dairy", icon: "🥛", action: "navigate:products" },
+          { id: "veg", title: "Vegetables", icon: "leaf", action: "navigate:products" },
+          { id: "fruit", title: "Fruits", icon: "sparkles", action: "navigate:products" },
+          { id: "dairy", title: "Dairy", icon: "package", action: "navigate:products" },
         ];
 
   const blueprint: AppBlueprint = {

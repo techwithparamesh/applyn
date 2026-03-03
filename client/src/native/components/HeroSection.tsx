@@ -32,7 +32,8 @@ export function HeroSection({
         backgroundImage: hasImage ? `url(${backgroundImage})` : undefined,
         backgroundSize: "cover",
         backgroundPosition: "center",
-        backgroundColor: themeColor,
+        // Use fallback so hero is never empty (e.g. before theme CSS vars are applied)
+        backgroundColor: themeColor || "#6366f1",
       }}
     >
       {hasImage ? (

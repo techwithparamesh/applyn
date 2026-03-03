@@ -130,14 +130,14 @@ export function buildHealthcareBlueprint(args: { appName: string; prompt?: strin
             categories:
               variant === "dental"
                 ? [
-                    { id: "c1", title: "Cleaning", icon: "🪥", action: "navigate:appointments" },
-                    { id: "c2", title: "Whitening", icon: "✨", action: "navigate:appointments" },
-                    { id: "c3", title: "Braces", icon: "🦷", action: "navigate:appointments" },
+                    { id: "c1", title: "Cleaning", icon: "sparkles", action: "navigate:appointments" },
+                    { id: "c2", title: "Whitening", icon: "sparkles", action: "navigate:appointments" },
+                    { id: "c3", title: "Braces", icon: "activity", action: "navigate:appointments" },
                   ]
                 : [
-                    { id: "c1", title: "Doctors", icon: "🧑‍⚕️", action: "navigate:doctors" },
-                    { id: "c2", title: "Appointments", icon: "📅", action: "navigate:appointments" },
-                    { id: "c3", title: "Records", icon: "📄", action: "navigate:records" },
+                    { id: "c1", title: "Doctors", icon: "doctors", action: "navigate:doctors" },
+                    { id: "c2", title: "Appointments", icon: "calendar", action: "navigate:appointments" },
+                    { id: "c3", title: "Records", icon: "list", action: "navigate:records" },
                   ],
           },
           { id: "doctors", type: "productGrid", title: "Available doctors", subtitle: "Book your visit with our specialists", columns: 2, products: doctors.slice(0, 4) },

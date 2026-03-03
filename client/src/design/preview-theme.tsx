@@ -22,6 +22,21 @@ export function PreviewThemeProvider({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const preset = useMemo(() => getThemePreset(themeId), [themeId]);
 
+  // Set theme vars on first render so hero/buttons aren't white before useEffect runs
+  const primary = primaryOverride?.trim() || preset.primary;
+  const secondary = secondaryOverride?.trim() || preset.secondary;
+  const initialStyle: React.CSSProperties = {
+    backgroundColor: preset.background,
+    color: preset.text,
+    ["--app-primary" as string]: primary,
+    ["--app-secondary" as string]: secondary,
+    ["--app-bg" as string]: preset.background,
+    ["--app-surface" as string]: preset.surface,
+    ["--app-text" as string]: preset.text,
+    ["--app-muted-text" as string]: preset.mutedText,
+    ["--app-border" as string]: preset.border,
+  };
+
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -70,10 +85,7 @@ export function PreviewThemeProvider({
       ref={containerRef}
       data-preview-theme={themeId}
       className="h-full w-full"
-      style={{
-        backgroundColor: "var(--app-bg)",
-        color: "var(--app-text)",
-      }}
+      style={initialStyle}
     >
       {children}
     </div>
