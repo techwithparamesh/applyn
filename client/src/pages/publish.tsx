@@ -394,6 +394,26 @@ export default function Publish() {
           <AppBuilderStepper appId={id} current="publish" tone="app" />
         </div>
 
+        <Card className="border-cyan-500/20 bg-cyan-500/5">
+          <CardContent className="p-5">
+            <h2 className="text-sm font-semibold text-white mb-3">From build to store — 3 steps</h2>
+            <ol className="space-y-2 text-sm text-muted-foreground">
+              <li className="flex gap-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cyan-500/20 text-cyan-400 text-xs font-medium">1</span>
+                <span><strong className="text-white">Build / download</strong> — Generate your app (APK/AAB or iOS). Download the build or use the platform to upload.</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cyan-500/20 text-cyan-400 text-xs font-medium">2</span>
+                <span><strong className="text-white">Upload to store</strong> — Google Play Console (Android) or App Store Connect (iOS). Use the checklist below for assets and descriptions.</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cyan-500/20 text-cyan-400 text-xs font-medium">3</span>
+                <span><strong className="text-white">Submit for review</strong> — Once uploaded, submit your app. Stores typically review within a few days.</span>
+              </li>
+            </ol>
+          </CardContent>
+        </Card>
+
         {appQuery.isLoading && (
           <div className="mt-2">
             <PageLoading label="Loading publish checklist…" />
@@ -796,6 +816,23 @@ export default function Publish() {
                     </div>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="glass border-white/10 mt-6 border-blue-500/20 bg-blue-500/5">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">iOS / App Store</CardTitle>
+                <CardDescription>
+                  Build ready — submit via Xcode and App Store Connect.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground space-y-2">
+                <p>
+                  For iOS, download your build from the platform (when available on your plan), then open the project in Xcode. Use App Store Connect to upload the build, add store listing assets, and submit for review. TestFlight is available for beta testing before public release.
+                </p>
+                <p className="text-xs">
+                  Need help? See the store-ready checklist in <code className="px-1.5 py-0.5 rounded bg-white/10 text-cyan-400">docs/PRODUCTION_IMPROVEMENTS.md</code> (section 7).
+                </p>
               </CardContent>
             </Card>
           </>

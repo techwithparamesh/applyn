@@ -48,12 +48,12 @@ export default function Home() {
                 </div>
                 
                 <h1 id="hero-heading" className="text-5xl md:text-7xl font-bold tracking-tight leading-[1.1]">
-                  <span className="text-white">Your Website is</span> <br />
-                  <span className="text-gradient">Your New App.</span>
+                  <span className="text-white">Turn Your Website or Idea</span> <br />
+                  <span className="text-gradient">Into a Premium App.</span>
                 </h1>
                 
                 <p className="text-lg text-muted-foreground leading-relaxed max-w-xl">
-                  Transform your existing website into a premium, Play Store-ready mobile app in under 5 minutes. No coding, no hassle, just results.
+                  Paste your website URL or describe your app with AI — get a store-ready mobile app in minutes. No code, no credit card required.
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-4 max-w-lg">
@@ -73,14 +73,16 @@ export default function Home() {
                     size="lg" 
                     className="h-14 px-8 text-lg font-semibold rounded-xl bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
                   >
-                    Try Free Preview <ArrowRight className="ml-2 h-5 w-5" />
+                    Convert Website to App <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </div>
+                <p className="text-xs text-muted-foreground">Convert website to app — we use your site’s branding and structure.</p>
 
-                <div className="flex items-center gap-8 pt-2">
+                <div className="flex items-center gap-6 pt-2 flex-wrap">
                   {[
                     { label: "No signup required", icon: Zap },
-                    { label: "Play Store Ready", icon: ShieldCheck }
+                    { label: "No credit card", icon: ShieldCheck },
+                    { label: "Play Store ready", icon: Smartphone }
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                       <item.icon className="h-5 w-5 text-cyan-400" />
@@ -90,16 +92,39 @@ export default function Home() {
                 </div>
 
                 {/* Or use AI prompt */}
-                <div className="flex items-center gap-4 pt-4 border-t border-white/10 mt-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-4 border-t border-white/10 mt-4">
                   <span className="text-sm text-muted-foreground">Or</span>
                   <Button 
                     onClick={handlePromptCreate}
                     variant="outline"
-                    className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/50"
+                    className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/50 w-full sm:w-auto"
                   >
                     <Sparkles className="mr-2 h-4 w-4" />
-                    Describe your app with AI
+                    Describe your app with AI — get a draft in minutes
                   </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">Build from idea: pick a template, add details, we generate native-style screens.</p>
+
+                {/* Category chips - Appy Pie style */}
+                <div className="pt-6">
+                  <p className="text-sm text-muted-foreground mb-3">Not sure where to start? Try:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { label: "Ecommerce", path: "/prompt-create?template=ecommerce" },
+                      { label: "Restaurant", path: "/prompt-create?template=restaurant" },
+                      { label: "Healthcare", path: "/prompt-create?template=healthcare" },
+                      { label: "Real Estate", path: "/prompt-create?template=realestate" },
+                    ].map(({ label, path }) => (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => setLocation(path)}
+                        className="px-4 py-2 rounded-full text-sm font-medium bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 hover:border-cyan-500/30 hover:text-white transition-colors"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </motion.div>
 

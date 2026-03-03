@@ -36,6 +36,7 @@ import {
   Loader2,
   X,
   Shield,
+  UploadCloud,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -218,6 +219,12 @@ export default function Dashboard() {
     if (statusFilter === "all") return apps || [];
     return (apps || []).filter((a) => a.status === statusFilter);
   }, [apps, statusFilter]);
+
+  const latestApp = useMemo(() => {
+    const list = apps || [];
+    if (!list.length) return null;
+    return [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] || null;
+  }, [apps]);
 
   const progressApp = useMemo(() => {
     const list = apps || [];
@@ -1112,6 +1119,40 @@ export default function Dashboard() {
                       onClick={() => setLocation(`/apps/${progressApp.id}/publish`)}
                     >
                       Publish Now
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
+
+            {!appsLoading && latestApp && statusFilter === "all" ? (
+              <Card className="mb-4 border border-cyan-500/20 bg-cyan-500/5">
+                <CardContent className="p-4">
+                  <div className="text-white font-medium">Your app &quot;{latestApp.name}&quot; is ready</div>
+                  <p className="text-sm text-muted-foreground mt-1">Customize, preview, or continue to publish when ready.</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-white/10 text-cyan-400 hover:bg-white/5"
+                      onClick={() => setLocation(`/apps/${latestApp.id}/preview`)}
+                    >
+                      <Eye className="mr-2 h-4 w-4" /> Preview
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-white/10 text-cyan-400 hover:bg-white/5"
+                      onClick={() => setLocation(`/apps/${latestApp.id}/visual-editor`)}
+                    >
+                      <Wand2 className="mr-2 h-4 w-4" /> Edit in Visual Editor
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="bg-cyan-600 hover:bg-cyan-500 text-white"
+                      onClick={() => setLocation(`/apps/${latestApp.id}/publish`)}
+                    >
+                      <UploadCloud className="mr-2 h-4 w-4" /> Continue to Publish
                     </Button>
                   </div>
                 </CardContent>

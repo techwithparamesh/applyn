@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { MobilePreview } from "@/components/mobile-preview";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
@@ -855,6 +855,7 @@ function deriveSuggestedScreens(args: {
 
 export default function PromptCreate() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const { toast } = useToast();
   const [creationMode, setCreationMode] = useState<CreationMode>(null);
   const [step, setStep] = useState<Step>("mode");
@@ -1118,12 +1119,12 @@ export default function PromptCreate() {
       queryClient.invalidateQueries({ queryKey: ["/api/apps"] });
 
       toast({
-        title: "🎉 App created!",
-        description: "Build started in background. You can track progress on the dashboard.",
+        title: "App created",
+        description: "Customize, preview, or continue to publish when ready.",
       });
 
-      // Builds are async; take the user to the dashboard where they can see status (draft/processing/live/failed)
-      setLocation("/dashboard");
+      // Take user straight to app preview so they can customize or preview (Appy Pie–style flow)
+      setLocation(`/apps/${app.id}/preview`);
     },
     onError: (err: any) => {
       toast({
@@ -1263,6 +1264,19 @@ export default function PromptCreate() {
     }
     createAppMutation.mutate();
   };
+
+  // Pre-select template from URL (e.g. /prompt-create?template=ecommerce from home category chips)
+  useEffect(() => {
+    const params = new URLSearchParams(search || "");
+    const templateId = params.get("template")?.toLowerCase();
+    if (!templateId) return;
+    const template = INDUSTRY_TEMPLATES.find((t) => t.id === templateId);
+    if (template) {
+      setSelectedTemplate(template);
+      setStep("template");
+      setCreationMode("scratch");
+    }
+  }, [search]);
 
   // Restore draft after login
   useEffect(() => {

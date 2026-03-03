@@ -38,6 +38,7 @@ type AppItem = {
   artifactSize?: number | null;
   createdAt: string | Date;
   updatedAt: string | Date;
+  generatedPrompt?: string | null;
 };
 
 type Me = {
@@ -455,6 +456,15 @@ export default function PreviewApp() {
             <AppBuilderStepper appId={app.id} current="preview" tone="app" />
           </div>
         </motion.div>
+
+        {app.generatedPrompt ? (
+          <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 px-4 py-3 mb-6 flex items-center gap-3">
+            <Sparkles className="h-5 w-5 text-purple-400 shrink-0" />
+            <p className="text-sm text-slate-300">
+              Built from your description — edit any section in the Visual Editor or use the buttons above to customize and publish.
+            </p>
+          </div>
+        ) : null}
 
         {/* Preview Section */}
         <motion.div

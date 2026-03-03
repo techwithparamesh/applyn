@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Visual App Editor - Appy Pie Style Component Editor
  *
  * A drag-and-drop visual editor for building native app screens
@@ -3665,6 +3665,12 @@ export default function VisualEditor() {
           </Button>
         </div>
       </header>
+      {(app as any)?.generatedPrompt ? (
+        <div className="shrink-0 flex items-center gap-3 px-4 py-2 bg-purple-500/10 border-b border-purple-500/20 text-sm text-slate-300">
+          <Sparkles className="h-4 w-4 text-purple-400 shrink-0" />
+          <span>Built from your description — edit any section below.</span>
+        </div>
+      ) : null}
       <Dialog open={blueprintOpen} onOpenChange={setBlueprintOpen}>
         <DialogContent className="sm:max-w-[720px] bg-slate-950 text-slate-100 border border-slate-800">
           <DialogHeader>
